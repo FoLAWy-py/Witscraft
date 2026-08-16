@@ -197,18 +197,25 @@ def get_settings() -> Settings:
         return Settings(_env_file=secrets_file, **compatibility)
 
     env_md = _read_env_md()
-    overrides = dict(
-        openai_api_key=env_md.get("OPENAI_API_KEY"),
-        deepinfra_api_key=env_md.get("DEEPINFRA_API_KEY") or env_md.get("DEEP_INFRA_APIKEY"),
-        database_username=env_md.get("DATABASE_USERNAME"),
-        database_password=env_md.get("DATABASE_PASSWORD"),
-        smtp_host=env_md.get("SMTP_HOST"),
-        smtp_port=int(env_md.get("SMTP_PORT", "465")),
-        smtp_username=env_md.get("SMTP_USERNAME"),
-        smtp_password=env_md.get("SMTP_PASSWORD"),
-        smtp_from_email=env_md.get("SMTP_FROM_EMAIL"),
-        frontend_base_url=env_md.get("FRONTEND_BASE_URL", "http://127.0.0.1:3000"),
-    )
+    overrides: dict[str, object] = {}
+    text_settings = {
+        "OPENAI_API_KEY": "openai_api_key",
+        "DATABASE_USERNAME": "database_username",
+        "DATABASE_PASSWORD": "database_password",
+        "SMTP_HOST": "smtp_host",
+        "SMTP_USERNAME": "smtp_username",
+        "SMTP_PASSWORD": "smtp_password",
+        "SMTP_FROM_EMAIL": "smtp_from_email",
+        "FRONTEND_BASE_URL": "frontend_base_url",
+    }
+    for env_key, setting_name in text_settings.items():
+        if env_key in env_md:
+            overrides[setting_name] = env_md[env_key]
+    deepinfra_key = env_md.get("DEEPINFRA_API_KEY") or env_md.get("DEEP_INFRA_APIKEY")
+    if deepinfra_key:
+        overrides["deepinfra_api_key"] = deepinfra_key
+    if "SMTP_PORT" in env_md:
+        overrides["smtp_port"] = int(env_md["SMTP_PORT"])
     if env_md.get("MODEL_PRICING"):
         overrides["model_pricing"] = json.loads(env_md["MODEL_PRICING"])
     if env_md.get("MODEL_PRICING_VERSION"):

@@ -166,3 +166,21 @@ def test_production_secret_file_does_not_fall_back_to_env_md(
     assert settings.app_environment == "production"
     assert settings.database_username == "secret-user"
     assert settings.deepinfra_api_key == "secret-provider-key"
+
+
+def test_development_environment_values_survive_missing_env_md_keys(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(config_module, "_read_env_md", lambda: {})
+    monkeypatch.setenv("DATABASE_USERNAME", "environment-user")
+    monkeypatch.setenv("DATABASE_PASSWORD", "environment-password")
+    monkeypatch.setenv("FRONTEND_BASE_URL", "http://ci.example.test:3000")
+    get_settings.cache_clear()
+    try:
+        settings = get_settings()
+    finally:
+        get_settings.cache_clear()
+
+    assert settings.database_username == "environment-user"
+    assert settings.database_password == "environment-password"
+    assert settings.frontend_base_url == "http://ci.example.test:3000"
