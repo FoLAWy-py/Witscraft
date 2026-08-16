@@ -305,6 +305,13 @@ async def clear_login_throttle(session: AsyncSession, key_hash: str) -> None:
     )
 
 
+async def prune_login_throttles(session: AsyncSession, retention_hours: int) -> None:
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=retention_hours)
+    await session.execute(
+        delete(AuthLoginThrottle).where(AuthLoginThrottle.updated_at < cutoff)
+    )
+
+
 def hash_session_token(raw_token: str) -> str:
     return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
 

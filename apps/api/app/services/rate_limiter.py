@@ -89,6 +89,12 @@ def classify_rate_limit(request: Request, settings: Settings) -> RateLimitRule |
         (f"{prefix}/auth/email-verification/", f"{prefix}/auth/password-reset/")
     ):
         return RateLimitRule("auth_email", settings.rate_limit_auth_email_requests, 600)
+    if method == "DELETE" and path == f"{prefix}/auth/account":
+        return RateLimitRule(
+            "auth_account_delete",
+            settings.rate_limit_account_delete_requests,
+            900,
+        )
     if method == "POST" and path == f"{prefix}/providers/test":
         return RateLimitRule("provider_test", settings.rate_limit_provider_test_requests, 60)
     generation_paths = {

@@ -87,6 +87,10 @@ def test_high_cost_routes_are_classified_independently() -> None:
         == "auth_email"
     )
     assert classify_rate_limit(_request("/api/providers/test"), settings).name == "provider_test"
+    assert (
+        classify_rate_limit(_request("/api/auth/account", method="DELETE"), settings).name
+        == "auth_account_delete"
+    )
     assert classify_rate_limit(_request("/api/chat/stream"), settings).name == "generation"
     assert (
         classify_rate_limit(

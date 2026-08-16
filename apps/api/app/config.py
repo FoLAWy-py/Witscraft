@@ -58,6 +58,7 @@ class Settings(BaseSettings):
     rate_limit_provider_test_requests: int = Field(default=10, ge=1)
     rate_limit_generation_requests: int = Field(default=20, ge=1)
     rate_limit_export_requests: int = Field(default=30, ge=1)
+    rate_limit_account_delete_requests: int = Field(default=5, ge=1)
 
     openai_api_key: str | None = None
     deepinfra_api_key: str | None = None
@@ -96,6 +97,8 @@ class Settings(BaseSettings):
     auth_verification_token_hours: int = 24
     auth_password_reset_token_minutes: int = 30
     auth_email_min_interval_seconds: int = 60
+    auth_login_throttle_retention_hours: int = Field(default=24, ge=1)
+    model_call_retention_days: int = Field(default=30, ge=1)
 
     smtp_host: str | None = None
     smtp_port: int = 465
@@ -225,6 +228,11 @@ def get_settings() -> Settings:
         "STREAM_CHECKPOINT_SECONDS": ("stream_checkpoint_seconds", float),
         "STREAM_CHECKPOINT_CHARACTERS": ("stream_checkpoint_characters", int),
         "GENERATION_STALE_SECONDS": ("generation_stale_seconds", int),
+        "AUTH_LOGIN_THROTTLE_RETENTION_HOURS": (
+            "auth_login_throttle_retention_hours",
+            int,
+        ),
+        "MODEL_CALL_RETENTION_DAYS": ("model_call_retention_days", int),
     }
     for env_key, (setting_name, parser) in numeric_settings.items():
         if env_key in env_md:

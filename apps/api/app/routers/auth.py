@@ -1,21 +1,23 @@
 from datetime import datetime, timedelta, timezone
 import ipaddress
+import json
 import re
 from typing import Annotated
 from urllib.parse import unquote
 from uuid import UUID
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
-from sqlalchemy import select
+from sqlalchemy import delete, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user_id
 from app.config import Settings, get_settings
-from app.db.models import AuthSession, User
+from app.db.models import AuthLoginThrottle, AuthSession, ModelCall, Story, User
 from app.db.session import get_session
 from app.schemas.auth import (
     AuthResponse,
+    AccountDeletionRequest,
     AuthSessionListResponse,
     AuthSessionResponse,
     AuthUserResponse,
@@ -40,11 +42,13 @@ from app.services.auth_service import (
     issue_action_token,
     make_login_throttle_key,
     normalize_email,
+    prune_login_throttles,
     record_failed_login,
     reset_password_with_token,
     revoke_auth_session,
     verify_email_token,
 )
+from app.services.account_data import build_account_export_payload
 from app.services.email_service import (
     EmailDeliveryError,
     check_smtp_connection,
@@ -173,14 +177,16 @@ async def login(
 ) -> AuthResponse:
     client_host = _client_ip(request)
     throttle_key = make_login_throttle_key(payload.email, client_host)
-    retry_after = await get_login_retry_after(session, throttle_key)
-    if retry_after is not None:
-        raise _login_throttled(retry_after)
-
     try:
         normalize_email(payload.email)
     except ValueError as error:
         raise HTTPException(status_code=401, detail="Invalid email or password") from error
+
+    await prune_login_throttles(session, settings.auth_login_throttle_retention_hours)
+    retry_after = await get_login_retry_after(session, throttle_key)
+    if retry_after is not None:
+        await session.commit()
+        raise _login_throttled(retry_after)
 
     user = await authenticate_user(session, payload.email, payload.password)
     if user is None:
@@ -387,6 +393,56 @@ async def logout(
     settings: Settings = Depends(get_settings),
 ) -> None:
     await revoke_auth_session(session, session_token)
+    await session.commit()
+    _delete_session_cookie(response, settings)
+
+
+@router.get("/export")
+async def export_account(
+    user_id: UUID = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    user = await session.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    payload = await build_account_export_payload(session, user)
+    filename = f"witscraft-account-{datetime.now(timezone.utc):%Y%m%d}.json"
+    return Response(
+        content=json.dumps(payload, ensure_ascii=False, indent=2),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.delete("/account", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_account(
+    payload: AccountDeletionRequest,
+    request: Request,
+    response: Response,
+    user_id: UUID = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+    settings: Settings = Depends(get_settings),
+) -> None:
+    user = await session.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    authenticated = await authenticate_user(session, user.email, payload.password)
+    if authenticated is None or authenticated.id != user_id:
+        raise HTTPException(status_code=401, detail="Current password is incorrect")
+
+    story_ids = list(
+        (await session.execute(select(Story.id).where(Story.user_id == user_id))).scalars()
+    )
+    model_call_owner = ModelCall.user_id == user_id
+    if story_ids:
+        model_call_owner = or_(model_call_owner, ModelCall.story_id.in_(story_ids))
+    await session.execute(delete(ModelCall).where(model_call_owner))
+    await session.execute(
+        delete(AuthLoginThrottle).where(
+            AuthLoginThrottle.key_hash == make_login_throttle_key(user.email, _client_ip(request))
+        )
+    )
+    await session.execute(delete(User).where(User.id == user_id))
     await session.commit()
     _delete_session_cookie(response, settings)
 

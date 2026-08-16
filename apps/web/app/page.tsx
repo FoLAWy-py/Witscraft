@@ -21,6 +21,7 @@ import {
   Copy,
   Cpu,
   Dot,
+  Download,
   Feather,
   FileText,
   Gauge,
@@ -61,7 +62,7 @@ import type { ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { ApiError, StreamInterruptedError, confirmEmailVerification, confirmPasswordReset, createBranch, createCharacter, createStory, createWorld, deleteBranch, deleteCharacter, deleteStory, deleteWorld, downloadStoryExport, duplicateBranch, generateSessionSummary, getAuthSessions, getCurrentUser, getProviders, getUserPreferences, getWorkspace, login, logout, register, requestEmailVerification, requestPasswordReset, revokeAuthSession, selectStoryWorld, sendStoryMessage, streamStoryInterview, streamStoryMessage, switchBranch, testProviderModel, updateBranch, updateCanonFact, updateCharacter, updateMemoryItem, updateModelRoutes, updateStory, updateUserPreferences, updateWorld } from "@/lib/api";
+import { ApiError, StreamInterruptedError, confirmEmailVerification, confirmPasswordReset, createBranch, createCharacter, createStory, createWorld, deleteAccount, deleteBranch, deleteCharacter, deleteStory, deleteWorld, downloadAccountExport, downloadStoryExport, duplicateBranch, generateSessionSummary, getAuthSessions, getCurrentUser, getProviders, getUserPreferences, getWorkspace, login, logout, register, requestEmailVerification, requestPasswordReset, revokeAuthSession, selectStoryWorld, sendStoryMessage, streamStoryInterview, streamStoryMessage, switchBranch, testProviderModel, updateBranch, updateCanonFact, updateCharacter, updateMemoryItem, updateModelRoutes, updateStory, updateUserPreferences, updateWorld } from "@/lib/api";
 import type { AuthSessionSummary, AuthUser, CanonFactSummary, ChatResponse, ConsistencyCheck, CreateStoryInput, LoginInput, MemoryItemSummary, ModelOption, ProvidersResponse, RegisterInput, SessionSummary, StoryInterviewMessage, StoryPurpose, StoryState, UserPreference, WorkspaceResponse } from "@/lib/types";
 
 type View = "story" | "settings";
@@ -235,6 +236,9 @@ export default function Home() {
   const [revokingSessionId, setRevokingSessionId] = useState<string | null>(null);
   const [confirmRevokeSessionId, setConfirmRevokeSessionId] = useState<string | null>(null);
   const [sessionError, setSessionError] = useState<string | null>(null);
+  const [exportingAccount, setExportingAccount] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [accountActionError, setAccountActionError] = useState<string | null>(null);
   const [view, setView] = useState<View>("story");
   const [mobileTab, setMobileTab] = useState<MobileTab>("story");
   const [leftOpen, setLeftOpen] = useState(false);
@@ -703,6 +707,44 @@ export default function Home() {
       setSessionError("撤销登录会话失败，请稍后重试。");
     } finally {
       setRevokingSessionId(null);
+    }
+  }
+
+  async function handleAccountExport() {
+    if (exportingAccount) return;
+    setExportingAccount(true);
+    setAccountActionError(null);
+    try {
+      await downloadAccountExport();
+    } catch (caught) {
+      setAccountActionError(caught instanceof ApiError ? caught.message : "账户数据导出失败，请稍后重试。");
+    } finally {
+      setExportingAccount(false);
+    }
+  }
+
+  async function handleDeleteAccount(password: string, confirmation: string) {
+    if (deletingAccount) return;
+    setDeletingAccount(true);
+    setAccountActionError(null);
+    try {
+      await deleteAccount(password, confirmation);
+      clearWorkspace();
+      setAuthSessions([]);
+      setAuthUser(null);
+      setAuthStatus("anonymous");
+      setView("story");
+      setMobileTab("story");
+    } catch (caught) {
+      if (caught instanceof ApiError && caught.status === 401) {
+        setAccountActionError("当前密码不正确，账户未删除。");
+      } else if (caught instanceof ApiError && caught.status === 429) {
+        setAccountActionError("删除尝试过多，请稍后再试。");
+      } else {
+        setAccountActionError(caught instanceof ApiError ? caught.message : "账户删除失败，任何数据均未更改。");
+      }
+    } finally {
+      setDeletingAccount(false);
     }
   }
 
@@ -1628,6 +1670,9 @@ export default function Home() {
           revokingSessionId={revokingSessionId}
           confirmRevokeSessionId={confirmRevokeSessionId}
           sessionError={sessionError}
+          exportingAccount={exportingAccount}
+          deletingAccount={deletingAccount}
+          accountActionError={accountActionError}
           models={models}
           providers={providers}
           selectedPurpose={selectedPurpose}
@@ -1653,6 +1698,8 @@ export default function Home() {
           onSavePreferences={handleSavePreferences}
           onRevokeSession={handleRevokeSession}
           onCancelRevokeSession={() => setConfirmRevokeSessionId(null)}
+          onExportAccount={() => void handleAccountExport()}
+          onDeleteAccount={(password, confirmation) => void handleDeleteAccount(password, confirmation)}
         />
       ) : (
         <section className="storyWorkspace">
@@ -3666,6 +3713,9 @@ function SettingsView({
   revokingSessionId,
   confirmRevokeSessionId,
   sessionError,
+  exportingAccount,
+  deletingAccount,
+  accountActionError,
   models,
   providers,
   selectedPurpose,
@@ -3690,7 +3740,9 @@ function SettingsView({
   onChangePreference,
   onSavePreferences,
   onRevokeSession,
-  onCancelRevokeSession
+  onCancelRevokeSession,
+  onExportAccount,
+  onDeleteAccount
 }: {
   uiLanguage: UiLanguage;
   onUiLanguageChange: (language: UiLanguage) => void;
@@ -3700,6 +3752,9 @@ function SettingsView({
   revokingSessionId: string | null;
   confirmRevokeSessionId: string | null;
   sessionError: string | null;
+  exportingAccount: boolean;
+  deletingAccount: boolean;
+  accountActionError: string | null;
   models: ModelOption[];
   providers: ProvidersResponse | null;
   selectedPurpose: StoryPurpose;
@@ -3725,7 +3780,14 @@ function SettingsView({
   onSavePreferences: () => void;
   onRevokeSession: (authSession: AuthSessionSummary) => void;
   onCancelRevokeSession: () => void;
+  onExportAccount: () => void;
+  onDeleteAccount: (password: string, confirmation: string) => void;
 }) {
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const deleteReady = deletePassword.length > 0 && deleteConfirmation === "DELETE";
+
   return (
     <section className="settingsPage">
       <div className="settingsInner">
@@ -3790,6 +3852,52 @@ function SettingsView({
           ) : (
             <EmptyState>{uiText(uiLanguage, "没有可用的登录会话。", "No active sign-in sessions.")}</EmptyState>
           )}
+        </Panel>
+
+        <Panel title={uiText(uiLanguage, "数据与账户", "Data and account")} icon={Download}>
+          <div className="accountDataRow">
+            <span>
+              <b>{uiText(uiLanguage, "导出全部数据", "Export all data")}</b>
+              <small>{uiText(uiLanguage, "下载账号、故事、消息、世界观、记忆、偏好与脱敏模型调用元数据。", "Download your profile, stories, messages, worlds, memories, preferences, and sanitized model-call metadata.")}</small>
+            </span>
+            <button className="cmdButton" type="button" onClick={onExportAccount} disabled={exportingAccount || deletingAccount}>
+              {exportingAccount ? <RefreshCw size={13} className="spinIcon" /> : <Download size={13} />}
+              {uiText(uiLanguage, "导出 JSON", "Export JSON")}
+            </button>
+          </div>
+
+          <div className="accountDangerZone">
+            <span>
+              <b>{uiText(uiLanguage, "永久删除账户", "Permanently delete account")}</b>
+              <small>{uiText(uiLanguage, "删除账号、故事、消息、世界观、角色、记忆、偏好、会话与模型调用记录。此操作无法撤销。", "Deletes your account, stories, messages, worlds, characters, memories, preferences, sessions, and model-call records. This cannot be undone.")}</small>
+            </span>
+            {!showDeleteAccount ? (
+              <button className="cmdButton dangerAction" type="button" onClick={() => setShowDeleteAccount(true)} disabled={exportingAccount}>
+                <Trash2 size={13} /> {uiText(uiLanguage, "删除账户", "Delete account")}
+              </button>
+            ) : (
+              <div className="accountDeleteForm">
+                <label>
+                  <span>{uiText(uiLanguage, "当前密码", "Current password")}</span>
+                  <input type="password" autoComplete="current-password" maxLength={128} value={deletePassword} onChange={(event) => setDeletePassword(event.target.value)} disabled={deletingAccount} />
+                </label>
+                <label>
+                  <span>{uiText(uiLanguage, "输入 DELETE 确认", "Type DELETE to confirm")}</span>
+                  <input type="text" autoComplete="off" value={deleteConfirmation} onChange={(event) => setDeleteConfirmation(event.target.value)} disabled={deletingAccount} />
+                </label>
+                <div className="routingActions">
+                  <button className="cmdButton dangerAction" type="button" disabled={!deleteReady || deletingAccount} onClick={() => onDeleteAccount(deletePassword, deleteConfirmation)}>
+                    {deletingAccount ? <RefreshCw size={13} className="spinIcon" /> : <Trash2 size={13} />}
+                    {uiText(uiLanguage, "永久删除", "Delete permanently")}
+                  </button>
+                  <button className="cmdButton" type="button" disabled={deletingAccount} onClick={() => { setShowDeleteAccount(false); setDeletePassword(""); setDeleteConfirmation(""); }}>
+                    <X size={13} /> {uiText(uiLanguage, "取消", "Cancel")}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+          {accountActionError && <div className="authError" role="alert">{accountActionError}</div>}
         </Panel>
 
         <Panel

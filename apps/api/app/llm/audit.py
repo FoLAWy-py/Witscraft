@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from uuid import UUID, uuid4
+
+from sqlalchemy import delete
 
 from app.config import Settings
 from app.db.models import ModelCall
@@ -178,6 +181,10 @@ class CallAuditor:
     async def _persist(self, row: ModelCall) -> bool:
         try:
             async with AsyncSessionLocal() as session:
+                cutoff = datetime.now(timezone.utc) - timedelta(
+                    days=self.settings.model_call_retention_days
+                )
+                await session.execute(delete(ModelCall).where(ModelCall.created_at < cutoff))
                 session.add(row)
                 await session.commit()
             return True

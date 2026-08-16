@@ -13,6 +13,7 @@ apps/
 ## Documentation
 
 - [`system architecture.md`](./system%20architecture.md): target application and data architecture
+- [`docs/data-privacy.md`](./docs/data-privacy.md): account export, deletion, retention, and model-provider data boundaries
 
 ## Local Development
 
@@ -98,6 +99,8 @@ LLM_CIRCUIT_COOLDOWN_SECONDS=30
 STREAM_CHECKPOINT_SECONDS=1
 STREAM_CHECKPOINT_CHARACTERS=512
 GENERATION_STALE_SECONDS=900
+AUTH_LOGIN_THROTTLE_RETENTION_HOURS=24
+MODEL_CALL_RETENTION_DAYS=30
 ```
 
 The circuit breaker is process-local. This is sufficient for the current single API process; move health state to shared infrastructure before running multiple API workers if coordinated failover is required.

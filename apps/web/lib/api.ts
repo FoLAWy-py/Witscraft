@@ -215,6 +215,37 @@ export async function revokeAuthSession(sessionId: string): Promise<void> {
   });
 }
 
+export async function downloadAccountExport(): Promise<void> {
+  if (typeof window === "undefined" || typeof document === "undefined" || typeof fetch !== "function") {
+    throw new Error("Account export downloads require a browser runtime");
+  }
+  const response = await fetch(`${API_BASE_URL}/api/auth/export`, {
+    credentials: "include"
+  });
+  if (!response.ok) {
+    throw new ApiError(`Account export failed with status ${response.status}`, response.status);
+  }
+  const blob = await response.blob();
+  const objectUrl = window.URL.createObjectURL(blob);
+  const disposition = response.headers.get("Content-Disposition") ?? "";
+  const filename = disposition.match(/filename="([^"]+)"/)?.[1] ?? "witscraft-account.json";
+  const link = document.createElement("a");
+  link.href = objectUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(objectUrl);
+}
+
+export async function deleteAccount(password: string, confirmation: string): Promise<void> {
+  await requestJson<void>(`${API_BASE_URL}/api/auth/account`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password, confirmation })
+  });
+}
+
 export async function getProviders(): Promise<ProvidersResponse> {
   return requestJson<ProvidersResponse>(`${API_BASE_URL}/api/providers`, {
     cache: "no-store"

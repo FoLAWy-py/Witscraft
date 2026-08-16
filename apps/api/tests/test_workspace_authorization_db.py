@@ -9,7 +9,7 @@ from starlette.requests import Request
 
 from app.config import Settings
 from app.db.models import CanonFact, Character, MemoryItem, Story, StoryBranch, User, World
-from app.db.session import AsyncSessionLocal
+from app.db.session import AsyncSessionLocal, engine as db_engine
 from app.routers.workspace import (
     export_story,
     update_branch,
@@ -229,5 +229,6 @@ def test_cross_user_workspace_resource_matrix_is_denied() -> None:
                 async with AsyncSessionLocal() as cleanup:
                     await cleanup.execute(delete(User).where(User.id.in_(user_ids)))
                     await cleanup.commit()
+            await db_engine.dispose()
 
     asyncio.run(scenario())

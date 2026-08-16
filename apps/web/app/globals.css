@@ -2995,6 +2995,68 @@ html.theme-transition textarea {
   font-size: 13px;
 }
 
+.accountDataRow,
+.accountDangerZone {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.accountDataRow > span,
+.accountDangerZone > span {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.accountDataRow b,
+.accountDangerZone b {
+  font-size: 13px;
+}
+
+.accountDataRow small,
+.accountDangerZone small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.accountDangerZone {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--danger) 30%, var(--line));
+}
+
+.accountDeleteForm {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.accountDeleteForm label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.accountDeleteForm input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 8px 9px;
+  font: inherit;
+}
+
+.accountDeleteForm .routingActions {
+  grid-column: 1 / -1;
+}
+
 .accountIdentity small,
 .sessionLoading,
 .sessionList small {
@@ -3360,6 +3422,12 @@ html.theme-transition textarea {
 @media (max-width: 980px) {
   .settingsInner {
     padding: 22px 14px;
+  }
+
+  .accountDataRow,
+  .accountDangerZone,
+  .accountDeleteForm {
+    grid-template-columns: 1fr;
   }
 
   .providerCards {
