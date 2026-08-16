@@ -1,0 +1,192 @@
+from copy import deepcopy
+from uuid import UUID, uuid4
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.db.models import (
+    CanonFact,
+    MemoryItem,
+    Message,
+    PlotEvent,
+    Story,
+    StoryBranch,
+    StoryStateSnapshot,
+    StorySummary,
+)
+
+
+async def clone_story_branch(
+    session: AsyncSession,
+    *,
+    story: Story,
+    source_branch: StoryBranch,
+    user_id: UUID,
+    name: str,
+) -> StoryBranch:
+    message_result = await session.execute(
+        select(Message)
+        .where(Message.story_id == story.id, Message.branch_id == source_branch.id)
+        .order_by(Message.created_at.asc(), Message.id.asc())
+    )
+    source_messages = list(message_result.scalars().all())
+    message_ids = {message.id: uuid4() for message in source_messages}
+
+    branch = StoryBranch(
+        id=uuid4(),
+        story_id=story.id,
+        parent_branch_id=source_branch.id,
+        name=name,
+        created_from_message_id=source_messages[-1].id if source_messages else None,
+    )
+    session.add(branch)
+    await session.flush()
+
+    for message in source_messages:
+        session.add(
+            Message(
+                id=message_ids[message.id],
+                story_id=story.id,
+                branch_id=branch.id,
+                role=message.role,
+                content=message.content,
+                token_count=message.token_count,
+                meta=deepcopy(message.meta or {}),
+                created_at=message.created_at,
+            )
+        )
+
+    snapshot_result = await session.execute(
+        select(StoryStateSnapshot)
+        .where(StoryStateSnapshot.story_id == story.id, StoryStateSnapshot.branch_id == source_branch.id)
+        .order_by(StoryStateSnapshot.created_at.asc(), StoryStateSnapshot.id.asc())
+    )
+    source_snapshots = list(snapshot_result.scalars().all())
+    for snapshot in source_snapshots:
+        session.add(
+            StoryStateSnapshot(
+                story_id=story.id,
+                branch_id=branch.id,
+                message_id=_mapped_message_id(snapshot.message_id, message_ids),
+                state=deepcopy(snapshot.state),
+                created_at=snapshot.created_at,
+            )
+        )
+    if not source_snapshots:
+        session.add(
+            StoryStateSnapshot(
+                story_id=story.id,
+                branch_id=branch.id,
+                state={
+                    "location": "未知地点",
+                    "time": "未知时间",
+                    "mood": "未定义",
+                    "objective": "继续推进剧情",
+                    "inventory": [],
+                    "open_threads": [],
+                    "relationships": [],
+                },
+            )
+        )
+
+    memory_result = await session.execute(
+        select(MemoryItem).where(
+            MemoryItem.story_id == story.id,
+            MemoryItem.branch_id == source_branch.id,
+        )
+    )
+    for memory in memory_result.scalars().all():
+        session.add(
+            MemoryItem(
+                user_id=memory.user_id or user_id,
+                story_id=story.id,
+                branch_id=branch.id,
+                character_id=memory.character_id,
+                memory_type=memory.memory_type,
+                content=memory.content,
+                importance=memory.importance,
+                recency_score=memory.recency_score,
+                entity_tags=deepcopy(memory.entity_tags or []),
+                meta=deepcopy(memory.meta or {}),
+                embedding=deepcopy(memory.embedding),
+                source_message_id=_mapped_message_id(memory.source_message_id, message_ids),
+                is_active=memory.is_active,
+            )
+        )
+
+    fact_result = await session.execute(
+        select(CanonFact).where(
+            CanonFact.story_id == story.id,
+            CanonFact.branch_id == source_branch.id,
+        )
+    )
+    source_facts = list(fact_result.scalars().all())
+    fact_ids = {fact.id: uuid4() for fact in source_facts}
+    for fact in source_facts:
+        session.add(
+            CanonFact(
+                id=fact_ids[fact.id],
+                story_id=story.id,
+                branch_id=branch.id,
+                character_id=fact.character_id,
+                fact_type=fact.fact_type,
+                content=fact.content,
+                importance=fact.importance,
+                confidence=fact.confidence,
+                is_active=fact.is_active,
+                source_message_id=_mapped_message_id(fact.source_message_id, message_ids),
+                superseded_by=fact_ids.get(fact.superseded_by),
+            )
+        )
+
+    summary_result = await session.execute(
+        select(StorySummary)
+        .where(StorySummary.story_id == story.id, StorySummary.branch_id == source_branch.id)
+        .order_by(StorySummary.created_at.asc(), StorySummary.id.asc())
+    )
+    for summary in summary_result.scalars().all():
+        session.add(
+            StorySummary(
+                user_id=user_id,
+                story_id=story.id,
+                branch_id=branch.id,
+                from_message_id=_mapped_message_id(summary.from_message_id, message_ids),
+                to_message_id=_mapped_message_id(summary.to_message_id, message_ids),
+                summary_type=summary.summary_type,
+                title=summary.title,
+                content=summary.content,
+                message_count=summary.message_count,
+                token_count=summary.token_count,
+                created_at=summary.created_at,
+            )
+        )
+
+    event_result = await session.execute(
+        select(PlotEvent)
+        .where(PlotEvent.story_id == story.id, PlotEvent.branch_id == source_branch.id)
+        .order_by(PlotEvent.created_at.asc(), PlotEvent.id.asc())
+    )
+    for event in event_result.scalars().all():
+        session.add(
+            PlotEvent(
+                story_id=story.id,
+                branch_id=branch.id,
+                source_message_id=_mapped_message_id(event.source_message_id, message_ids),
+                event_type=event.event_type,
+                summary=event.summary,
+                characters=deepcopy(event.characters or []),
+                locations=deepcopy(event.locations or []),
+                objects=deepcopy(event.objects or []),
+                importance=event.importance,
+                created_at=event.created_at,
+            )
+        )
+
+    story.current_branch_id = branch.id
+    return branch
+
+
+def _mapped_message_id(message_id: UUID | None, message_ids: dict[UUID, UUID]) -> UUID | None:
+    if message_id is None:
+        return None
+    return message_ids.get(message_id)

@@ -1,0 +1,35 @@
+[project]
+name = "witscraft-api"
+version = "0.1.0"
+description = "FastAPI backend for Witscraft interactive novel engine"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "pydantic>=2.8.0",
+    "pydantic-settings>=2.4.0",
+    "python-dotenv>=1.0.1",
+    "openai>=1.99.0",
+    "httpx>=0.28.0",
+    "sqlalchemy>=2.0.51",
+    "asyncpg>=0.31.0",
+    "alembic>=1.18.5",
+    "greenlet>=3.5.3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0",
+    "ruff>=0.6.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

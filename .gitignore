@@ -1,0 +1,29 @@
+.DS_Store
+node_modules/
+.next/
+dist/
+build/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.venv/
+
+# Local secrets and runtime state
+.env*
+!.env.example
+env.md
+.runtime/
+cookies.txt
+*.log
+*.pid
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Machine-specific deployment and private working notes
+deploy/
+开发计划.md
+
+*.pyc
+*.tsbuildinfo
