@@ -58,12 +58,13 @@ import {
   X
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { ApiError, StreamInterruptedError, confirmEmailVerification, confirmPasswordReset, createBranch, createCharacter, createStory, createWorld, deleteAccount, deleteBranch, deleteCharacter, deleteStory, deleteWorld, downloadAccountExport, downloadStoryExport, duplicateBranch, generateSessionSummary, getAuthSessions, getCurrentUser, getProviders, getUserPreferences, getWorkspace, login, logout, register, requestEmailVerification, requestPasswordReset, revokeAuthSession, selectStoryWorld, sendStoryMessage, streamStoryInterview, streamStoryMessage, switchBranch, testProviderModel, updateBranch, updateCanonFact, updateCharacter, updateMemoryItem, updateModelRoutes, updateStory, updateUserPreferences, updateWorld } from "@/lib/api";
-import type { AuthSessionSummary, AuthUser, CanonFactSummary, ChatResponse, ConsistencyCheck, CreateStoryInput, LoginInput, MemoryItemSummary, ModelOption, ProvidersResponse, RegisterInput, SessionSummary, StoryInterviewMessage, StoryPurpose, StoryState, UserPreference, WorkspaceResponse } from "@/lib/types";
+import { ApiError, StreamInterruptedError, confirmEmailVerification, confirmPasswordReset, createBranch, createCharacter, createStory, createWorld, deleteAccount, deleteBranch, deleteCharacter, deleteStory, deleteWorld, downloadAccountExport, downloadStoryExport, duplicateBranch, generateSessionSummary, getAuthSessions, getCurrentUser, getMyQuota, getProviders, getUserPreferences, getWorkspace, login, logout, register, requestEmailVerification, requestPasswordReset, revokeAuthSession, selectStoryWorld, sendStoryMessage, streamStoryInterview, streamStoryMessage, switchBranch, testProviderModel, updateBranch, updateCanonFact, updateCharacter, updateMemoryItem, updateModelRoutes, updateStory, updateUserPreferences, updateWorld } from "@/lib/api";
+import type { AuthSessionSummary, AuthUser, CanonFactSummary, ChatResponse, ConsistencyCheck, CreateStoryInput, LoginInput, MemoryItemSummary, ModelOption, ProvidersResponse, QuotaUsage, RegisterInput, SessionSummary, StoryInterviewMessage, StoryPurpose, StoryState, UserPreference, WorkspaceResponse } from "@/lib/types";
 
 type View = "story" | "settings";
 type MobileTab = "library" | "story" | "inspector";
@@ -132,6 +133,9 @@ function classifyFailure(caught: unknown, fallback: string): { message: string; 
     return { message: "生成连接在完成前中断。已保留当前内容，请重新同步数据库中的最终状态。", kind: "stream" };
   }
   if (caught instanceof ApiError) {
+    if (caught.status === 429 && caught.message.toLowerCase().includes("quota")) {
+      return { message: "本周 AI 额度不足。可在设置中查看用量与重置时间。", kind: "api" };
+    }
     if (caught.status === 502) {
       return { message: "模型服务暂时没有完成请求。当前上下文未丢失，可重新同步后继续。", kind: "provider" };
     }
@@ -239,6 +243,7 @@ export default function Home() {
   const [exportingAccount, setExportingAccount] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [accountActionError, setAccountActionError] = useState<string | null>(null);
+  const [quota, setQuota] = useState<QuotaUsage | null>(null);
   const [view, setView] = useState<View>("story");
   const [mobileTab, setMobileTab] = useState<MobileTab>("story");
   const [leftOpen, setLeftOpen] = useState(false);
@@ -544,6 +549,7 @@ export default function Home() {
         setPreferenceError(null);
       })
       .catch(() => setPreferenceError("读取创作偏好失败，请稍后重试。"));
+    void refreshQuota();
     void loadWorkspace();
   }, [authStatus, authUser?.email_verified]);
 
@@ -582,6 +588,14 @@ export default function Home() {
     }
   }
 
+  async function refreshQuota() {
+    try {
+      setQuota(await getMyQuota());
+    } catch {
+      setQuota(null);
+    }
+  }
+
   async function handleAuthenticate(mode: "login" | "register", input: LoginInput | RegisterInput) {
     if (authSubmitting) return;
     setAuthSubmitting(true);
@@ -593,6 +607,7 @@ export default function Home() {
         : await login(input as LoginInput);
       setAuthUser(response.user);
       setAuthStatus("authenticated");
+      void refreshQuota();
       setError(null);
     } catch (caught) {
       if (caught instanceof ApiError) {
@@ -672,6 +687,7 @@ export default function Home() {
     try {
       await logout();
       clearWorkspace();
+      setQuota(null);
       setAuthUser(null);
       setAuthStatus("anonymous");
       setView("story");
@@ -731,6 +747,7 @@ export default function Home() {
       await deleteAccount(password, confirmation);
       clearWorkspace();
       setAuthSessions([]);
+      setQuota(null);
       setAuthUser(null);
       setAuthStatus("anonymous");
       setView("story");
@@ -1025,6 +1042,7 @@ export default function Home() {
       streamAbortRef.current = null;
       streamAssistantActiveRef.current = false;
       setPending(false);
+      void refreshQuota();
     }
   }
 
@@ -1063,6 +1081,7 @@ export default function Home() {
       setError(caught instanceof ApiError ? caught.message : `${command === "rewrite" ? "重写" : "重新生成"}失败，请稍后重试。`);
     } finally {
       setPending(false);
+      void refreshQuota();
     }
   }
 
@@ -1598,6 +1617,15 @@ export default function Home() {
 
         <div className="topbarSpacer" />
 
+        <QuotaMeter quota={quota} uiLanguage={uiLanguage} compact />
+
+        {authUser.is_admin && (
+          <Link className="adminNavLink" href="/admin" title={uiText(uiLanguage, "管理员控制台", "Administrator console")}>
+            <ShieldCheck size={14} />
+            <span>{uiText(uiLanguage, "管理", "Admin")}</span>
+          </Link>
+        )}
+
         {view === "story" && (
           <div className="tabletToggles">
             <IconToggle
@@ -1665,6 +1693,7 @@ export default function Home() {
           uiLanguage={uiLanguage}
           onUiLanguageChange={setUiLanguage}
           authUser={authUser}
+          quota={quota}
           authSessions={authSessions}
           loadingAuthSessions={loadingAuthSessions}
           revokingSessionId={revokingSessionId}
@@ -3704,10 +3733,40 @@ function KnowledgeEditForm({
   );
 }
 
+function QuotaMeter({ quota, uiLanguage, compact = false }: { quota: QuotaUsage | null; uiLanguage: UiLanguage; compact?: boolean }) {
+  if (!quota) {
+    return <div className={`quotaMeter ${compact ? "compact" : ""} loading`}><span>{uiText(uiLanguage, "额度读取中", "Loading quota")}</span></div>;
+  }
+  const resetLabel = new Intl.DateTimeFormat(uiLanguage === "zh-CN" ? "zh-CN" : "en-AU", {
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(new Date(quota.resets_at));
+  const percent = quota.unlimited ? 0 : Math.min(100, quota.percentage_used);
+  const number = new Intl.NumberFormat(uiLanguage === "zh-CN" ? "zh-CN" : "en-AU", { notation: compact ? "compact" : "standard", maximumFractionDigits: 1 });
+  return (
+    <div className={`quotaMeter ${compact ? "compact" : ""}`} title={`${uiText(uiLanguage, "重置时间", "Resets")} ${resetLabel}`}>
+      <div className="quotaMeterLabel">
+        <span>{quota.unlimited ? uiText(uiLanguage, "管理员不限额", "Admin unlimited") : `${quota.percentage_used.toFixed(1)}%`}</span>
+        {!compact && <small>{uiText(uiLanguage, "重置", "Resets")} {resetLabel}</small>}
+      </div>
+      {!quota.unlimited && <div className="quotaTrack" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}><span style={{ width: `${percent}%` }} /></div>}
+      {!compact && (
+        <div className="quotaNumbers">
+          <span><b>{number.format(quota.used_tokens)}</b><small>{uiText(uiLanguage, "已用 tokens", "tokens used")}</small></span>
+          <span><b>{quota.limit_tokens === null ? "∞" : number.format(quota.limit_tokens)}</b><small>{uiText(uiLanguage, "周额度", "weekly limit")}</small></span>
+          <span><b>{quota.remaining_tokens === null ? "∞" : number.format(quota.remaining_tokens)}</b><small>{uiText(uiLanguage, "剩余", "remaining")}</small></span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SettingsView({
   uiLanguage,
   onUiLanguageChange,
   authUser,
+  quota,
   authSessions,
   loadingAuthSessions,
   revokingSessionId,
@@ -3747,6 +3806,7 @@ function SettingsView({
   uiLanguage: UiLanguage;
   onUiLanguageChange: (language: UiLanguage) => void;
   authUser: AuthUser;
+  quota: QuotaUsage | null;
   authSessions: AuthSessionSummary[];
   loadingAuthSessions: boolean;
   revokingSessionId: string | null;
@@ -3852,6 +3912,10 @@ function SettingsView({
           ) : (
             <EmptyState>{uiText(uiLanguage, "没有可用的登录会话。", "No active sign-in sessions.")}</EmptyState>
           )}
+        </Panel>
+
+        <Panel title={uiText(uiLanguage, "本周 AI 额度", "Weekly AI quota")} icon={Gauge}>
+          <QuotaMeter quota={quota} uiLanguage={uiLanguage} />
         </Panel>
 
         <Panel title={uiText(uiLanguage, "数据与账户", "Data and account")} icon={Download}>

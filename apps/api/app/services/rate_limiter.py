@@ -97,6 +97,8 @@ def classify_rate_limit(request: Request, settings: Settings) -> RateLimitRule |
         )
     if method == "POST" and path == f"{prefix}/providers/test":
         return RateLimitRule("provider_test", settings.rate_limit_provider_test_requests, 60)
+    if method == "POST" and path == f"{prefix}/admin/quota/reset-all":
+        return RateLimitRule("admin_quota_reset", settings.rate_limit_admin_reset_requests, 900)
     generation_paths = {
         f"{prefix}/chat/send",
         f"{prefix}/chat/stream",

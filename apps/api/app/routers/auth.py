@@ -515,4 +515,5 @@ def _user_response(user: User) -> AuthUserResponse:
         email=user.email,
         display_name=user.display_name or "Author",
         email_verified=user.email_verified_at is not None,
+        is_admin=user.is_admin,
     )

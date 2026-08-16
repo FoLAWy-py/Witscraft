@@ -16,6 +16,7 @@ apps/
 - [`docs/data-privacy.md`](./docs/data-privacy.md): account export, deletion, retention, and model-provider data boundaries
 - [`docs/database-performance.md`](./docs/database-performance.md): repeatable PostgreSQL query-plan benchmark and index policy
 - [`docs/backup-recovery.md`](./docs/backup-recovery.md): encrypted backup operation, restore procedure, RPO/RTO, and drill evidence
+- [`docs/admin-and-quota.md`](./docs/admin-and-quota.md): administrator permission boundary, weekly AI allowance, and reset operation
 - [`docs/security-checks.md`](./docs/security-checks.md): dependency, secret, and production artifact security gates
 
 ## Local Development
@@ -55,7 +56,7 @@ NEXT_ALLOWED_DEV_ORIGINS=<your-computer-lan-ip> npm run dev
 
 The backend reads local development secrets from the root `env.md` file. Do not commit real secrets into a public repository. A production process never reads `env.md`; it must receive environment variables or a `WITSCRAFT_SECRETS_FILE` deployment secret file.
 Database structure is versioned in `apps/api/migrations`; application startup does not mutate schema or seed users.
-Migration `0012` adds concurrently-built indexes for branch timelines, active memory/canon retrieval, workspace ownership filters, model-call inspection, and critical foreign-key maintenance. The rollback-only 230,000-row `EXPLAIN ANALYZE` benchmark is documented in `docs/database-performance.md`.
+Migration `0012` adds concurrently-built indexes for branch timelines, active memory/canon retrieval, workspace ownership filters, model-call inspection, and critical foreign-key maintenance. Migration `0013` adds administrator roles, global quota reset events, and the per-user model-call index used by weekly usage accounting. The rollback-only 230,000-row `EXPLAIN ANALYZE` benchmark is documented in `docs/database-performance.md`.
 
 Operational probes have separate meanings: `/health/live` checks only process responsiveness, while `/health/ready` verifies required non-billable configuration, PostgreSQL connectivity, and the deployed Alembic revision. A release is not ready until the database revision matches the application migration head.
 
@@ -111,9 +112,24 @@ STREAM_CHECKPOINT_CHARACTERS=512
 GENERATION_STALE_SECONDS=900
 AUTH_LOGIN_THROTTLE_RETENTION_HOURS=24
 MODEL_CALL_RETENTION_DAYS=30
+USER_WEEKLY_TOKEN_QUOTA=500000
+RATE_LIMIT_ADMIN_RESET_REQUESTS=5
 ```
 
 The circuit breaker is process-local. This is sufficient for the current single API process; move health state to shared infrastructure before running multiple API workers if coordinated failover is required.
+
+## Administrator and Weekly Quota
+
+Standard users receive a weekly AI token allowance that resets every Monday at `00:00 UTC`. The workspace and settings views show usage percentage, consumed and remaining tokens, and the reset time in the user's local time zone. Administrators have a separate `/admin` console, are exempt from the allowance, can review account-level usage, and can begin a new global quota window without deleting audit history.
+
+Administrator roles are assigned only through the controlled backend CLI; there is no browser role-escalation endpoint:
+
+```bash
+cd apps/api
+uv run python scripts/set_admin.py administrator@example.com
+```
+
+See [`docs/admin-and-quota.md`](./docs/admin-and-quota.md) for the permission boundary, accounting semantics, concurrency limitation, revocation command, and operational checks.
 
 ## Generation Idempotency
 

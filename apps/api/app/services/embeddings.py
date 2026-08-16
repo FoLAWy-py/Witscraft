@@ -51,6 +51,9 @@ class EmbeddingService:
             )
             return vectors
 
+        if self.auditor is not None:
+            await self.auditor.ensure_quota(input_tokens)
+
         try:
             response = await self.client.embeddings.create(
                 model=self.settings.openai_embedding_model,

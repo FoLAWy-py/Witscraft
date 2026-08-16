@@ -51,6 +51,9 @@ class LLMGateway:
                 )
                 continue
 
+            if self.auditor is not None:
+                await self.auditor.ensure_quota(self._requested_tokens(candidate))
+
             for local_attempt in range(1, self.settings.llm_max_attempts + 1):
                 attempt_number += 1
                 started = time.perf_counter()
@@ -108,6 +111,9 @@ class LLMGateway:
                     f"Model {candidate.provider}:{candidate.model} is unavailable"
                 )
                 continue
+
+            if self.auditor is not None:
+                await self.auditor.ensure_quota(self._requested_tokens(candidate))
 
             for local_attempt in range(1, self.settings.llm_max_attempts + 1):
                 attempt_number += 1
@@ -211,6 +217,14 @@ class LLMGateway:
                 )
             )
         return candidates
+
+    @staticmethod
+    def _requested_tokens(request: LLMRequest) -> int:
+        from app.services.token_estimator import estimate_tokens
+
+        return sum(estimate_tokens(message.content) for message in request.messages) + int(
+            request.max_output_tokens
+        )
 
     def _provider_available(self, provider: str) -> bool:
         adapter = self.adapters.get(provider)

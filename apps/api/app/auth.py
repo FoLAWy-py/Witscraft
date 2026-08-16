@@ -43,3 +43,15 @@ async def get_verified_user_id(
     if user.email_verified_at is None:
         raise HTTPException(status_code=403, detail="Email verification required")
     return user_id
+
+
+async def get_admin_user(
+    user_id: UUID = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> User:
+    user = await session.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Administrator access required")
+    return user

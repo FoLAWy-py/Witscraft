@@ -13,6 +13,7 @@ from app.llm.audit import CallAuditor
 from app.llm.router import LLMGateway
 from app.schemas.chat import ChatRequest, ChatResponse
 from app.services.story_engine import StoryEngine
+from app.services.quota_service import QuotaExceededError
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -81,6 +82,14 @@ async def stream_chat(
         except asyncio.CancelledError as error:
             await engine.fail_active_generation(error, cancelled=True)
             raise
+        except QuotaExceededError as error:
+            await engine.fail_active_generation(error)
+            event = {
+                "type": "error",
+                "status": 429,
+                "detail": "Weekly AI token quota exceeded",
+            }
+            yield f"event: error\ndata: {json.dumps(event)}\n\n"
         except Exception as error:
             await engine.fail_active_generation(error)
             event = {"type": "error", "status": 500, "detail": "Generation failed"}

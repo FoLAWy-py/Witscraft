@@ -58,6 +58,41 @@ export type AuthUser = {
   email: string;
   display_name: string;
   email_verified: boolean;
+  is_admin: boolean;
+};
+
+export type QuotaUsage = {
+  limit_tokens: number | null;
+  used_tokens: number;
+  remaining_tokens: number | null;
+  percentage_used: number;
+  period_started_at: string;
+  resets_at: string;
+  unlimited: boolean;
+};
+
+export type AdminUserQuota = QuotaUsage & {
+  id: string;
+  email: string;
+  display_name: string;
+  is_admin: boolean;
+  created_at: string;
+};
+
+export type AdminOverview = {
+  total_users: number;
+  administrator_count: number;
+  weekly_token_quota: number;
+  period_started_at: string;
+  resets_at: string;
+  total_used_tokens: number;
+  users: AdminUserQuota[];
+};
+
+export type QuotaResetResponse = {
+  reset_event_id: string;
+  effective_at: string;
+  resets_at: string;
 };
 
 export type AuthResponse = {

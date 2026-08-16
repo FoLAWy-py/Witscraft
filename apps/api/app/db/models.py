@@ -36,6 +36,7 @@ class User(Base, TimestampMixin):
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     display_name: Mapped[str | None] = mapped_column(String(120))
     email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
 
     worlds: Mapped[list["World"]] = relationship(back_populates="user")
     stories: Mapped[list["Story"]] = relationship(back_populates="user")
@@ -401,6 +402,7 @@ class ModelCall(Base):
             postgresql_where=text("call_type = 'llm' AND status = 'succeeded'"),
         ),
         Index("ix_model_calls_created", "created_at"),
+        Index("ix_model_calls_user_created", "user_id", "created_at"),
     )
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
@@ -426,3 +428,20 @@ class ModelCall(Base):
     response: Mapped[dict] = mapped_column(JSONB, default=dict)
     error: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class QuotaResetEvent(Base):
+    __tablename__ = "quota_reset_events"
+    __table_args__ = (Index("ix_quota_reset_events_effective", text("effective_at DESC")),)
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    reset_by_user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    reason: Mapped[str] = mapped_column(String(220), default="Manual administrator reset")
+    effective_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

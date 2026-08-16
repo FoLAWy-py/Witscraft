@@ -14,6 +14,7 @@ from app.llm.audit import CallAuditor
 from app.llm.model_registry import PURPOSE_DEFAULTS, get_model, list_models
 from app.llm.router import LLMGateway
 from app.schemas.llm import ChatMessage, LLMRequest, ProviderName, StoryPurpose
+from app.services.quota_service import QuotaExceededError
 
 router = APIRouter(prefix="/providers", tags=["providers"])
 HEALTH_FRESHNESS = timedelta(hours=6)
@@ -195,6 +196,8 @@ async def test_provider(
     gateway = LLMGateway(settings, auditor=auditor)
     try:
         response = await gateway.generate(gateway.normalize_request(test_request))
+    except QuotaExceededError:
+        raise
     except Exception as caught:
         message = str(caught).strip() or caught.__class__.__name__
         check = await _record_health(

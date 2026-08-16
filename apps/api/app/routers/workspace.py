@@ -54,6 +54,7 @@ from app.schemas.llm import ChatMessage, LLMRequest
 from app.services.embeddings import EmbeddingService
 from app.services.branch_manager import clone_story_branch
 from app.services.session_summarizer import generate_session_summary
+from app.services.quota_service import QuotaExceededError
 from app.services.story_exporter import (
     build_story_export_payload,
     export_filename,
@@ -484,6 +485,8 @@ async def generate_story_draft(
     try:
         response = await gateway.generate(gateway.normalize_request(llm_request))
         return StoryDraftResponse.model_validate_json(response.text)
+    except QuotaExceededError:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=502, detail="Story inspiration generation failed") from exc
 
@@ -587,6 +590,8 @@ async def _generate_story_interview(
                 )
             }
         )
+    except QuotaExceededError:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=502, detail="Story interview generation failed") from exc
 
@@ -653,6 +658,14 @@ async def stream_story_interview(
                 }
             )
             result = _finalize_story_interview(parsed_result, request.message)
+        except QuotaExceededError as error:
+            payload = {
+                "detail": str(error),
+                "status": 429,
+                "resets_at": error.snapshot.resets_at.isoformat(),
+            }
+            yield f"event: error\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
+            return
         except Exception:
             payload = {"detail": "Story interview generation failed", "status": 502}
             yield f"event: error\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"

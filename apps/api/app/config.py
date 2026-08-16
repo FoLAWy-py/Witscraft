@@ -59,6 +59,7 @@ class Settings(BaseSettings):
     rate_limit_generation_requests: int = Field(default=20, ge=1)
     rate_limit_export_requests: int = Field(default=30, ge=1)
     rate_limit_account_delete_requests: int = Field(default=5, ge=1)
+    rate_limit_admin_reset_requests: int = Field(default=5, ge=1)
 
     openai_api_key: str | None = None
     deepinfra_api_key: str | None = None
@@ -99,6 +100,7 @@ class Settings(BaseSettings):
     auth_email_min_interval_seconds: int = 60
     auth_login_throttle_retention_hours: int = Field(default=24, ge=1)
     model_call_retention_days: int = Field(default=30, ge=1)
+    user_weekly_token_quota: int = Field(default=500000, ge=1000)
 
     smtp_host: str | None = None
     smtp_port: int = 465
@@ -240,6 +242,8 @@ def get_settings() -> Settings:
             int,
         ),
         "MODEL_CALL_RETENTION_DAYS": ("model_call_retention_days", int),
+        "USER_WEEKLY_TOKEN_QUOTA": ("user_weekly_token_quota", int),
+        "RATE_LIMIT_ADMIN_RESET_REQUESTS": ("rate_limit_admin_reset_requests", int),
     }
     for env_key, (setting_name, parser) in numeric_settings.items():
         if env_key in env_md:

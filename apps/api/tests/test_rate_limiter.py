@@ -93,6 +93,10 @@ def test_high_cost_routes_are_classified_independently() -> None:
     )
     assert classify_rate_limit(_request("/api/chat/stream"), settings).name == "generation"
     assert (
+        classify_rate_limit(_request("/api/admin/quota/reset-all"), settings).name
+        == "admin_quota_reset"
+    )
+    assert (
         classify_rate_limit(
             _request("/api/workspace/stories/x/branches/y/export", method="GET"),
             settings,

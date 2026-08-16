@@ -2,9 +2,9 @@
 
 **Document status:** Production baseline
 
-**Architecture version:** 2.2
+**Architecture version:** 2.3
 
-**Last updated:** 16 August 2026
+**Last updated:** 17 August 2026
 
 **System owner:** Witscraft Engineering
 
@@ -29,6 +29,7 @@ The architecture is guided by the following principles:
 ```mermaid
 flowchart LR
     User["Author"] --> Browser["Next.js Web Application"]
+    Administrator["Administrator"] --> Browser
     Browser --> Proxy["HTTPS Reverse Proxy"]
     Proxy --> Web["Next.js Production Server"]
     Proxy --> API["FastAPI Application"]
@@ -83,7 +84,7 @@ Witscraft/
 │   │   ├── pyproject.toml
 │   │   └── uv.lock
 │   └── web/
-│       ├── app/                     # Next.js App Router application
+│       ├── app/                     # Workspace and separate administrator route
 │       ├── lib/                     # Typed API client and shared types
 │       ├── package.json
 │       └── package-lock.json
@@ -98,7 +99,7 @@ Machine-specific deployment files and live secrets are intentionally excluded fr
 
 ### 5.1 Web Application
 
-The Next.js application provides the writing workspace, authentication views, story and branch management, model routing settings, account data export, and account deletion controls.
+The Next.js application provides the writing workspace, authentication views, story and branch management, model routing settings, weekly quota visibility, account data export, and account deletion controls. A separate `/admin` route provides account-level usage governance without exposing narrative content.
 
 The current interface is implemented as a cohesive App Router workspace rather than a collection of independently deployed frontends. It communicates exclusively with the FastAPI API through the typed client in `apps/web/lib/api.ts`.
 
@@ -114,7 +115,7 @@ Client responsibilities include:
 
 ### 5.2 API Routers
 
-FastAPI routers define four principal API areas:
+FastAPI routers define six principal API areas:
 
 | Router | Responsibility |
 | --- | --- |
@@ -122,6 +123,8 @@ FastAPI routers define four principal API areas:
 | `workspace` | Stories, branches, worlds, characters, memories, canon facts, preferences, summaries, and exports |
 | `chat` | Context preview, regular generation, and streamed generation |
 | `providers` | Model catalogue, user routing preferences, and provider health tests |
+| `quota` | Authenticated personal weekly usage and reset boundary |
+| `admin` | Role-protected account usage overview and global quota reset |
 
 Routers perform protocol validation and authorization entry checks. Domain coordination remains in services so persistence and generation rules are not duplicated across endpoints.
 
@@ -166,6 +169,8 @@ Authentication uses server-side sessions. Only a one-way session-token hash is p
 
 Every user-owned query is scoped by the authenticated user identifier. Story, branch, world, character, memory, canon fact, workspace, and export authorization boundaries are covered by PostgreSQL integration tests.
 
+The persisted `User.is_admin` flag is the administrator role source of truth. Administrative dependencies reload the current user from PostgreSQL and reject standard accounts with HTTP `403`; a client-provided role is never trusted. Role assignment and revocation are controlled host operations with no public self-promotion endpoint. Administrators may view account identity and aggregate quota usage and may reset the global quota window. They do not receive cross-user access to stories, messages, memories, exports, passwords, sessions, provider credentials, prompts, or model responses.
+
 ### 5.7 Health and Lifecycle Services
 
 Health probes have distinct semantics:
@@ -184,12 +189,13 @@ PostgreSQL is the authoritative store. The principal entity groups are:
 
 | Group | Entities |
 | --- | --- |
-| Identity | `User`, `AuthCredential`, `AuthSession`, `AuthActionToken`, `AuthLoginThrottle` |
+| Identity and roles | `User`, `AuthCredential`, `AuthSession`, `AuthActionToken`, `AuthLoginThrottle` |
 | Narrative ownership | `World`, `Character`, `Story`, `StoryBranch` |
 | Narrative history | `Message`, `PlotEvent`, `StoryStateSnapshot`, `StorySummary` |
 | Long-term context | `MemoryItem`, `CanonFact`, `UserPreference` |
 | Generation control | `GenerationRequest` and branch version fields |
 | Model operations | `UserModelRoute`, `ModelHealthCheck`, `ModelCall` |
+| Usage governance | `QuotaResetEvent` |
 
 UUIDs are used for externally referenced entities. Foreign keys and database cascades enforce ownership lifecycles, while application-level checks enforce user authorization.
 
@@ -276,6 +282,16 @@ The production direction is to hash and deduplicate content before embedding, ca
 
 Multi-model routing is supported by purpose. A multi-agent architecture is not the default because narrative generation is primarily a coordinated state-transition workflow, not an open-ended autonomous task graph. Additional agents are justified only when an independently measurable task, such as evaluation or complex planning, produces sufficient quality improvement to offset latency, cost, and failure complexity.
 
+### 9.1 Weekly Usage Governance
+
+Standard users receive a configurable weekly allowance through `USER_WEEKLY_TOKEN_QUOTA`, with a default of 500,000 tokens. The natural period is Monday `00:00 UTC` through the following Monday. Successful external LLM and embedding audit rows contribute their recorded input and output tokens; deterministic local and dry-run operations do not consume the allowance.
+
+The provider-neutral gateway performs a preflight check using estimated input plus maximum output before contacting a provider. Rejection returns HTTP `429` and the next reset boundary. Administrators are exempt from the allowance.
+
+A manual global reset creates an append-only `QuotaResetEvent`; historical `ModelCall` records remain intact. The latest reset within the current calendar week becomes the effective period start. The administrator overview reads account usage through one grouped aggregate query and never joins narrative content.
+
+This is a preflight and reconciliation design rather than a reservation ledger. The single-process deployment can admit simultaneous requests that together exceed the remaining allowance by a bounded amount. Strict multi-worker enforcement requires durable token reservations before horizontal scaling.
+
 ## 10. Security and Privacy Boundaries
 
 Production security controls include:
@@ -284,6 +300,7 @@ Production security controls include:
 - explicit trusted-host and browser-origin validation;
 - CSRF checks for unsafe browser requests;
 - category-specific sliding-window rate limits;
+- backend-enforced administrator role checks and a separate limit for global quota reset;
 - secure server-side sessions;
 - structured log redaction for credentials, cookies, prompts, and sensitive query values;
 - metadata-only model-call auditing;
@@ -305,7 +322,7 @@ The current implementation uses structured application logs and PostgreSQL audit
 
 ## 12. Migration and Release Contract
 
-Alembic is the only production schema migration mechanism.
+Alembic is the only production schema migration mechanism. Revision `0013` adds administrator roles, append-only quota reset events, and a user/time model-call index for weekly accounting.
 
 The release order is:
 
@@ -338,6 +355,7 @@ The following constraints are known and accepted for the current deployment:
 - A production-equivalent staging environment has not yet been established.
 - Metrics, tracing, and alerting are not yet connected to a dedicated observability platform.
 - Database query plans are benchmarked locally, but production slow-query telemetry and tenant-skew analysis are not yet available.
+- Weekly quotas use provider-call preflight checks without durable concurrent token reservations.
 
 Evolution should occur in this order:
 
@@ -357,6 +375,7 @@ Evolution should occur in this order:
 | Provider-neutral LLM Gateway | Isolates provider parameter, streaming, retry, and error differences |
 | Explicit generation ledger | Prevents duplicate narrative writes and duplicate model spend |
 | Selective embeddings | Controls cost and avoids low-value vector work on every turn |
+| Backend-owned roles and weekly quotas | Enforces least privilege and gives users a predictable spend boundary |
 | Single orchestrator by default | Keeps authorization and state transitions deterministic and observable |
 | Explicit Alembic deployment step | Prevents application startup from mutating production schema |
 | Separate liveness and readiness | Distinguishes process availability from dependency and migration safety |

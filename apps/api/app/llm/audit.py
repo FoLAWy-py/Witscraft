@@ -13,6 +13,7 @@ from app.db.session import AsyncSessionLocal
 from app.logging_security import redact_sensitive_text
 from app.schemas.llm import LLMRequest, LLMResponse
 from app.services.token_estimator import estimate_tokens
+from app.services.quota_service import ensure_quota
 
 
 logger = logging.getLogger(__name__)
@@ -38,6 +39,12 @@ class CallAuditor:
         self.story_id = story_id
         self.turn_id = uuid4()
         return self.turn_id
+
+    async def ensure_quota(self, requested_tokens: int) -> None:
+        if self.user_id is None or self.settings.dry_run_llm:
+            return
+        async with AsyncSessionLocal() as session:
+            await ensure_quota(session, self.user_id, requested_tokens, self.settings)
 
     async def record_llm(
         self,

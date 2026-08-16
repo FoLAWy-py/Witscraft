@@ -22,6 +22,7 @@ class AuthUserResponse(BaseModel):
     email: str
     display_name: str
     email_verified: bool
+    is_admin: bool
 
 
 class AuthResponse(BaseModel):

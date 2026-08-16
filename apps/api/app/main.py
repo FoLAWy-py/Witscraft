@@ -1,9 +1,11 @@
 import re
 from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
@@ -12,7 +14,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from app.config import Settings, get_settings, validate_runtime_security
 from app.db.session import engine
 from app.logging_security import install_sensitive_log_filters
-from app.routers import auth, chat, providers, workspace
+from app.routers import admin, auth, chat, providers, quota, workspace
 from app.services.auth_service import SESSION_COOKIE_NAME
 from app.services.health import ReadinessReport, check_readiness
 from app.services.rate_limiter import (
@@ -20,6 +22,7 @@ from app.services.rate_limiter import (
     classify_rate_limit,
     rate_limit_key,
 )
+from app.services.quota_service import QuotaExceededError, snapshot_payload
 
 
 UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
@@ -124,6 +127,21 @@ def create_app(
             content={"detail": "Database temporarily unavailable"},
         )
 
+    @application.exception_handler(QuotaExceededError)
+    async def quota_exceeded_handler(_request: Request, error: QuotaExceededError) -> JSONResponse:
+        retry_after = max(
+            1, int((error.snapshot.resets_at - datetime.now(timezone.utc)).total_seconds())
+        )
+        return JSONResponse(
+            status_code=429,
+            content={
+                "detail": "Weekly AI token quota exceeded",
+                "requested_tokens": error.requested_tokens,
+                "quota": jsonable_encoder(snapshot_payload(error.snapshot)),
+            },
+            headers={"Retry-After": str(retry_after)},
+        )
+
     application.add_middleware(
         CORSMiddleware,
         allow_origins=app_settings.cors_origins,
@@ -141,6 +159,8 @@ def create_app(
     application.include_router(providers.router, prefix=app_settings.api_prefix)
     application.include_router(workspace.router, prefix=app_settings.api_prefix)
     application.include_router(auth.router, prefix=app_settings.api_prefix)
+    application.include_router(quota.router, prefix=app_settings.api_prefix)
+    application.include_router(admin.router, prefix=app_settings.api_prefix)
 
     @application.get("/health")
     async def health() -> dict[str, str]:

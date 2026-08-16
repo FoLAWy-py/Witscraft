@@ -2,6 +2,7 @@ import type {
   AuthResponse,
   AuthMessageResponse,
   AuthSessionListResponse,
+  AdminOverview,
   ChatResponse,
   CreateBranchInput,
   CreateStoryInput,
@@ -12,6 +13,8 @@ import type {
   ModelHealthResponse,
   ModelRoutesResponse,
   ProvidersResponse,
+  QuotaResetResponse,
+  QuotaUsage,
   RegisterInput,
   StoryPurpose,
   UpdateCanonFactInput,
@@ -143,6 +146,24 @@ function getDeviceName(): string | undefined {
 
 export async function getCurrentUser(): Promise<AuthResponse> {
   return requestJson<AuthResponse>(`${API_BASE_URL}/api/auth/me`, { cache: "no-store" });
+}
+
+export async function getMyQuota(): Promise<QuotaUsage> {
+  return requestJson<QuotaUsage>(`${API_BASE_URL}/api/quota/me`, { cache: "no-store" });
+}
+
+export async function getAdminOverview(): Promise<AdminOverview> {
+  return requestJson<AdminOverview>(`${API_BASE_URL}/api/admin/overview`, {
+    cache: "no-store"
+  });
+}
+
+export async function resetAllQuotas(reason: string): Promise<QuotaResetResponse> {
+  return requestJson<QuotaResetResponse>(`${API_BASE_URL}/api/admin/quota/reset-all`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reason })
+  });
 }
 
 export async function login(input: LoginInput): Promise<AuthResponse> {
