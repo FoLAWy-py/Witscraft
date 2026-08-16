@@ -28,7 +28,7 @@ jobs:
         with:
           base: ""
           head: ${{ github.sha }}
-          version: v3.96.0
+          version: "3.96.0"
           extra_args: --no-verification --results=unverified --fail-on-scan-errors
 
   backend:
@@ -53,6 +53,10 @@ jobs:
         run: uv run --with pip-audit==2.10.1 pip-audit --local
       - name: Verify production security boundaries
         run: uv run pytest -q tests/test_security_boundaries.py
+        env:
+          DATABASE_USERNAME: ci-user
+          DATABASE_PASSWORD: ci-password
+          DATABASE_NAME: witscraft-ci
 
   frontend:
     name: Node dependency and artifact checks
