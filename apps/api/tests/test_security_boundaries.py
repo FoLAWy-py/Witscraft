@@ -44,6 +44,8 @@ def test_production_runtime_rejects_missing_services_and_broad_boundaries() -> N
         frontend_base_url="https://app.example.com",
         cors_origins=["*"],
         allowed_hosts=["*"],
+        database_username=None,
+        database_password=None,
     )
 
     with pytest.raises(RuntimeError) as caught:
@@ -151,6 +153,8 @@ def test_production_secret_file_does_not_fall_back_to_env_md(
     )
     monkeypatch.setenv("WITSCRAFT_SECRETS_FILE", str(secret_file))
     monkeypatch.delenv("APP_ENVIRONMENT", raising=False)
+    monkeypatch.delenv("DATABASE_USERNAME", raising=False)
+    monkeypatch.delenv("DATABASE_PASSWORD", raising=False)
     monkeypatch.setattr(
         config_module,
         "_read_env_md",
