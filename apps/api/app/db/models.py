@@ -53,6 +53,7 @@ class AuthCredential(Base, TimestampMixin):
 
 class AuthSession(Base):
     __tablename__ = "auth_sessions"
+    __table_args__ = (Index("ix_auth_sessions_user_created", "user_id", text("created_at DESC")),)
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
@@ -67,6 +68,7 @@ class AuthSession(Base):
 
 class AuthLoginThrottle(Base):
     __tablename__ = "auth_login_throttles"
+    __table_args__ = (Index("ix_auth_login_throttles_updated", "updated_at"),)
 
     key_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
     failure_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -77,6 +79,14 @@ class AuthLoginThrottle(Base):
 
 class AuthActionToken(Base):
     __tablename__ = "auth_action_tokens"
+    __table_args__ = (
+        Index(
+            "ix_auth_action_tokens_user_purpose_created",
+            "user_id",
+            "purpose",
+            text("created_at DESC"),
+        ),
+    )
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
@@ -89,6 +99,7 @@ class AuthActionToken(Base):
 
 class World(Base, TimestampMixin):
     __tablename__ = "worlds"
+    __table_args__ = (Index("ix_worlds_user_updated", "user_id", text("updated_at DESC")),)
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
@@ -106,6 +117,9 @@ class World(Base, TimestampMixin):
 
 class Character(Base, TimestampMixin):
     __tablename__ = "characters"
+    __table_args__ = (
+        Index("ix_characters_user_world_created", "user_id", "world_id", "created_at"),
+    )
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
@@ -122,6 +136,10 @@ class Character(Base, TimestampMixin):
 
 class Story(Base, TimestampMixin):
     __tablename__ = "stories"
+    __table_args__ = (
+        Index("ix_stories_user_updated", "user_id", text("updated_at DESC")),
+        Index("ix_stories_user_world", "user_id", "world_id"),
+    )
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
@@ -142,6 +160,10 @@ class Story(Base, TimestampMixin):
 
 class StoryBranch(Base):
     __tablename__ = "story_branches"
+    __table_args__ = (
+        Index("ix_story_branches_story_created", "story_id", "created_at", "id"),
+        Index("ix_story_branches_parent", "parent_branch_id"),
+    )
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     story_id: Mapped[UUID] = mapped_column(ForeignKey("stories.id", ondelete="CASCADE"), nullable=False)
@@ -156,6 +178,15 @@ class StoryBranch(Base):
 
 class Message(Base):
     __tablename__ = "messages"
+    __table_args__ = (
+        Index(
+            "ix_messages_story_branch_created",
+            "story_id",
+            "branch_id",
+            text("created_at DESC"),
+            text("id DESC"),
+        ),
+    )
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     story_id: Mapped[UUID] = mapped_column(ForeignKey("stories.id", ondelete="CASCADE"), nullable=False)
@@ -202,6 +233,9 @@ class GenerationRequest(Base, TimestampMixin):
 
 class PlotEvent(Base):
     __tablename__ = "plot_events"
+    __table_args__ = (
+        Index("ix_plot_events_story_branch_created", "story_id", "branch_id", "created_at", "id"),
+    )
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     story_id: Mapped[UUID] = mapped_column(ForeignKey("stories.id", ondelete="CASCADE"), nullable=False)
@@ -218,6 +252,15 @@ class PlotEvent(Base):
 
 class StoryStateSnapshot(Base):
     __tablename__ = "story_state_snapshots"
+    __table_args__ = (
+        Index(
+            "ix_story_state_snapshots_story_branch_created",
+            "story_id",
+            "branch_id",
+            text("created_at DESC"),
+        ),
+        Index("ix_story_state_snapshots_message", "message_id"),
+    )
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     story_id: Mapped[UUID] = mapped_column(ForeignKey("stories.id", ondelete="CASCADE"), nullable=False)
@@ -229,6 +272,14 @@ class StoryStateSnapshot(Base):
 
 class StorySummary(Base):
     __tablename__ = "story_summaries"
+    __table_args__ = (
+        Index(
+            "ix_story_summaries_story_branch_created",
+            "story_id",
+            "branch_id",
+            text("created_at DESC"),
+        ),
+    )
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
@@ -246,6 +297,17 @@ class StorySummary(Base):
 
 class CanonFact(Base, TimestampMixin):
     __tablename__ = "canon_facts"
+    __table_args__ = (
+        Index(
+            "ix_canon_facts_active_story_branch_rank",
+            "story_id",
+            "branch_id",
+            text("importance DESC"),
+            text("created_at DESC"),
+            postgresql_where=text("is_active IS TRUE"),
+        ),
+        Index("ix_canon_facts_source_message", "source_message_id"),
+    )
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     story_id: Mapped[UUID] = mapped_column(ForeignKey("stories.id", ondelete="CASCADE"), nullable=False)
@@ -262,6 +324,17 @@ class CanonFact(Base, TimestampMixin):
 
 class MemoryItem(Base, TimestampMixin):
     __tablename__ = "memory_items"
+    __table_args__ = (
+        Index(
+            "ix_memory_items_active_story_branch_rank",
+            "story_id",
+            "branch_id",
+            text("importance DESC"),
+            text("updated_at DESC"),
+            postgresql_where=text("is_active IS TRUE"),
+        ),
+        Index("ix_memory_items_source_message", "source_message_id"),
+    )
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     user_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
@@ -320,6 +393,15 @@ class ModelHealthCheck(Base):
 
 class ModelCall(Base):
     __tablename__ = "model_calls"
+    __table_args__ = (
+        Index(
+            "ix_model_calls_story_latest_llm",
+            "story_id",
+            text("created_at DESC"),
+            postgresql_where=text("call_type = 'llm' AND status = 'succeeded'"),
+        ),
+        Index("ix_model_calls_created", "created_at"),
+    )
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     user_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))

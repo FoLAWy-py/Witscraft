@@ -2,7 +2,7 @@
 
 **Document status:** Production baseline
 
-**Architecture version:** 2.0
+**Architecture version:** 2.1
 
 **Last updated:** 16 August 2026
 
@@ -195,6 +195,20 @@ UUIDs are used for externally referenced entities. Foreign keys and database cas
 
 Embedding values are currently stored behind a pgvector-ready boundary. A future migration will move them to fixed-dimension vector columns with model, dimension, version, content hash, and embedding timestamp metadata.
 
+### 6.1 Query and Index Strategy
+
+Indexes follow observed application query shapes rather than individual columns in isolation.
+Composite indexes cover tenant ownership, branch-local chronology, and latest-record retrieval.
+Partial indexes limit write and storage overhead for active memory/canon ranking and successful
+story-generation audit lookup. Supporting foreign-key indexes protect message cleanup and branch
+deletion from repeated child-table scans.
+
+Migration `0012` creates these indexes concurrently to avoid long exclusive table locks during a
+production upgrade. A rollback-only benchmark inserts 230,000 synthetic rows into the actual
+application tables and verifies critical reads with `EXPLAIN ANALYZE`; all covered reads use
+bounded index scans at the current revision. Methodology and measured results are maintained in
+`docs/database-performance.md`.
+
 ## 7. Generation and Transaction Model
 
 Generation is divided into explicit phases to avoid holding a database write transaction while waiting for an external model.
@@ -306,6 +320,7 @@ The following constraints are known and accepted for the current deployment:
 - Backup automation, encrypted off-site retention, and restoration drills remain P0 operational work.
 - A production-equivalent staging environment has not yet been established.
 - Metrics, tracing, and alerting are not yet connected to a dedicated observability platform.
+- Database query plans are benchmarked locally, but production slow-query telemetry and tenant-skew analysis are not yet available.
 
 Evolution should occur in this order:
 
@@ -328,6 +343,7 @@ Evolution should occur in this order:
 | Single orchestrator by default | Keeps authorization and state transitions deterministic and observable |
 | Explicit Alembic deployment step | Prevents application startup from mutating production schema |
 | Separate liveness and readiness | Distinguishes process availability from dependency and migration safety |
+| Workload-shaped PostgreSQL indexes | Accelerates branch and ownership reads while partial indexes constrain write amplification |
 | Offline secret verification | Prevents suspected credentials from being transmitted to third parties |
 
 This architecture is the production baseline for subsequent implementation and operational planning.

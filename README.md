@@ -14,6 +14,7 @@ apps/
 
 - [`system architecture.md`](./system%20architecture.md): formal production architecture, runtime boundaries, and controlled evolution path
 - [`docs/data-privacy.md`](./docs/data-privacy.md): account export, deletion, retention, and model-provider data boundaries
+- [`docs/database-performance.md`](./docs/database-performance.md): repeatable PostgreSQL query-plan benchmark and index policy
 - [`docs/security-checks.md`](./docs/security-checks.md): dependency, secret, and production artifact security gates
 
 ## Local Development
@@ -53,6 +54,7 @@ NEXT_ALLOWED_DEV_ORIGINS=<your-computer-lan-ip> npm run dev
 
 The backend reads local development secrets from the root `env.md` file. Do not commit real secrets into a public repository. A production process never reads `env.md`; it must receive environment variables or a `WITSCRAFT_SECRETS_FILE` deployment secret file.
 Database structure is versioned in `apps/api/migrations`; application startup does not mutate schema or seed users.
+Migration `0012` adds concurrently-built indexes for branch timelines, active memory/canon retrieval, workspace ownership filters, model-call inspection, and critical foreign-key maintenance. The rollback-only 230,000-row `EXPLAIN ANALYZE` benchmark is documented in `docs/database-performance.md`.
 
 Operational probes have separate meanings: `/health/live` checks only process responsiveness, while `/health/ready` verifies required non-billable configuration, PostgreSQL connectivity, and the deployed Alembic revision. A release is not ready until the database revision matches the application migration head.
 
