@@ -32,7 +32,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app_settings = settings or get_settings()
     validate_runtime_security(app_settings)
     install_sensitive_log_filters()
-    application = FastAPI(title=app_settings.app_name)
+    production = app_settings.app_environment == "production"
+    application = FastAPI(
+        title=app_settings.app_name,
+        debug=False,
+        docs_url=None if production else "/docs",
+        redoc_url=None if production else "/redoc",
+        openapi_url=None if production else "/openapi.json",
+    )
     rate_limiter = SlidingWindowRateLimiter(app_settings.rate_limit_max_keys)
 
     @application.middleware("http")

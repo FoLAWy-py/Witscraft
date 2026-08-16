@@ -14,6 +14,7 @@ apps/
 
 - [`system architecture.md`](./system%20architecture.md): target application and data architecture
 - [`docs/data-privacy.md`](./docs/data-privacy.md): account export, deletion, retention, and model-provider data boundaries
+- [`docs/security-checks.md`](./docs/security-checks.md): dependency, secret, and production artifact security gates
 
 ## Local Development
 
@@ -62,6 +63,8 @@ Unsafe browser requests validate `Origin` against the frontend/CORS allowlist. C
 Production also applies separate sliding-window limits to registration, login, verification/password-reset email, provider tests, story generation and export. A rejected request returns `429` with `Retry-After`, `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` and `X-Request-ID`. Limits are process-local for the current single API process; use a shared Redis-backed limiter before enabling multiple API workers.
 
 Application and Uvicorn logs redact authentication headers, cookies, passwords, API/SMTP secrets, sensitive URL parameters and explicitly logged prompt/message fields. Model audit rows store counts and metadata instead of prompt or response text, and provider errors are sanitized before persistence. Keep request IDs for correlation rather than adding request bodies to logs.
+
+Production disables FastAPI's interactive documentation and OpenAPI schema endpoints, never enables debug exception responses, and does not publish browser sourcemaps. The repository security workflow scans committed history, locked dependency graphs and production browser artifacts on every pull request and push to `main`.
 
 ## Model Routing
 

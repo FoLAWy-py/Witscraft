@@ -7,12 +7,12 @@
     "build": "next build",
     "build:production": "NEXT_PUBLIC_BASE_PATH=/witscraft NEXT_PUBLIC_API_BASE_URL=/witscraft next build",
     "start": "next start --hostname 0.0.0.0",
-    "lint": "next lint",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
-    "next": "^15.0.0",
+    "next": "^16.3.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-markdown": "^10.1.0",
@@ -23,7 +23,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "eslint": "^9.0.0",
-    "eslint-config-next": "^15.0.0",
+    "eslint-config-next": "^16.3.1",
     "typescript": "^5.7.0"
   }
 }

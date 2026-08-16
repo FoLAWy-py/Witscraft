@@ -104,6 +104,28 @@ def test_csrf_rejects_cross_site_cookie_request_without_origin() -> None:
     assert response.status_code == 403
 
 
+def test_production_disables_api_schema_and_hides_unhandled_errors() -> None:
+    application = create_app(_production_settings())
+
+    @application.get("/debug-probe")
+    async def debug_probe() -> None:
+        raise RuntimeError("sensitive-internal-marker")
+
+    client = TestClient(
+        application,
+        base_url="https://app.example.com",
+        raise_server_exceptions=False,
+    )
+
+    for path in ("/docs", "/redoc", "/openapi.json"):
+        assert client.get(path).status_code == 404
+
+    response = client.get("/debug-probe")
+    assert response.status_code == 500
+    assert "sensitive-internal-marker" not in response.text
+    assert "Traceback" not in response.text
+
+
 def test_production_secret_file_does_not_fall_back_to_env_md(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
