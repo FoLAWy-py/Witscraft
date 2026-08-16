@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.witscraft.backup</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>__PROJECT_ROOT__/scripts/backup-postgres.sh</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>__PROJECT_ROOT__</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/opt/postgresql@18/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+    <key>WITSCRAFT_SECRETS_FILE</key>
+    <string>__PROJECT_ROOT__/.runtime/api.env</string>
+    <key>WITSCRAFT_BACKUP_CERT</key>
+    <string>__PROJECT_ROOT__/.runtime/backup-recipient.pem</string>
+    <key>WITSCRAFT_BACKUP_DIR</key>
+    <string>__PROJECT_ROOT__/.runtime/backups</string>
+    <key>WITSCRAFT_BACKUP_OFFSITE_DIR</key>
+    <string>__OFFSITE_BACKUP_DIRECTORY__</string>
+    <key>WITSCRAFT_BACKUP_LOCAL_RETENTION_DAYS</key>
+    <string>7</string>
+    <key>WITSCRAFT_BACKUP_OFFSITE_RETENTION_DAYS</key>
+    <string>35</string>
+  </dict>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>3</integer>
+    <key>Minute</key>
+    <integer>15</integer>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>StandardOutPath</key>
+  <string>__PROJECT_ROOT__/.runtime/backup.log</string>
+  <key>StandardErrorPath</key>
+  <string>__PROJECT_ROOT__/.runtime/backup.log</string>
+</dict>
+</plist>

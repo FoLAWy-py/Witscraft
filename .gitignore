@@ -20,6 +20,9 @@ cookies.txt
 *.key
 *.p12
 *.pfx
+*.dump.cms
+*.dump.cms.sha256
+*.dump.cms.json
 
 # Machine-specific deployment and private working notes
 deploy/

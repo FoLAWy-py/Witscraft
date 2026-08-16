@@ -2,7 +2,7 @@
 
 **Document status:** Production baseline
 
-**Architecture version:** 2.1
+**Architecture version:** 2.2
 
 **Last updated:** 16 August 2026
 
@@ -209,6 +209,23 @@ application tables and verifies critical reads with `EXPLAIN ANALYZE`; all cover
 bounded index scans at the current revision. Methodology and measured results are maintained in
 `docs/database-performance.md`.
 
+### 6.2 Backup and Recovery
+
+The production host creates one logical PostgreSQL backup each day. `pg_dump` custom output is
+compressed with Zstandard and streamed directly into a CMS AES-256-GCM envelope. The backup task
+holds only a public recipient certificate; restoration requires a separately controlled private key
+and passphrase. Each artifact has a SHA-256 transport checksum and a non-sensitive manifest that
+records schema and application revisions.
+
+Local encrypted artifacts are retained for 7 days. The tooling supports a 35-day off-site replica,
+but external transfer remains disabled until the owner approves a destination and independent key
+escrow. This limitation means total host loss is not yet covered by the stated recovery objectives.
+
+Restoration always targets a new isolated database first. The restore gate validates checksum,
+authenticated decryption, dump catalogue, Alembic revision, and core record counts before an
+isolated API performs login, workspace read, and dry-run generation smoke tests. Detailed operating
+procedures and drill evidence are maintained in `docs/backup-recovery.md`.
+
 ## 7. Generation and Transaction Model
 
 Generation is divided into explicit phases to avoid holding a database write transaction while waiting for an external model.
@@ -317,7 +334,7 @@ The following constraints are known and accepted for the current deployment:
 - The API runs as one process; rate-limit and circuit-breaker state are process-local.
 - Long-running jobs execute within request orchestration rather than a durable worker queue.
 - Embedding storage has not yet migrated to fixed-dimension pgvector columns.
-- Backup automation, encrypted off-site retention, and restoration drills remain P0 operational work.
+- Daily encrypted local backup and application-level restoration drills are operational; approved off-site replication and independent recovery-key escrow remain P0 work.
 - A production-equivalent staging environment has not yet been established.
 - Metrics, tracing, and alerting are not yet connected to a dedicated observability platform.
 - Database query plans are benchmarked locally, but production slow-query telemetry and tenant-skew analysis are not yet available.
@@ -344,6 +361,7 @@ Evolution should occur in this order:
 | Explicit Alembic deployment step | Prevents application startup from mutating production schema |
 | Separate liveness and readiness | Distinguishes process availability from dependency and migration safety |
 | Workload-shaped PostgreSQL indexes | Accelerates branch and ownership reads while partial indexes constrain write amplification |
+| Public-key encrypted logical backups | Keeps decryption material out of the unattended backup process and supports isolated recovery drills |
 | Offline secret verification | Prevents suspected credentials from being transmitted to third parties |
 
 This architecture is the production baseline for subsequent implementation and operational planning.

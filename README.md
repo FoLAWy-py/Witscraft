@@ -15,6 +15,7 @@ apps/
 - [`system architecture.md`](./system%20architecture.md): formal production architecture, runtime boundaries, and controlled evolution path
 - [`docs/data-privacy.md`](./docs/data-privacy.md): account export, deletion, retention, and model-provider data boundaries
 - [`docs/database-performance.md`](./docs/database-performance.md): repeatable PostgreSQL query-plan benchmark and index policy
+- [`docs/backup-recovery.md`](./docs/backup-recovery.md): encrypted backup operation, restore procedure, RPO/RTO, and drill evidence
 - [`docs/security-checks.md`](./docs/security-checks.md): dependency, secret, and production artifact security gates
 
 ## Local Development
@@ -57,6 +58,8 @@ Database structure is versioned in `apps/api/migrations`; application startup do
 Migration `0012` adds concurrently-built indexes for branch timelines, active memory/canon retrieval, workspace ownership filters, model-call inspection, and critical foreign-key maintenance. The rollback-only 230,000-row `EXPLAIN ANALYZE` benchmark is documented in `docs/database-performance.md`.
 
 Operational probes have separate meanings: `/health/live` checks only process responsiveness, while `/health/ready` verifies required non-billable configuration, PostgreSQL connectivity, and the deployed Alembic revision. A release is not ready until the database revision matches the application migration head.
+
+The production host runs `scripts/backup-postgres.sh` daily through a LaunchAgent. Backups use PostgreSQL custom format, Zstandard compression, and CMS AES-256-GCM public-key encryption. Recovery operation and the latest drill evidence are documented in `docs/backup-recovery.md`; off-site replication remains disabled until its external destination is explicitly approved.
 
 ## Production Security Boundary
 
