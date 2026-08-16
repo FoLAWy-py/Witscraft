@@ -3113,6 +3113,10 @@ html.theme-transition textarea {
   font-size: 17px;
 }
 
+.adminMetrics article:last-child b {
+  font-size: 14px;
+}
+
 .adminMetrics small {
   margin-top: 2px;
   color: #626961;
@@ -3149,6 +3153,11 @@ html.theme-transition textarea {
 .adminResetConfirm span,
 .adminResetConfirm small {
   display: block;
+}
+
+.adminResetCancel {
+  width: 30px;
+  height: 30px;
 }
 
 .adminResetConfirm small {
@@ -3210,6 +3219,19 @@ html.theme-transition textarea {
   text-transform: uppercase;
 }
 
+.adminTable th:nth-child(1) {
+  width: 36%;
+}
+
+.adminTable th:nth-child(2) {
+  width: 14%;
+}
+
+.adminTable th:nth-child(3),
+.adminTable th:nth-child(4) {
+  width: 16%;
+}
+
 .adminTable tr:last-child td {
   border-bottom: 0;
 }
@@ -3217,6 +3239,17 @@ html.theme-transition textarea {
 .adminTable td > b,
 .adminTable td > small {
   display: block;
+}
+
+.adminAccountCell {
+  max-width: 0;
+}
+
+.adminAccountCell b,
+.adminAccountCell small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .adminTable td > small {
@@ -3249,6 +3282,11 @@ html.theme-transition textarea {
   grid-template-columns: minmax(0, 1fr) 38px;
   align-items: center;
   gap: 7px;
+}
+
+.adminUsage > div {
+  background: #d9ddd8;
+  box-shadow: inset 0 0 0 1px #cfd4cf;
 }
 
 .adminUsage small,
@@ -3799,13 +3837,114 @@ html.theme-transition textarea {
   }
 
   .adminResetConfirm {
-    grid-template-columns: 18px minmax(0, 1fr) 30px;
+    position: relative;
+    grid-template-columns: 18px minmax(0, 1fr);
+    padding: 12px 44px 12px 10px;
   }
 
   .adminResetConfirm .cmdButton {
     grid-column: 1 / -1;
     width: 100%;
     justify-content: center;
+  }
+
+  .adminResetCancel {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+  }
+
+  .adminTableWrap {
+    overflow: hidden;
+  }
+
+  .adminTable {
+    min-width: 0;
+  }
+
+  .adminTable thead {
+    display: none;
+  }
+
+  .adminTable tbody,
+  .adminTable tr {
+    display: block;
+  }
+
+  .adminTable tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px 14px;
+    padding: 13px;
+    border-bottom: 1px solid #e2e5e1;
+  }
+
+  .adminTable tr:last-child {
+    border-bottom: 0;
+  }
+
+  .adminTable td {
+    min-width: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .adminTable td::before {
+    display: block;
+    margin-bottom: 3px;
+    color: #70766f;
+    content: attr(data-label);
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .adminAccountCell {
+    max-width: none;
+  }
+
+  .adminAccountCell::before,
+  .adminRoleCell::before {
+    display: none !important;
+  }
+
+  .adminAccountCell b,
+  .adminAccountCell small {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .adminRoleCell {
+    justify-self: end;
+  }
+
+  .adminUsageCell {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+    padding-top: 10px !important;
+    border-top: 1px solid #edf0ec !important;
+  }
+
+  .adminUsageCell::before {
+    margin: 0 !important;
+  }
+
+  .adminUsage {
+    width: 100%;
+  }
+
+  .adminTokenCell,
+  .adminResetCell {
+    align-self: end;
+  }
+
+  .adminResetCell {
+    max-width: 160px;
+    color: #414640;
+    text-align: right !important;
   }
 
   .quotaMeter.compact {

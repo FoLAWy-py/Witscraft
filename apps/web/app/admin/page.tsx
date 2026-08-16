@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, ArrowLeft, Gauge, RefreshCw, RotateCcw, ShieldCheck, Users } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Gauge, RefreshCw, RotateCcw, ShieldCheck, Users, X } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
@@ -109,7 +109,7 @@ export default function AdminPage() {
             <AlertTriangle size={16} />
             <span><b>Reset every standard user now?</b><small>Usage history is retained; a new global quota window starts immediately.</small></span>
             <button className="cmdButton dangerAction" type="button" disabled={resetting} onClick={() => void resetQuotas()}>{resetting ? <RefreshCw className="spinIcon" size={14} /> : <RotateCcw size={14} />} Confirm reset</button>
-            <button className="plainIcon" type="button" aria-label="Cancel reset" onClick={() => setConfirmingReset(false)} disabled={resetting}>×</button>
+            <button className="plainIcon adminResetCancel" type="button" aria-label="Cancel reset" title="Cancel reset" onClick={() => setConfirmingReset(false)} disabled={resetting}><X size={14} /></button>
           </div>
         )}
       </section>
@@ -124,13 +124,13 @@ export default function AdminPage() {
             <tbody>
               {overview.users.map((user) => (
                 <tr key={user.id}>
-                  <td><b>{user.display_name}</b><small>{user.email}</small></td>
-                  <td><span className={`roleBadge ${user.is_admin ? "admin" : "standard"}`}>{user.is_admin ? "Administrator" : "Standard"}</span></td>
-                  <td>
+                  <td className="adminAccountCell" data-label="Account"><b>{user.display_name}</b><small>{user.email}</small></td>
+                  <td className="adminRoleCell" data-label="Role"><span className={`roleBadge ${user.is_admin ? "admin" : "standard"}`}>{user.is_admin ? "Administrator" : "Standard"}</span></td>
+                  <td className="adminUsageCell" data-label="Usage">
                     {user.unlimited ? <span className="unlimitedLabel">Unlimited</span> : <div className="adminUsage"><div><span style={{ width: `${Math.min(100, user.percentage_used)}%` }} /></div><small>{user.percentage_used.toFixed(1)}%</small></div>}
                   </td>
-                  <td><b>{formatTokens(user.used_tokens)}</b><small>{user.limit_tokens === null ? "No limit" : `of ${formatTokens(user.limit_tokens)}`}</small></td>
-                  <td>{formatDate(user.resets_at)}</td>
+                  <td className="adminTokenCell" data-label="Tokens"><b>{formatTokens(user.used_tokens)}</b><small>{user.limit_tokens === null ? "No limit" : `of ${formatTokens(user.limit_tokens)}`}</small></td>
+                  <td className="adminResetCell" data-label="Resets">{formatDate(user.resets_at)}</td>
                 </tr>
               ))}
             </tbody>
