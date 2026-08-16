@@ -12,7 +12,7 @@ apps/
 
 ## Documentation
 
-- [`system architecture.md`](./system%20architecture.md): target application and data architecture
+- [`system architecture.md`](./system%20architecture.md): formal production architecture, runtime boundaries, and controlled evolution path
 - [`docs/data-privacy.md`](./docs/data-privacy.md): account export, deletion, retention, and model-provider data boundaries
 - [`docs/security-checks.md`](./docs/security-checks.md): dependency, secret, and production artifact security gates
 
@@ -53,6 +53,8 @@ NEXT_ALLOWED_DEV_ORIGINS=<your-computer-lan-ip> npm run dev
 
 The backend reads local development secrets from the root `env.md` file. Do not commit real secrets into a public repository. A production process never reads `env.md`; it must receive environment variables or a `WITSCRAFT_SECRETS_FILE` deployment secret file.
 Database structure is versioned in `apps/api/migrations`; application startup does not mutate schema or seed users.
+
+Operational probes have separate meanings: `/health/live` checks only process responsiveness, while `/health/ready` verifies required non-billable configuration, PostgreSQL connectivity, and the deployed Alembic revision. A release is not ready until the database revision matches the application migration head.
 
 ## Production Security Boundary
 

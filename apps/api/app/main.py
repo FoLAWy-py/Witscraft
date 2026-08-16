@@ -1,4 +1,6 @@
 import re
+from collections.abc import Awaitable, Callable
+from contextlib import asynccontextmanager
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
@@ -8,9 +10,11 @@ from sqlalchemy.exc import SQLAlchemyError
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.config import Settings, get_settings, validate_runtime_security
+from app.db.session import engine
 from app.logging_security import install_sensitive_log_filters
 from app.routers import auth, chat, providers, workspace
 from app.services.auth_service import SESSION_COOKIE_NAME
+from app.services.health import ReadinessReport, check_readiness
 from app.services.rate_limiter import (
     SlidingWindowRateLimiter,
     classify_rate_limit,
@@ -28,17 +32,32 @@ def _origin_allowed(settings: Settings, origin: str) -> bool:
     return bool(settings.cors_origin_regex and re.fullmatch(settings.cors_origin_regex, origin))
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+ReadinessProbe = Callable[[Settings, object], Awaitable[ReadinessReport]]
+
+
+def create_app(
+    settings: Settings | None = None,
+    *,
+    database_engine=engine,
+    readiness_probe: ReadinessProbe = check_readiness,
+) -> FastAPI:
     app_settings = settings or get_settings()
     validate_runtime_security(app_settings)
     install_sensitive_log_filters()
     production = app_settings.app_environment == "production"
+
+    @asynccontextmanager
+    async def lifespan(_application: FastAPI):
+        yield
+        await database_engine.dispose()
+
     application = FastAPI(
         title=app_settings.app_name,
         debug=False,
         docs_url=None if production else "/docs",
         redoc_url=None if production else "/redoc",
         openapi_url=None if production else "/openapi.json",
+        lifespan=lifespan,
     )
     rate_limiter = SlidingWindowRateLimiter(app_settings.rate_limit_max_keys)
 
@@ -126,6 +145,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @application.get("/health")
     async def health() -> dict[str, str]:
         return {"status": "ok", "app": app_settings.app_name}
+
+    @application.get("/health/live")
+    async def health_live() -> dict[str, str]:
+        return {"status": "alive", "app": app_settings.app_name}
+
+    @application.get("/health/ready")
+    async def health_ready():
+        report = await readiness_probe(app_settings, database_engine)
+        payload = {
+            "status": "ready" if report.ready else "not_ready",
+            "checks": report.checks,
+            "migration_revisions": list(report.migration_revisions),
+            "expected_migration_revisions": list(report.expected_migration_revisions),
+        }
+        if not report.ready:
+            return JSONResponse(status_code=503, content=payload, headers={"Cache-Control": "no-store"})
+        return JSONResponse(content=payload, headers={"Cache-Control": "no-store"})
 
     return application
 

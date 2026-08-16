@@ -52,7 +52,7 @@ jobs:
       - name: Audit installed dependencies
         run: uv run --with pip-audit==2.10.1 pip-audit --local
       - name: Verify production security boundaries
-        run: uv run pytest -q tests/test_security_boundaries.py
+        run: uv run pytest -q tests/test_security_boundaries.py tests/test_health.py
         env:
           DATABASE_USERNAME: ci-user
           DATABASE_PASSWORD: ci-password
