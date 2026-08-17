@@ -11,7 +11,7 @@ from app.schemas.chat import StoryState
 from app.schemas.llm import ChatMessage
 
 
-STATE_EXTRACTION_PROMPT_VERSION = "state-extraction-v1"
+STATE_EXTRACTION_PROMPT_VERSION = "state-extraction-v2"
 STATE_EXTRACTION_SYSTEM_PROMPT = (
     "你是小说连续性状态提取器。只提取本轮结束时明确成立的信息，不续写剧情。"
     "返回 JSON：location、time、mood、objective、inventory、open_threads、relationships "
@@ -24,9 +24,13 @@ STATE_EXTRACTION_SYSTEM_PROMPT = (
     " from、to、bond、value（-100 到 100）。"
     "若文本说明某个新称呼只是既有角色的职阶、称号、代号或别名，必须沿用既有实体"
     "名称，不得为该称呼新增第二条关系。"
-    "memory 只写值得后续召回、会影响后续选择的行动或事件；寒暄、点头、重复陈述、"
+    "mood、objective 和 relationship bond 只能使用本轮原文明示的词；没有明确变化时返回 null。"
+    "计划前往某地或准备工具不是新的 open thread；只有原文明示已经查明或解决时才能删除旧 thread。"
+    "memory 最多一条，必须逐字复制本轮原文中最短的关键事件从句，不得释义；只记录抵达、物品得失、"
+    "伤亡、离开、开启、摧毁、交付、背叛或救援等会影响后续选择的结果。寒暄、点头、重复陈述、"
     "无后果的短暂动作不得写入；canon 只写稳定事实，禁止写比喻、疑问、"
-    "备选行动或推测。禁止补充本轮文本没有出现的姓名、物品、日期、时间或背景。"
+    "备选行动、推测、称号或别名声明，并必须逐字复制原文中的最短事实从句。"
+    "禁止补充本轮文本没有出现的姓名、物品、日期、时间或背景。"
     "relationships 必须是数组，例如 [{\"from\":\"甲\",\"to\":\"乙\","
     "\"bond\":\"信任\",\"value\":60}]，没有关系变化时返回 null。"
     "所有文本使用简洁中文。"
@@ -136,8 +140,8 @@ async def extract_story_updates_with_llm(
     state = StoryState(
         location=_grounded_location(payload.location, previous.location, source_text),
         time=_grounded_value(payload.time, previous.time, source_text),
-        mood=_generated_value(payload.mood, previous.mood),
-        objective=_grounded_value(payload.objective, previous.objective, source_text),
+        mood=_grounded_value(payload.mood, previous.mood, source_text),
+        objective=_grounded_objective(payload.objective, previous.objective, source_text),
         inventory=_grounded_list(
             payload.inventory,
             previous.inventory,
@@ -145,11 +149,10 @@ async def extract_story_updates_with_llm(
             limit=20,
             reject_negated=True,
         ),
-        open_threads=_grounded_list(
+        open_threads=_grounded_open_threads(
             payload.open_threads,
             previous.open_threads,
             thread_source,
-            limit=12,
         ),
     )
     relationship_source = f"{source_text}\n{json.dumps(relationships or [], ensure_ascii=False)}"
@@ -163,9 +166,9 @@ async def extract_story_updates_with_llm(
         if payload.relationships is not None
         else list(relationships or [])
     )
-    if not extracted_relationships and perspective_character:
-        extracted_relationships = _infer_explicit_relationships(
-            source_text, perspective_character
+    if perspective_character:
+        extracted_relationships.extend(
+            _infer_explicit_relationships(source_text, perspective_character)
         )
     aliases = _relationship_aliases(
         source_text,
@@ -176,8 +179,8 @@ async def extract_story_updates_with_llm(
     return ExtractionResult(
         state=state,
         relationships=normalized_relationships[:20],
-        memories=_grounded_list(payload.memories, [], source_text, limit=3),
-        canon_facts=_grounded_list(payload.canon_facts, [], source_text, limit=4),
+        memories=_grounded_memories(payload.memories, source_text),
+        canon_facts=_grounded_canon_facts(payload.canon_facts, source_text),
         source="llm",
     )
 
@@ -339,6 +342,150 @@ def _grounded_value(value: str | None, fallback: str, source: str) -> str:
     if generated == fallback or _is_grounded(generated, source):
         return generated
     return fallback
+
+
+def _grounded_objective(value: str | None, fallback: str, source: str) -> str:
+    candidate = _grounded_value(value, fallback, source)
+    if candidate == fallback:
+        return fallback
+    objective_markers = (
+        "决定",
+        "目标",
+        "任务",
+        "必须",
+        "继续",
+        "调查",
+        "寻找",
+        "查明",
+        "确认",
+        "验证",
+        "摆脱",
+        "修好",
+        "核对",
+    )
+    return candidate if any(marker in source for marker in objective_markers) else fallback
+
+
+def _grounded_open_threads(
+    values: list[str] | None,
+    fallback: list[str],
+    source: str,
+) -> list[str]:
+    if values is None:
+        return list(fallback)
+    planned_actions = ("前往", "去往", "抵达", "准备", "出发")
+    compact_source = re.sub(r"\s+", "", source)
+    stable_fact_markers = ("已经", "已被", "来自", "写明", "证明", "无法", "必须", "不会")
+    incoming = []
+    for value in values:
+        normalized = re.sub(r"^(?:调查|确认|查明|寻找|弄清)", "", _clean_phrase(value))
+        compact_value = re.sub(r"\s+", "", normalized)
+        thread_anchor = re.sub(
+            r"(?:的)?(?:含义|来源|身份|位置|真相|关系|目的)$",
+            "",
+            compact_value,
+        )
+        source_grounded = compact_value in compact_source or (
+            len(thread_anchor) >= 2 and thread_anchor in compact_source
+        )
+        if (
+            compact_value
+            and source_grounded
+            and not any(marker in normalized for marker in planned_actions)
+            and not any(marker in normalized for marker in stable_fact_markers)
+        ):
+            incoming.append(normalized)
+    preserved = []
+    for value in fallback:
+        compact_value = re.sub(r"\s+", "", _clean_phrase(value))
+        resolved = any(
+            marker in compact_source
+            for marker in (
+                f"{compact_value}已经查明",
+                f"{compact_value}已查明",
+                f"{compact_value}已经解决",
+                f"{compact_value}已解决",
+            )
+        )
+        if not resolved and value not in incoming:
+            preserved.append(value)
+    return _merge_unique(preserved, incoming, limit=12)
+
+
+def _grounded_memories(values: list[str], source: str) -> list[str]:
+    consequence_markers = (
+        "抵达",
+        "丢进",
+        "丢弃",
+        "拿起",
+        "拾到",
+        "获得",
+        "失去",
+        "死亡",
+        "离开",
+        "打开",
+        "开启",
+        "摧毁",
+        "交给",
+        "背叛",
+        "救下",
+        "受伤",
+    )
+    sentences = [
+        _clean_phrase(sentence)
+        for sentence in re.split(r"[。！？\n]+", source)
+        if _clean_phrase(sentence)
+    ]
+    multi_event = next(
+        (
+            sentence
+            for sentence in sentences
+            if sum(marker in sentence for marker in consequence_markers) >= 2
+        ),
+        None,
+    )
+    if multi_event:
+        return [multi_event]
+    compact_source = re.sub(r"\s+", "", source)
+    grounded = []
+    for value in values:
+        cleaned = _clean_phrase(value)
+        if (
+            re.sub(r"\s+", "", cleaned) not in compact_source
+            or not any(marker in cleaned for marker in consequence_markers)
+        ):
+            continue
+        arrival_index = cleaned.find("抵达")
+        if arrival_index >= 0:
+            cleaned = cleaned[arrival_index:]
+        grounded.append(cleaned)
+    return _merge_unique([], grounded, limit=1)
+
+
+def _grounded_canon_facts(values: list[str], source: str) -> list[str]:
+    excluded = ("不是名字", "职阶", "称号", "代号", "别名")
+    stable_markers = (
+        "已经",
+        "已被",
+        "来自",
+        "写着",
+        "写明",
+        "证明",
+        "无法",
+        "不能",
+        "必须",
+        "不会",
+        "已死亡",
+    )
+    compact_source = re.sub(r"\s+", "", source)
+    grounded = [
+        value
+        for value in values
+        if re.sub(r"\s+", "", _clean_phrase(value)) in compact_source
+        and not any(marker in value for marker in excluded)
+        and any(marker in value for marker in stable_markers)
+    ]
+    return _merge_unique([], grounded, limit=4)
 
 
 def _grounded_location(value: str | None, fallback: str, source: str) -> str:

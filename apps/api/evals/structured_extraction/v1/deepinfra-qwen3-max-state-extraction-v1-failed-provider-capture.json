@@ -1,0 +1,70 @@
+{
+  "call_limit": 8,
+  "capture_method": "bounded_live_provider",
+  "captured_at": "2026-08-17T12:27:29.576538Z",
+  "case_set_sha256": "6b3c0ff4ad053c72da7faf5e51ad85ad2dbd0edf9032130783818d4ee631cf9f",
+  "evaluation_version": "structured-extraction-v1",
+  "evidence_kind": "provider_capture",
+  "measurements": {
+    "abstract-perspective-is-not-location": {
+      "input_tokens": 463,
+      "latency_ms": 2265,
+      "output_tokens": 69
+    },
+    "explicit-arrival-and-stable-fact": {
+      "input_tokens": 484,
+      "latency_ms": 2949,
+      "output_tokens": 106
+    },
+    "explicit-kinship-inference": {
+      "input_tokens": 455,
+      "latency_ms": 3277,
+      "output_tokens": 155
+    },
+    "inventory-removal-and-addition": {
+      "input_tokens": 473,
+      "latency_ms": 2993,
+      "output_tokens": 106
+    },
+    "planned-destination-is-not-location": {
+      "input_tokens": 469,
+      "latency_ms": 3135,
+      "output_tokens": 82
+    },
+    "quiet-turn-preserves-state": {
+      "input_tokens": 462,
+      "latency_ms": 2772,
+      "output_tokens": 60
+    },
+    "resolved-thread-is-removed": {
+      "input_tokens": 475,
+      "latency_ms": 3074,
+      "output_tokens": 81
+    },
+    "title-alias-does-not-duplicate-character": {
+      "input_tokens": 501,
+      "latency_ms": 3788,
+      "output_tokens": 144
+    }
+  },
+  "model": "Qwen/Qwen3-Max",
+  "prompt_version": "state-extraction-v1",
+  "provider": "deepinfra",
+  "responses": {
+    "abstract-perspective-is-not-location": "{\n  \"location\": \"海底通信塔\",\n  \"time\": \"深夜\",\n  \"mood\": \"压抑\",\n  \"objective\": \"验证语音\",\n  \"inventory\": [],\n  \"open_threads\": [\"语音真伪\"],\n  \"relationships\": null,\n  \"memories\": [],\n  \"canon_facts\": []\n}",
+    "explicit-arrival-and-stable-fact": "{\n  \"location\": \"废弃地铁站\",\n  \"time\": \"夜晚\",\n  \"mood\": \"警觉\",\n  \"objective\": \"调查站台广播的来源\",\n  \"inventory\": [\"铜钥匙\"],\n  \"open_threads\": [\"站台广播的来源\"],\n  \"relationships\": null,\n  \"memories\": [\"跟着烛尾出发\", \"抵达废弃地铁站\", \"档案写明废弃地铁站已经封锁\"],\n  \"canon_facts\": [\"废弃地铁站已经封锁\"]\n}",
+    "explicit-kinship-inference": "{\n  \"location\": null,\n  \"time\": null,\n  \"mood\": null,\n  \"objective\": \"确认录音来源\",\n  \"inventory\": null,\n  \"open_threads\": [\"周墨失踪原因\", \"警告内容含义\"],\n  \"relationships\": [\n    {\n      \"from\": \"周砚\",\n      \"to\": \"周墨\",\n      \"bond\": \"兄弟\",\n      \"value\": 70\n    }\n  ],\n  \"memories\": [\"周砚确认录音中的声音是失踪兄长周墨\", \"周墨在录音中留下警告\"],\n  \"canon_facts\": [\"周墨是周砚的兄长\", \"周墨已失踪\", \"录音中包含周墨留下的警告\"]\n}",
+    "inventory-removal-and-addition": "{\n  \"location\": \"石桥\",\n  \"time\": \"清晨\",\n  \"mood\": \"紧张\",\n  \"objective\": \"摆脱追踪\",\n  \"inventory\": [\"纸条\", \"铜币\"],\n  \"open_threads\": [],\n  \"relationships\": null,\n  \"memories\": [\"宁舟将旧钥匙丢进河里以消除行踪线索\"],\n  \"canon_facts\": [\"旧钥匙已被丢弃\", \"铜币位于桥栏上并被宁舟拾起\"]\n}",
+    "planned-destination-is-not-location": "{\n  \"location\": null,\n  \"time\": null,\n  \"mood\": null,\n  \"objective\": \"准备工具\",\n  \"inventory\": null,\n  \"open_threads\": [\"前往废弃地铁站\"],\n  \"relationships\": null,\n  \"memories\": [\"烛尾提议稍后再前往废弃地铁站，当前需先准备工具\"],\n  \"canon_facts\": []\n}",
+    "quiet-turn-preserves-state": "{\n  \"location\": null,\n  \"time\": null,\n  \"mood\": null,\n  \"objective\": null,\n  \"inventory\": null,\n  \"open_threads\": null,\n  \"relationships\": null,\n  \"memories\": [],\n  \"canon_facts\": []\n}",
+    "resolved-thread-is-removed": "{\n  \"location\": null,\n  \"time\": null,\n  \"mood\": null,\n  \"objective\": null,\n  \"inventory\": [\"铜钥匙\"],\n  \"open_threads\": [\"失踪兄长位置\"],\n  \"relationships\": null,\n  \"memories\": [\"查阅档案确认铜钥匙来自市政厅\"],\n  \"canon_facts\": [\"铜钥匙来自市政厅\"]\n}",
+    "title-alias-does-not-duplicate-character": "{\n  \"location\": null,\n  \"time\": null,\n  \"mood\": \"疑惑\",\n  \"objective\": \"查明烛尾的真正身份\",\n  \"inventory\": null,\n  \"open_threads\": [\"橘猫真实身份\", \"烛尾职阶的含义\"],\n  \"relationships\": [\n    {\n      \"from\": \"罗小罗\",\n      \"to\": \"橘猫\",\n      \"bond\": \"初步信任\",\n      \"value\": 40\n    }\n  ],\n  \"memories\": [\"橘猫自称‘烛尾’，并说明这是职阶而非名字\"],\n  \"canon_facts\": [\"‘烛尾’是职阶，不是名字\"]\n}"
+  },
+  "schema_version": 1,
+  "totals": {
+    "calls": 8,
+    "input_tokens": 3782,
+    "latency_ms": 24253,
+    "output_tokens": 803
+  }
+}

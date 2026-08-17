@@ -12,7 +12,7 @@ Witscraft routes AI-authored narrative and auxiliary structured tasks independen
 
 Every quality-sensitive model route must be governed by a named prompt version, a versioned fixed evaluation corpus, explicit metrics and thresholds, and an approval record bound to the exact corpus hash and provider/model identity.
 
-CI uses synthetic recorded responses only to verify deterministic contracts and evaluator behavior. Synthetic evidence is never sufficient to approve a new provider route. A route change requires a complete, bounded provider capture over synthetic or properly anonymized cases, a timezone-qualified capture record, and passing quality thresholds. The capture is reused until the prompt, corpus, provider model version, or relevant adapter semantics change.
+CI uses synthetic recorded responses to verify deterministic contracts and evaluator behavior, and replays reviewed provider captures without network traffic. Synthetic evidence is never sufficient to approve a new provider route. A route change requires a complete, bounded provider capture over synthetic or properly anonymized cases, a timezone-qualified capture record, and passing quality thresholds. The capture is reused until the prompt, corpus, provider model version, relevant adapter semantics, or deterministic acceptance boundary changes.
 
 The application registry and route approval record must change atomically in one reviewed commit. A pinned legacy exception may keep a pre-evaluation default in service, but cannot be transferred to another model. Quality evidence is evaluated alongside measured token cost and latency; no single example or single metric decides rollout.
 

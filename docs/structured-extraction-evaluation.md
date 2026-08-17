@@ -6,7 +6,7 @@
 
 Witscraft uses a structured model call to convert an AI-authored narrative turn into durable scene state, inventory, unresolved threads, relationships, memories, and canon facts. A cheaper or faster model must not become the default merely because it returns valid JSON in one demonstration. This gate measures recorded responses against a fixed, synthetic, anonymized corpus before a route change can be approved.
 
-The current corpus is `structured-extraction-v1` and is bound to prompt version `state-extraction-v1`, the exact system-prompt SHA-256, and the canonical case-set SHA-256. It covers quiet turns, explicit arrival, planned destinations, abstract perspective language, inventory removal and addition, resolved threads, explicit kinship, and title/alias canonicalization.
+The current corpus is `structured-extraction-v1` and is bound to prompt version `state-extraction-v2`, the exact system-prompt SHA-256, and the canonical case-set SHA-256. It covers quiet turns, explicit arrival, planned destinations, abstract perspective language, inventory removal and addition, resolved threads, explicit kinship, and title/alias canonicalization.
 
 ## Evidence classes
 
@@ -38,11 +38,19 @@ The thresholds are versioned in `apps/api/evals/structured_extraction/v1/thresho
 
 ## Commands
 
-Run the deterministic contract and current-route approval gate without provider traffic:
+Re-score the current route from its immutable real-provider capture, without new provider traffic:
 
 ```bash
 cd apps/api
 uv run python ../../scripts/evaluate-structured-extraction.py
+```
+
+Run the synthetic evaluator contract explicitly when changing evaluator behavior:
+
+```bash
+cd apps/api
+uv run python ../../scripts/evaluate-structured-extraction.py \
+  --responses evals/structured_extraction/v1/reference_responses.json
 ```
 
 Evaluate a previously captured candidate bundle:
@@ -55,11 +63,30 @@ uv run python ../../scripts/evaluate-structured-extraction.py \
   --output /tmp/structured-extraction-report.json
 ```
 
-The evaluator never contacts a provider. A live capture is a separate, explicitly authorized and bounded operation. Do not generate a new capture on every CI run or conversation; reuse it while the case hash, prompt version, provider model version, and relevant adapter behavior remain unchanged.
+The evaluator never contacts a provider. A live capture is a separate, explicitly authorized and bounded operation. The repository capture command refuses dry-run mode, requires an explicit billable-call acknowledgement, accepts only registered provider/model pairs, performs no more than eight sequential calls, writes no credentials or provider request metadata, and refuses to overwrite immutable evidence:
+
+```bash
+cd apps/api
+uv run python ../../scripts/capture-structured-extraction.py \
+  --provider deepinfra \
+  --model Qwen/Qwen3-Max \
+  --output evals/structured_extraction/v1/provider-capture.json \
+  --confirm-live-provider
+```
+
+Do not generate a new capture on every CI run or conversation. Reuse it while the case hash, prompt version, provider model version, and relevant adapter behavior remain unchanged.
 
 ## Route approval lifecycle
 
-`route_approval.json` is checked against the registered `state_update` default on every CI run and release preflight. The current Qwen route is recorded as a pre-evaluation legacy baseline: it may remain in place, but that exception is pinned to the exact provider/model pair and cannot approve another model.
+`route_approval.json` is checked against the registered `state_update` default on every CI run and release preflight. The current DeepInfra `Qwen/Qwen3-Max` route is approved by the reviewed `state-extraction-v2` provider capture. Model quality scores are calculated from those real provider responses. CI replays the immutable capture without new provider traffic and reports `score_source=provider_capture` plus the provider-evidence metrics; synthetic reference metrics test only the evaluator and can never be presented as the model's score. The gate fails if the prompt, corpus, route identity, thresholds, or deterministic post-processing changes incompatibly.
+
+## Current provider evidence
+
+The first bounded capture against `state-extraction-v1` used 3,782 input and 803 output tokens over eight calls. JSON parsing and critical assertions passed, but scalar accuracy was 90.6%, collection F1 was 73.4%, relationship F1 was 75%, and accepted hallucination rate was 27.6%; it was retained as failed evidence and never approved.
+
+The failure drove `state-extraction-v2` and stricter deterministic acceptance rules: mood and objectives require source grounding, planned actions cannot become open threads, unresolved threads survive unless explicitly resolved, relationship kinship overrides use source-exact labels, and memories/canon facts use bounded source-span and event-category rules. The alias case also stopped expecting a relationship label that the supplied text could not support.
+
+The second bounded capture used 4,598 input and 670 output tokens over eight calls with 20,059 ms aggregate provider latency. Replaying the unchanged provider responses through the completed deterministic boundary achieved 100% parse success, scalar accuracy, collection F1, relationship F1, and critical assertions, with 0% accepted hallucinations. This capture approves only the exact current route, prompt, corpus, thresholds, and post-processing behavior.
 
 To change the default:
 

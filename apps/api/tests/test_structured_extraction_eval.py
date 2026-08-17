@@ -1,4 +1,7 @@
 import copy
+import json
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -12,6 +15,7 @@ from app.llm.model_registry import PURPOSE_DEFAULTS, get_model
 
 
 EVAL_ROOT = Path(__file__).parents[1] / "evals" / "structured_extraction" / "v1"
+REPOSITORY_ROOT = Path(__file__).parents[3]
 
 
 def _fixtures() -> tuple[dict, dict, dict[str, float]]:
@@ -102,14 +106,43 @@ def test_current_structured_default_matches_route_approval() -> None:
         current_model=model.model,
     )
 
-    assert report is None
+    assert report is not None
+    assert report.passed is True
+    assert report.evidence_kind == "provider_capture"
+    assert report.metrics.scalar_accuracy == 1.0
+    assert report.metrics.collection_f1 == 1.0
+    assert report.metrics.relationship_f1 == 1.0
+    assert report.metrics.hallucination_rate == 0.0
+
+
+def test_default_cli_reports_real_provider_score_as_primary_result() -> None:
+    completed = subprocess.run(
+        [sys.executable, str(REPOSITORY_ROOT / "scripts/evaluate-structured-extraction.py")],
+        cwd=REPOSITORY_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    payload = json.loads(completed.stdout)
+
+    assert payload["evidence_kind"] == "provider_capture"
+    assert payload["provider"] == "deepinfra"
+    assert payload["model"] == "Qwen/Qwen3-Max"
+    assert payload["route_approval"]["score_source"] == "provider_capture"
+    assert payload["metrics"] == payload["route_approval"]["provider_evidence_metrics"]
 
 
 def test_legacy_exception_cannot_approve_a_different_model() -> None:
     cases, _, thresholds = _fixtures()
     approval = load_json(EVAL_ROOT / "route_approval.json")
     changed = copy.deepcopy(approval)
-    changed["state_update_route"]["model"] = "zai-org/GLM-5.2"
+    changed["state_update_route"].update(
+        {
+            "model": "zai-org/GLM-5.2",
+            "evidence_kind": "legacy_pre_evaluation_default",
+        }
+    )
+    changed["state_update_route"].pop("response_bundle", None)
 
     with pytest.raises(ValueError, match="legacy exception"):
         validate_route_approval(

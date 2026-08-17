@@ -41,8 +41,8 @@ def test_structured_state_update_populates_inspector_fields():
           "inventory": ["旧车票", "录音笔", "夹层纸片"],
           "open_threads": ["07:47 的含义", "失踪兄长与车站的关系"],
           "relationships": [{"from": "周砚", "to": "周墨", "bond": "牵挂", "value": 72}],
-          "memories": ["周砚在废弃站台拾到写有兄长名字的旧车票。"],
-          "canon_facts": ["旧车票背面写着 07:47。"]
+          "memories": ["周砚在废弃的旧车站二号站台拾到旧车票。"],
+          "canon_facts": ["车票背面写着 07:47。"]
         }"""
     )
 
@@ -63,8 +63,8 @@ def test_structured_state_update_populates_inspector_fields():
     assert result.relationships == [
         {"from": "周砚", "to": "周墨", "bond": "牵挂", "value": 72}
     ]
-    assert result.memories == ["周砚在废弃站台拾到写有兄长名字的旧车票"]
-    assert result.canon_facts == ["旧车票背面写着 07:47"]
+    assert result.memories == ["周砚在废弃的旧车站二号站台拾到旧车票"]
+    assert result.canon_facts == ["车票背面写着 07:47"]
     assert result.source == "llm"
 
 
@@ -235,3 +235,37 @@ def test_complete_inventory_can_preserve_old_item_and_remove_discarded_item():
     )
 
     assert result.state.inventory == ["纸条", "铜币"]
+
+
+def test_live_shaped_overreach_is_rejected_by_deterministic_postprocessing():
+    result = asyncio.run(
+        extract_story_updates_with_llm(
+            FakeGateway(
+                """{
+                  "location": null,
+                  "time": null,
+                  "mood": "疑惑",
+                  "objective": "准备工具",
+                  "inventory": null,
+                  "open_threads": ["前往废弃地铁站"],
+                  "relationships": null,
+                  "memories": ["烛尾提议稍后再前往废弃地铁站，当前需先准备工具"],
+                  "canon_facts": ["‘烛尾’是职阶，不是名字"]
+                }"""
+            ),
+            StoryState(
+                location="修车铺",
+                mood="平静",
+                objective="修好发动机",
+                open_threads=["橘猫身份"],
+            ),
+            "我们要不要去废弃地铁站？",
+            "橘猫说先准备工具，稍后再前往废弃地铁站。‘烛尾’不是名字，是职阶。",
+        )
+    )
+
+    assert result.state.mood == "平静"
+    assert result.state.objective == "修好发动机"
+    assert result.state.open_threads == ["橘猫身份"]
+    assert result.memories == []
+    assert result.canon_facts == []

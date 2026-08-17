@@ -1,0 +1,70 @@
+{
+  "call_limit": 8,
+  "capture_method": "bounded_live_provider",
+  "captured_at": "2026-08-17T12:31:34.924445Z",
+  "case_set_sha256": "b3195a5b40ad4ff490e1ab0deb6264bad998d3ffbfdb10778cf8663940832c1e",
+  "evaluation_version": "structured-extraction-v1",
+  "evidence_kind": "provider_capture",
+  "measurements": {
+    "abstract-perspective-is-not-location": {
+      "input_tokens": 565,
+      "latency_ms": 2142,
+      "output_tokens": 63
+    },
+    "explicit-arrival-and-stable-fact": {
+      "input_tokens": 586,
+      "latency_ms": 2554,
+      "output_tokens": 99
+    },
+    "explicit-kinship-inference": {
+      "input_tokens": 557,
+      "latency_ms": 2895,
+      "output_tokens": 125
+    },
+    "inventory-removal-and-addition": {
+      "input_tokens": 575,
+      "latency_ms": 2230,
+      "output_tokens": 90
+    },
+    "planned-destination-is-not-location": {
+      "input_tokens": 571,
+      "latency_ms": 2457,
+      "output_tokens": 66
+    },
+    "quiet-turn-preserves-state": {
+      "input_tokens": 564,
+      "latency_ms": 2762,
+      "output_tokens": 60
+    },
+    "resolved-thread-is-removed": {
+      "input_tokens": 577,
+      "latency_ms": 2490,
+      "output_tokens": 75
+    },
+    "title-alias-does-not-duplicate-character": {
+      "input_tokens": 603,
+      "latency_ms": 2529,
+      "output_tokens": 92
+    }
+  },
+  "model": "Qwen/Qwen3-Max",
+  "prompt_version": "state-extraction-v2",
+  "provider": "deepinfra",
+  "responses": {
+    "abstract-perspective-is-not-location": "{\n  \"location\": null,\n  \"time\": null,\n  \"mood\": null,\n  \"objective\": null,\n  \"inventory\": null,\n  \"open_threads\": [\"语音真伪\"],\n  \"relationships\": null,\n  \"memories\": [],\n  \"canon_facts\": []\n}",
+    "explicit-arrival-and-stable-fact": "{\n  \"location\": \"废弃地铁站\",\n  \"time\": \"夜晚\",\n  \"mood\": \"警觉\",\n  \"objective\": \"调查站台广播的来源\",\n  \"inventory\": [\"铜钥匙\"],\n  \"open_threads\": [\"调查站台广播的来源\", \"废弃地铁站已经封锁\"],\n  \"relationships\": null,\n  \"memories\": [\"你们抵达废弃地铁站\"],\n  \"canon_facts\": [\"废弃地铁站已经封锁\"]\n}",
+    "explicit-kinship-inference": "{\n  \"location\": null,\n  \"time\": null,\n  \"mood\": null,\n  \"objective\": null,\n  \"inventory\": null,\n  \"open_threads\": [\"周墨留下了什么警告\", \"周墨为何失踪\"],\n  \"relationships\": [\n    {\n      \"from\": \"周砚\",\n      \"to\": \"周墨\",\n      \"bond\": \"兄弟\",\n      \"value\": 70\n    }\n  ],\n  \"memories\": [\"周砚确认失踪兄长周墨留下了警告\"],\n  \"canon_facts\": [\"录音中的声音属于周墨\"]\n}",
+    "inventory-removal-and-addition": "{\n  \"location\": \"石桥\",\n  \"time\": \"清晨\",\n  \"mood\": \"紧张\",\n  \"objective\": \"摆脱追踪\",\n  \"inventory\": [\"纸条\", \"铜币\"],\n  \"open_threads\": [],\n  \"relationships\": null,\n  \"memories\": [\"宁舟把旧钥匙丢进河里\"],\n  \"canon_facts\": [\"宁舟拿起桥栏上的铜币\"]\n}",
+    "planned-destination-is-not-location": "{\n  \"location\": null,\n  \"time\": null,\n  \"mood\": null,\n  \"objective\": \"准备工具\",\n  \"inventory\": null,\n  \"open_threads\": [\"前往废弃地铁站\"],\n  \"relationships\": null,\n  \"memories\": [],\n  \"canon_facts\": []\n}",
+    "quiet-turn-preserves-state": "{\n  \"location\": null,\n  \"time\": null,\n  \"mood\": null,\n  \"objective\": null,\n  \"inventory\": null,\n  \"open_threads\": null,\n  \"relationships\": null,\n  \"memories\": [],\n  \"canon_facts\": []\n}",
+    "resolved-thread-is-removed": "{\n  \"location\": null,\n  \"time\": null,\n  \"mood\": null,\n  \"objective\": null,\n  \"inventory\": null,\n  \"open_threads\": [\"失踪兄长位置\"],\n  \"relationships\": null,\n  \"memories\": [\"钥匙来源已经查明\"],\n  \"canon_facts\": [\"铜钥匙来自市政厅\"]\n}",
+    "title-alias-does-not-duplicate-character": "{\n  \"location\": null,\n  \"time\": null,\n  \"mood\": \"试探\",\n  \"objective\": \"确认橘猫身份\",\n  \"inventory\": null,\n  \"open_threads\": [\"橘猫身份\"],\n  \"relationships\": null,\n  \"memories\": [\"‘烛尾’不是名字，是职阶。\"],\n  \"canon_facts\": [\"‘烛尾’不是名字，是职阶。\"]\n}"
+  },
+  "schema_version": 1,
+  "totals": {
+    "calls": 8,
+    "input_tokens": 4598,
+    "latency_ms": 20059,
+    "output_tokens": 670
+  }
+}

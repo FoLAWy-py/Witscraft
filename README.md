@@ -89,7 +89,7 @@ The browser submits the story purpose rather than assembling a provider/model pa
 
 Route updates are serialized per account and append an immutable before/after snapshot in the same database transaction as the active routes. The settings view can undo the latest change; that undo is itself audited and can be undone again. No-op saves create no audit noise. Route history is included in account export and removed with the account.
 
-The `state_update` default is pinned to a versioned route-approval record. CI and release preflight run an eight-case synthetic structured-extraction contract, but synthetic responses cannot approve a new model. A replacement default requires a complete provider capture bound to the exact case hash and prompt version, with passing parse, accuracy, F1, critical-invariant, and hallucination thresholds; see [`docs/structured-extraction-evaluation.md`](./docs/structured-extraction-evaluation.md).
+The `state_update` default is pinned to a versioned route-approval record. Its model-quality score is calculated from the reviewed eight-case `state-extraction-v2` DeepInfra responses; the synthetic contract tests the evaluator only. The default CI command directly replays the immutable provider capture without new network spend and reports `score_source=provider_capture`; it does not substitute a synthetic score. The current route passes every parse, accuracy, F1, critical-invariant, and hallucination threshold. A replacement default still requires its own complete provider capture bound to the exact case hash and prompt version; see [`docs/structured-extraction-evaluation.md`](./docs/structured-extraction-evaluation.md).
 
 ## Model Call Auditing
 

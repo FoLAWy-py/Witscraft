@@ -1,12 +1,13 @@
 {
   "schema_version": 1,
   "evaluation_version": "structured-extraction-v1",
-  "prompt_version": "state-extraction-v1",
+  "prompt_version": "state-extraction-v2",
   "state_update_route": {
     "provider": "deepinfra",
     "model": "Qwen/Qwen3-Max",
-    "evidence_kind": "legacy_pre_evaluation_default",
-    "decision": "may-remain-current-not-approved-as-new-candidate",
-    "recorded_at": "2026-08-17T00:00:00Z"
+    "evidence_kind": "provider_capture",
+    "response_bundle": "deepinfra-qwen3-max-state-extraction-v2-provider-capture.json",
+    "decision": "approved-current-default",
+    "recorded_at": "2026-08-17T12:31:34.924445Z"
   }
 }

@@ -25,7 +25,14 @@ def main() -> int:
     )
     default_root = API_ROOT / "evals" / "structured_extraction" / "v1"
     parser.add_argument("--cases", type=Path, default=default_root / "cases.json")
-    parser.add_argument("--responses", type=Path, default=default_root / "reference_responses.json")
+    parser.add_argument(
+        "--responses",
+        type=Path,
+        help=(
+            "Recorded response bundle to evaluate. By default, evaluate the real-provider "
+            "capture referenced by route_approval.json."
+        ),
+    )
     parser.add_argument("--thresholds", type=Path, default=default_root / "thresholds.json")
     parser.add_argument("--approval", type=Path, default=default_root / "route_approval.json")
     parser.add_argument("--output", type=Path)
@@ -40,29 +47,45 @@ def main() -> int:
     thresholds = thresholds_payload.get("thresholds")
     if not isinstance(thresholds, dict):
         raise ValueError("Threshold file must contain a thresholds object")
-    report = evaluate_recorded_responses(
-        load_json(args.cases),
-        load_json(args.responses),
-        {key: float(value) for key, value in thresholds.items()},
-        require_provider_evidence=args.require_provider_evidence,
-    )
+    cases_payload = load_json(args.cases)
+    normalized_thresholds = {key: float(value) for key, value in thresholds.items()}
     default_model = PURPOSE_DEFAULTS["state_update"]
     default_option = get_model(default_model)
     if default_option is None:
         raise ValueError(f"State-update default {default_model} is not registered")
     approval_report = validate_route_approval(
-        load_json(args.cases),
-        {key: float(value) for key, value in thresholds.items()},
+        cases_payload,
+        normalized_thresholds,
         load_json(args.approval),
         evaluation_root=args.approval.parent,
         current_provider=default_option.provider,
         current_model=default_option.model,
     )
+    if args.responses is None:
+        if approval_report is None:
+            raise ValueError(
+                "The current route has no provider capture; a real-provider model score "
+                "cannot be produced"
+            )
+        report = approval_report
+    else:
+        report = evaluate_recorded_responses(
+            cases_payload,
+            load_json(args.responses),
+            normalized_thresholds,
+            require_provider_evidence=args.require_provider_evidence,
+        )
     payload = report.as_dict()
     payload["route_approval"] = {
         "provider": default_option.provider,
         "model": default_option.model,
         "provider_capture_revalidated": approval_report is not None,
+        "score_source": report.evidence_kind,
+        "provider_evidence_metrics": (
+            approval_report.as_dict()["metrics"]
+            if approval_report is not None
+            else None
+        ),
     }
     serialized = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True)
     if args.output:
