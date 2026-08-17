@@ -86,3 +86,9 @@ Narrative context uses a 5,460-token shared section ceiling beneath a conservati
 World, character, state, canon, preferences, story instructions, cumulative summary, memories, and recent messages are all trimmed against their actual allocation. Context preview returns the conservative estimator version, provider-calibration status, full demand, allocation, selected estimate, authoritative source, dropped item counts, and `dynamic_section_budget` when content was truncated. The final rendered prompt estimate remains independently visible and the LLM Gateway still enforces the purpose hard limit.
 
 These controls are intentionally deterministic. Model or prompt changes should modify the central budget table only after regression evidence demonstrates a quality need.
+
+## Structured model approval
+
+The `state_update` route cannot be changed on the strength of a cheaper advertised price or a single valid JSON response. Its approval record is checked against the registry in CI and release preflight. A new default requires a bounded provider capture over the exact versioned corpus, with at least 99% parse success, 95% scalar accuracy, 90% collection F1, 95% relationship F1, 100% critical-invariant success, and at most 2% accepted hallucinations. Cost and latency remain additional selection inputs after the quality floor passes.
+
+The checked-in synthetic reference consumes no provider quota and cannot approve a new model. Captures should be reused while prompt, case hash, provider model version, and adapter semantics remain unchanged. This prevents repeated evaluation spend and avoids treating CI mocks as supplier-quality evidence.

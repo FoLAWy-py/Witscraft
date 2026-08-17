@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "thresholds": {
+    "min_parse_success_rate": 0.99,
+    "min_scalar_accuracy": 0.95,
+    "min_collection_f1": 0.9,
+    "min_relationship_f1": 0.95,
+    "min_critical_pass_rate": 1.0,
+    "max_hallucination_rate": 0.02
+  }
+}

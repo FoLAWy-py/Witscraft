@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "evaluation_version": "structured-extraction-v1",
+  "prompt_version": "state-extraction-v1",
+  "case_set_sha256": "6b3c0ff4ad053c72da7faf5e51ad85ad2dbd0edf9032130783818d4ee631cf9f",
+  "evidence_kind": "synthetic_contract",
+  "provider": "synthetic",
+  "model": "contract-reference-v1",
+  "responses": {
+    "quiet-turn-preserves-state": "{\"location\":null,\"time\":null,\"mood\":null,\"objective\":null,\"inventory\":null,\"open_threads\":null,\"relationships\":null,\"memories\":[],\"canon_facts\":[]}",
+    "explicit-arrival-and-stable-fact": "{\"location\":\"废弃地铁站\",\"time\":\"夜晚\",\"mood\":\"紧张\",\"objective\":\"调查站台广播的来源\",\"inventory\":[\"铜钥匙\"],\"open_threads\":[\"站台广播的来源\"],\"relationships\":null,\"memories\":[\"抵达废弃地铁站\"],\"canon_facts\":[\"废弃地铁站已经封锁\"]}",
+    "planned-destination-is-not-location": "{\"location\":\"废弃地铁站\",\"time\":null,\"mood\":null,\"objective\":null,\"inventory\":null,\"open_threads\":null,\"relationships\":null,\"memories\":[],\"canon_facts\":[]}",
+    "abstract-perspective-is-not-location": "{\"location\":\"沈澜的角度\",\"time\":null,\"mood\":null,\"objective\":null,\"inventory\":null,\"open_threads\":null,\"relationships\":null,\"memories\":[],\"canon_facts\":[]}",
+    "inventory-removal-and-addition": "{\"location\":null,\"time\":null,\"mood\":null,\"objective\":null,\"inventory\":[\"纸条\",\"铜币\"],\"open_threads\":null,\"relationships\":null,\"memories\":[\"宁舟把旧钥匙丢进河里，保留纸条，又拿起桥栏上的铜币\"],\"canon_facts\":[]}",
+    "resolved-thread-is-removed": "{\"location\":null,\"time\":null,\"mood\":null,\"objective\":null,\"inventory\":null,\"open_threads\":[\"失踪兄长位置\"],\"relationships\":null,\"memories\":[],\"canon_facts\":[\"铜钥匙来自市政厅\"]}",
+    "explicit-kinship-inference": "{\"location\":null,\"time\":null,\"mood\":null,\"objective\":null,\"inventory\":null,\"open_threads\":null,\"relationships\":null,\"memories\":[],\"canon_facts\":[]}",
+    "title-alias-does-not-duplicate-character": "{\"location\":null,\"time\":null,\"mood\":null,\"objective\":null,\"inventory\":null,\"open_threads\":null,\"relationships\":[{\"from\":\"罗小罗\",\"to\":\"橘猫\",\"bond\":\"初步信任\",\"value\":40},{\"from\":\"罗小罗\",\"to\":\"烛尾\",\"bond\":\"使命引导者\",\"value\":55}],\"memories\":[],\"canon_facts\":[]}"
+  }
+}

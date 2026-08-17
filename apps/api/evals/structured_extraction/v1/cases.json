@@ -1,0 +1,265 @@
+{
+  "schema_version": 1,
+  "evaluation_version": "structured-extraction-v1",
+  "prompt_version": "state-extraction-v1",
+  "prompt_sha256": "bf7cd62b364fec0cd1d7b92fc677486a69bf19666cdfc47bcfe145b01db03aa8",
+  "data_classification": "synthetic-anonymized",
+  "cases": [
+    {
+      "id": "quiet-turn-preserves-state",
+      "previous_state": {
+        "location": "旧钟楼",
+        "time": "傍晚",
+        "mood": "克制",
+        "objective": "等待联络人",
+        "inventory": ["铜钥匙"],
+        "open_threads": ["联络人的身份"]
+      },
+      "previous_relationships": [],
+      "perspective_character": "宁舟",
+      "user_turn": "我点头，继续等。",
+      "assistant_turn": "雨声敲着窗，房间里暂时没有新的变化。",
+      "expected": {
+        "state": {
+          "location": "旧钟楼",
+          "time": "傍晚",
+          "mood": "克制",
+          "objective": "等待联络人",
+          "inventory": ["铜钥匙"],
+          "open_threads": ["联络人的身份"]
+        },
+        "relationships": [],
+        "memories": [],
+        "canon_facts": []
+      },
+      "critical_assertions": [
+        {"path": "state.location", "equals": "旧钟楼"},
+        {"path": "state.inventory", "equals": ["铜钥匙"]}
+      ]
+    },
+    {
+      "id": "explicit-arrival-and-stable-fact",
+      "previous_state": {
+        "location": "修车铺",
+        "time": "下午",
+        "mood": "警觉",
+        "objective": "准备出发",
+        "inventory": [],
+        "open_threads": []
+      },
+      "previous_relationships": [],
+      "perspective_character": "罗小罗",
+      "user_turn": "跟着烛尾出发。",
+      "assistant_turn": "十分钟后，你们抵达废弃地铁站。夜晚的站台一片死寂。罗小罗拿起铜钥匙，决定调查站台广播的来源。档案写明废弃地铁站已经封锁。",
+      "expected": {
+        "state": {
+          "location": "废弃地铁站",
+          "time": "夜晚",
+          "mood": "紧张",
+          "objective": "调查站台广播的来源",
+          "inventory": ["铜钥匙"],
+          "open_threads": ["站台广播的来源"]
+        },
+        "relationships": [],
+        "memories": ["抵达废弃地铁站"],
+        "canon_facts": ["废弃地铁站已经封锁"]
+      },
+      "critical_assertions": [
+        {"path": "state.location", "equals": "废弃地铁站"},
+        {"path": "canon_facts.0", "equals": "废弃地铁站已经封锁"}
+      ]
+    },
+    {
+      "id": "planned-destination-is-not-location",
+      "previous_state": {
+        "location": "修车铺",
+        "time": "上午",
+        "mood": "平静",
+        "objective": "修好发动机",
+        "inventory": ["扳手"],
+        "open_threads": []
+      },
+      "previous_relationships": [],
+      "perspective_character": "罗小罗",
+      "user_turn": "我们要不要去废弃地铁站？",
+      "assistant_turn": "烛尾说先准备工具，稍后再前往废弃地铁站。两人仍留在修车铺。",
+      "expected": {
+        "state": {
+          "location": "修车铺",
+          "time": "上午",
+          "mood": "平静",
+          "objective": "修好发动机",
+          "inventory": ["扳手"],
+          "open_threads": []
+        },
+        "relationships": [],
+        "memories": [],
+        "canon_facts": []
+      },
+      "critical_assertions": [
+        {"path": "state.location", "equals": "修车铺"}
+      ]
+    },
+    {
+      "id": "abstract-perspective-is-not-location",
+      "previous_state": {
+        "location": "海底通信塔",
+        "time": "深夜",
+        "mood": "压抑",
+        "objective": "验证语音",
+        "inventory": [],
+        "open_threads": ["语音真伪"]
+      },
+      "previous_relationships": [],
+      "perspective_character": "沈澜",
+      "user_turn": "站在沈澜的角度，她应该相信这段语音吗？",
+      "assistant_turn": "她没有立刻回答，也没有离开海底通信塔。",
+      "expected": {
+        "state": {
+          "location": "海底通信塔",
+          "time": "深夜",
+          "mood": "压抑",
+          "objective": "验证语音",
+          "inventory": [],
+          "open_threads": ["语音真伪"]
+        },
+        "relationships": [],
+        "memories": [],
+        "canon_facts": []
+      },
+      "critical_assertions": [
+        {"path": "state.location", "equals": "海底通信塔"}
+      ]
+    },
+    {
+      "id": "inventory-removal-and-addition",
+      "previous_state": {
+        "location": "石桥",
+        "time": "清晨",
+        "mood": "紧张",
+        "objective": "摆脱追踪",
+        "inventory": ["旧钥匙", "纸条"],
+        "open_threads": []
+      },
+      "previous_relationships": [],
+      "perspective_character": "宁舟",
+      "user_turn": "把会暴露行踪的东西处理掉。",
+      "assistant_turn": "宁舟把旧钥匙丢进河里，保留纸条，又拿起桥栏上的铜币。",
+      "expected": {
+        "state": {
+          "location": "石桥",
+          "time": "清晨",
+          "mood": "紧张",
+          "objective": "摆脱追踪",
+          "inventory": ["纸条", "铜币"],
+          "open_threads": []
+        },
+        "relationships": [],
+        "memories": ["宁舟把旧钥匙丢进河里，保留纸条，又拿起桥栏上的铜币"],
+        "canon_facts": []
+      },
+      "critical_assertions": [
+        {"path": "state.inventory", "equals": ["纸条", "铜币"]}
+      ]
+    },
+    {
+      "id": "resolved-thread-is-removed",
+      "previous_state": {
+        "location": "市政档案室",
+        "time": "中午",
+        "mood": "专注",
+        "objective": "核对档案",
+        "inventory": ["铜钥匙"],
+        "open_threads": ["钥匙来源", "失踪兄长位置"]
+      },
+      "previous_relationships": [],
+      "perspective_character": "周砚",
+      "user_turn": "查阅钥匙的入库记录。",
+      "assistant_turn": "档案证明铜钥匙来自市政厅，钥匙来源已经查明；失踪兄长位置仍然未知。",
+      "expected": {
+        "state": {
+          "location": "市政档案室",
+          "time": "中午",
+          "mood": "专注",
+          "objective": "核对档案",
+          "inventory": ["铜钥匙"],
+          "open_threads": ["失踪兄长位置"]
+        },
+        "relationships": [],
+        "memories": [],
+        "canon_facts": ["铜钥匙来自市政厅"]
+      },
+      "critical_assertions": [
+        {"path": "state.open_threads", "equals": ["失踪兄长位置"]}
+      ]
+    },
+    {
+      "id": "explicit-kinship-inference",
+      "previous_state": {
+        "location": "录音室",
+        "time": "午夜",
+        "mood": "不安",
+        "objective": "确认录音来源",
+        "inventory": [],
+        "open_threads": []
+      },
+      "previous_relationships": [],
+      "perspective_character": "周砚",
+      "user_turn": "周砚确认失踪兄长周墨留下了警告。",
+      "assistant_turn": "录音中的声音属于周墨。",
+      "expected": {
+        "state": {
+          "location": "录音室",
+          "time": "午夜",
+          "mood": "不安",
+          "objective": "确认录音来源",
+          "inventory": [],
+          "open_threads": []
+        },
+        "relationships": [
+          {"from": "周砚", "to": "周墨", "bond": "兄长", "value": 70}
+        ],
+        "memories": [],
+        "canon_facts": []
+      },
+      "critical_assertions": [
+        {"path": "relationships.0.to", "equals": "周墨"}
+      ]
+    },
+    {
+      "id": "title-alias-does-not-duplicate-character",
+      "previous_state": {
+        "location": "修车铺",
+        "time": "傍晚",
+        "mood": "试探",
+        "objective": "确认橘猫身份",
+        "inventory": [],
+        "open_threads": ["橘猫身份"]
+      },
+      "previous_relationships": [
+        {"from": "罗小罗", "to": "橘猫", "bond": "初步信任", "value": 40}
+      ],
+      "perspective_character": "罗小罗",
+      "user_turn": "你到底是谁？",
+      "assistant_turn": "橘猫望着罗小罗说：‘我叫烛尾’。‘烛尾’不是名字，是职阶。",
+      "expected": {
+        "state": {
+          "location": "修车铺",
+          "time": "傍晚",
+          "mood": "试探",
+          "objective": "确认橘猫身份",
+          "inventory": [],
+          "open_threads": ["橘猫身份"]
+        },
+        "relationships": [
+          {"from": "罗小罗", "to": "橘猫", "bond": "使命引导者", "value": 55}
+        ],
+        "memories": [],
+        "canon_facts": []
+      },
+      "critical_assertions": [
+        {"path": "relationships.0.to", "equals": "橘猫"}
+      ]
+    }
+  ]
+}

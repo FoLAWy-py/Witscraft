@@ -76,7 +76,9 @@ jobs:
       - name: Audit installed dependencies
         run: uv run --with pip-audit==2.10.1 pip-audit --local
       - name: Lint backend
-        run: uv run ruff check app tests migrations ../../scripts/create-release-manifest.py ../../scripts/smoke-release.py
+        run: uv run ruff check app tests migrations ../../scripts/create-release-manifest.py ../../scripts/evaluate-structured-extraction.py ../../scripts/smoke-release.py
+      - name: Run structured extraction evaluation gate
+        run: uv run python ../../scripts/evaluate-structured-extraction.py
       - name: Upgrade empty database to migration head
         run: uv run alembic upgrade head
       - name: Reject model and migration drift

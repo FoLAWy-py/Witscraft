@@ -28,7 +28,8 @@ Run the dependency checks with network access:
 cd apps/api
 uv sync --frozen --all-extras
 uv run --with pip-audit==2.10.1 pip-audit --local
-uv run ruff check app tests migrations ../../scripts/create-release-manifest.py ../../scripts/smoke-release.py
+uv run ruff check app tests migrations ../../scripts/create-release-manifest.py ../../scripts/evaluate-structured-extraction.py ../../scripts/smoke-release.py
+uv run python ../../scripts/evaluate-structured-extraction.py
 uv run alembic upgrade head
 uv run alembic check
 uv run pytest -q

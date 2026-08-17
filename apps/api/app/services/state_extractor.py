@@ -11,6 +11,28 @@ from app.schemas.chat import StoryState
 from app.schemas.llm import ChatMessage
 
 
+STATE_EXTRACTION_PROMPT_VERSION = "state-extraction-v1"
+STATE_EXTRACTION_SYSTEM_PROMPT = (
+    "你是小说连续性状态提取器。只提取本轮结束时明确成立的信息，不续写剧情。"
+    "返回 JSON：location、time、mood、objective、inventory、open_threads、relationships "
+    "均可为 null，null 表示沿用旧值；memories、canon_facts 为本轮新增数组。"
+    "mood 是当前场景情绪而非作品文风；objective 是角色眼下可执行目标而非故事简介。"
+    "location 只表示本轮结束时角色实际身处的地点；不要求文本使用固定动词。计划前往、讨论是否去、"
+    "看见远处地点、回忆某地，以及‘站在某人角度/立场’等抽象表达都不得更新 location。"
+    "inventory 是角色当前持有物品的完整列表；open_threads 仅保留尚未解决的具体问题。"
+    "relationships 要包含文本明确说明的长期关系，即使相关人物未在现场；每项必须含"
+    " from、to、bond、value（-100 到 100）。"
+    "若文本说明某个新称呼只是既有角色的职阶、称号、代号或别名，必须沿用既有实体"
+    "名称，不得为该称呼新增第二条关系。"
+    "memory 只写值得后续召回、会影响后续选择的行动或事件；寒暄、点头、重复陈述、"
+    "无后果的短暂动作不得写入；canon 只写稳定事实，禁止写比喻、疑问、"
+    "备选行动或推测。禁止补充本轮文本没有出现的姓名、物品、日期、时间或背景。"
+    "relationships 必须是数组，例如 [{\"from\":\"甲\",\"to\":\"乙\","
+    "\"bond\":\"信任\",\"value\":60}]，没有关系变化时返回 null。"
+    "所有文本使用简洁中文。"
+)
+
+
 LOCATION_PATTERNS = [
     re.compile(r"(?:进入|抵达|来到|走进|到达|身处|停在|留在|位于)(?P<value>[^，。！？\n]{2,24})"),
 ]
@@ -82,25 +104,7 @@ async def extract_story_updates_with_llm(
     messages = [
         ChatMessage(
             role="system",
-            content=(
-                "你是小说连续性状态提取器。只提取本轮结束时明确成立的信息，不续写剧情。"
-                "返回 JSON：location、time、mood、objective 可为 null；inventory、open_threads、"
-                "relationships 可为 null 表示沿用旧值；memories、canon_facts 为本轮新增数组。"
-                "mood 是当前场景情绪而非作品文风；objective 是角色眼下可执行目标而非故事简介。"
-                "location 只表示本轮结束时角色实际身处的地点；不要求文本使用固定动词。计划前往、讨论是否去、"
-                "看见远处地点、回忆某地，以及‘站在某人角度/立场’等抽象表达都不得更新 location。"
-                "inventory 是角色当前持有物品的完整列表；open_threads 仅保留尚未解决的具体问题。"
-                "relationships 要包含文本明确说明的长期关系，即使相关人物未在现场；每项必须含"
-                " from、to、bond、value（-100 到 100）。"
-                "若文本说明某个新称呼只是既有角色的职阶、称号、代号或别名，必须沿用既有实体"
-                "名称，不得为该称呼新增第二条关系。"
-                "memory 只写值得后续召回、会影响后续选择的行动或事件；寒暄、点头、重复陈述、"
-                "无后果的短暂动作不得写入；canon 只写稳定事实，禁止写比喻、疑问、"
-                "备选行动或推测。禁止补充本轮文本没有出现的姓名、物品、日期、时间或背景。"
-                "relationships 必须是数组，例如 [{\"from\":\"甲\",\"to\":\"乙\","
-                "\"bond\":\"信任\",\"value\":60}]，没有关系变化时返回 null。"
-                "所有文本使用简洁中文。"
-            ),
+            content=STATE_EXTRACTION_SYSTEM_PROMPT,
         ),
         ChatMessage(role="user", content=json.dumps(prompt, ensure_ascii=False)),
     ]
@@ -127,22 +131,24 @@ async def extract_story_updates_with_llm(
         return fallback
 
     source_text = f"{user_message}\n{assistant_message}"
+    inventory_source = f"{source_text}\n{json.dumps(previous.inventory, ensure_ascii=False)}"
+    thread_source = f"{source_text}\n{json.dumps(previous.open_threads, ensure_ascii=False)}"
     state = StoryState(
-        location=_grounded_location(payload.location, fallback.state.location, source_text),
-        time=_grounded_value(payload.time, fallback.state.time, source_text),
-        mood=_generated_value(payload.mood, fallback.state.mood),
-        objective=_grounded_value(payload.objective, fallback.state.objective, source_text),
+        location=_grounded_location(payload.location, previous.location, source_text),
+        time=_grounded_value(payload.time, previous.time, source_text),
+        mood=_generated_value(payload.mood, previous.mood),
+        objective=_grounded_value(payload.objective, previous.objective, source_text),
         inventory=_grounded_list(
             payload.inventory,
-            fallback.state.inventory,
-            source_text,
+            previous.inventory,
+            inventory_source,
             limit=20,
             reject_negated=True,
         ),
         open_threads=_grounded_list(
             payload.open_threads,
-            fallback.state.open_threads,
-            source_text,
+            previous.open_threads,
+            thread_source,
             limit=12,
         ),
     )

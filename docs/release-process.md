@@ -6,7 +6,7 @@
 
 Run releases only from a clean commit that has a successful `Security` GitHub Actions workflow.
 The local preflight installs the committed lock graphs, audits dependencies, runs all backend and
-frontend gates, builds the production frontend, scans browser artifacts, and writes a release
+frontend gates, validates the structured-extraction contract and route approval, builds the production frontend, scans browser artifacts, and writes a release
 manifest under the ignored `.runtime` directory by default:
 
 ```bash

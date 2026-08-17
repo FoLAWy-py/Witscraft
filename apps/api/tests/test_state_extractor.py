@@ -194,3 +194,44 @@ def test_abstract_standing_perspective_never_becomes_location():
     )
 
     assert result.state.location == "海底通信塔"
+
+
+def test_valid_structured_nulls_preserve_previous_state_instead_of_regex_fallback():
+    result = asyncio.run(
+        extract_story_updates_with_llm(
+            FakeGateway(
+                '{"location":null,"time":null,"mood":null,"objective":null,'
+                '"inventory":null,"open_threads":null,"relationships":null,'
+                '"memories":[],"canon_facts":[]}'
+            ),
+            StoryState(
+                location="录音室",
+                objective="确认录音来源",
+                inventory=["录音带"],
+                open_threads=[],
+            ),
+            "周砚确认失踪兄长周墨留下了警告。",
+            "录音中的声音属于周墨。",
+        )
+    )
+
+    assert result.state.objective == "确认录音来源"
+    assert result.state.inventory == ["录音带"]
+    assert result.state.open_threads == []
+
+
+def test_complete_inventory_can_preserve_old_item_and_remove_discarded_item():
+    result = asyncio.run(
+        extract_story_updates_with_llm(
+            FakeGateway(
+                '{"location":null,"time":null,"mood":null,"objective":null,'
+                '"inventory":["纸条","铜币"],"open_threads":null,'
+                '"relationships":null,"memories":[],"canon_facts":[]}'
+            ),
+            StoryState(inventory=["旧钥匙", "纸条"]),
+            "把会暴露行踪的东西处理掉。",
+            "宁舟把旧钥匙丢进河里，保留纸条，又拿起桥栏上的铜币。",
+        )
+    )
+
+    assert result.state.inventory == ["纸条", "铜币"]

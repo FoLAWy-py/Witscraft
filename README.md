@@ -18,6 +18,7 @@ apps/
 - [`docs/backup-recovery.md`](./docs/backup-recovery.md): encrypted backup operation, restore procedure, RPO/RTO, and drill evidence
 - [`docs/admin-and-quota.md`](./docs/admin-and-quota.md): administrator permission boundary, weekly AI allowance, and reset operation
 - [`docs/model-cost-controls.md`](./docs/model-cost-controls.md): purpose-level model budgets, embedding cache metrics, and quota interaction
+- [`docs/structured-extraction-evaluation.md`](./docs/structured-extraction-evaluation.md): versioned state-extraction corpus, metrics, evidence classes, and model-approval gate
 - [`docs/security-checks.md`](./docs/security-checks.md): dependency, secret, and production artifact security gates
 - [`docs/release-process.md`](./docs/release-process.md): executable preflight, release manifest, smoke checks, and rollback contract
 
@@ -83,6 +84,8 @@ The current backend default for every story purpose is `Qwen/Qwen3-Max`. The reg
 The browser submits the story purpose rather than assembling a provider/model pair. `GET /api/providers` exposes an `effective_routes` manifest, and context preview reports the effective route for the selected narrative purpose. During client migration, an optional legacy provider/model pair is accepted only when it matches the current backend route; a stale pair is rejected with HTTP `409` before narrative state is written. Provider credentials and infrastructure base URLs remain server-side.
 
 Route updates are serialized per account and append an immutable before/after snapshot in the same database transaction as the active routes. The settings view can undo the latest change; that undo is itself audited and can be undone again. No-op saves create no audit noise. Route history is included in account export and removed with the account.
+
+The `state_update` default is pinned to a versioned route-approval record. CI and release preflight run an eight-case synthetic structured-extraction contract, but synthetic responses cannot approve a new model. A replacement default requires a complete provider capture bound to the exact case hash and prompt version, with passing parse, accuracy, F1, critical-invariant, and hallucination thresholds; see [`docs/structured-extraction-evaluation.md`](./docs/structured-extraction-evaluation.md).
 
 ## Model Call Auditing
 
