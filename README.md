@@ -86,7 +86,7 @@ Migration `0009` records LLM and embedding calls with a shared request/turn ID, 
 
 Query embedding reuse is scoped to one turn. A cache hit records zero billable tokens and zero estimated cost while preserving the estimated avoided input tokens for operational analysis. Purpose-specific input and output limits are enforced centrally by the LLM Gateway; see [`docs/model-cost-controls.md`](./docs/model-cost-controls.md).
 
-Long-term-memory candidates are scored and checked for normalized near-duplicates before embedding. Low-value transient actions are discarded, while accepted memories retain computed importance and current character/inventory entity tags for retrieval ranking. The admission filter is deterministic and does not make an additional model call.
+Long-term-memory candidates are scored and checked for normalized near-duplicates before embedding. Low-value transient actions are discarded, while accepted memories retain computed importance and current character/inventory entity tags for retrieval ranking. Retrieval combines keyword overlap, entity tags, importance, relative update time, and compatible-vector similarity. Semantic query embeddings activate only when the candidate set exceeds `MEMORY_VECTOR_SEARCH_MIN_ITEMS` and contains a current model/version vector, so small or legacy-only sets remain deterministic and cost-free. The admission filter is deterministic and does not make an additional model call.
 
 Set `MODEL_PRICING_VERSION` and `MODEL_PRICING` in the production environment to enable cost estimates. Rates are supplied per million tokens and are intentionally not hardcoded in the repository:
 
@@ -120,6 +120,7 @@ GENERATION_STALE_SECONDS=900
 AUTH_LOGIN_THROTTLE_RETENTION_HOURS=24
 MODEL_CALL_RETENTION_DAYS=30
 EMBEDDING_VERSION=v1
+MEMORY_VECTOR_SEARCH_MIN_ITEMS=40
 USER_WEEKLY_TOKEN_QUOTA=500000
 STORY_WEEKLY_TOKEN_QUOTA=250000
 USER_WEEKLY_TOKEN_SOFT_LIMIT_PERCENTAGE=80

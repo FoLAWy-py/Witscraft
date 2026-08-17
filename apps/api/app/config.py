@@ -76,6 +76,7 @@ class Settings(BaseSettings):
     default_deepinfra_model: str = "Qwen/Qwen3-Max"
     openai_embedding_model: str = "text-embedding-3-large"
     embedding_version: str = "v1"
+    memory_vector_search_min_items: int = Field(default=40, ge=1, le=10000)
     model_pricing: dict[str, dict[str, float]] = Field(default_factory=dict)
     model_pricing_version: str = "unconfigured"
     dry_run_llm: bool = False
@@ -248,6 +249,7 @@ def get_settings() -> Settings:
             int,
         ),
         "MODEL_CALL_RETENTION_DAYS": ("model_call_retention_days", int),
+        "MEMORY_VECTOR_SEARCH_MIN_ITEMS": ("memory_vector_search_min_items", int),
         "USER_WEEKLY_TOKEN_QUOTA": ("user_weekly_token_quota", int),
         "STORY_WEEKLY_TOKEN_QUOTA": ("story_weekly_token_quota", int),
         "USER_WEEKLY_TOKEN_SOFT_LIMIT_PERCENTAGE": (

@@ -43,6 +43,8 @@ The computed importance and matched entity tags are stored with accepted memorie
 
 Every accepted or manually refreshed embedding is bound to a normalized SHA-256 content hash, provider-qualified model identifier, vector dimensions, operator-controlled `EMBEDDING_VERSION`, and UTC generation time. Semantic ranking compares a query only with memories whose model, dimensions, and version all match. Migration `0014` labels existing vectors `legacy:unversioned` / `legacy-v0`, so they remain available to structured importance and recency ranking without being silently compared to a new vector space.
 
+Memory retrieval always applies deterministic keyword, entity, importance, and relative-recency scoring. Semantic similarity is an additional signal only when the active set exceeds `MEMORY_VECTOR_SEARCH_MIN_ITEMS`, which defaults to 40, and at least one candidate matches the current model and embedding version. If every stored vector is legacy or incompatible, retrieval skips the query embedding entirely instead of paying for a vector that cannot be compared.
+
 ## Weekly allowance interaction
 
 Quota preflight uses estimated input plus the normalized maximum output. Purpose limits therefore bound both the possible provider charge and the amount reserved by preflight. Successful external usage is later reconciled from recorded provider tokens. Local deterministic embeddings, dry-run responses, failed calls, and cache-hit rows do not consume the weekly allowance.

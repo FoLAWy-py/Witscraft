@@ -159,6 +159,15 @@ class EmbeddingService:
             and version == self.settings.embedding_version
         )
 
+    def is_model_version_compatible(
+        self,
+        *,
+        model: str | None,
+        version: str | None,
+    ) -> bool:
+        provider, current_model = self._provider_and_model()
+        return model == f"{provider}:{current_model}" and version == self.settings.embedding_version
+
     async def _record_call(
         self,
         *,

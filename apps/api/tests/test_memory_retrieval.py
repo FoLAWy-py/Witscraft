@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -38,10 +39,11 @@ class FakeSession:
 
 
 class CountingEmbeddingService:
-    def __init__(self, vector=None):
+    def __init__(self, vector=None, threshold=MEMORY_VECTOR_SEARCH_MIN_ITEMS):
         self.vector = vector or [0.0, 1.0]
         self.calls = 0
         self.cache_hits = 0
+        self.settings = SimpleNamespace(memory_vector_search_min_items=threshold)
 
     async def embed(self, _text, **_kwargs):
         self.calls += 1
@@ -54,11 +56,15 @@ class CountingEmbeddingService:
     def is_compatible(*, model, dimensions, version, vector):
         return model == "local:test-embedding" and dimensions == len(vector) and version == "test-v1"
 
+    @staticmethod
+    def is_model_version_compatible(*, model, version):
+        return model == "local:test-embedding" and version == "test-v1"
 
-def _engine(memories) -> tuple[StoryEngine, CountingEmbeddingService]:
+
+def _engine(memories, *, threshold=MEMORY_VECTOR_SEARCH_MIN_ITEMS) -> tuple[StoryEngine, CountingEmbeddingService]:
     engine = StoryEngine.__new__(StoryEngine)
     engine.session = FakeSession(memories)
-    embedding_service = CountingEmbeddingService()
+    embedding_service = CountingEmbeddingService(threshold=threshold)
     engine.embedding_service = embedding_service
     engine.turn_context = TurnContext()
     return engine, embedding_service
@@ -68,6 +74,8 @@ def _memory(index: int, embedding=None):
     return SimpleNamespace(
         content=f"memory-{index}",
         importance=5,
+        recency_score=1,
+        entity_tags=[],
         embedding=embedding,
         embedding_model="local:test-embedding",
         embedding_dimensions=len(embedding or []),
@@ -91,6 +99,32 @@ def test_small_memory_set_uses_structured_order_without_embedding() -> None:
     result = asyncio.run(engine._load_memories(uuid4(), uuid4(), "寻找钥匙"))
 
     assert result == [f"memory-{index}" for index in range(8)]
+    assert embedding_service.calls == 0
+
+
+def test_small_memory_set_uses_keyword_and_entity_hybrid_ranking_without_embedding() -> None:
+    memories = [_memory(index) for index in range(12)]
+    memories[0].importance = 10
+    memories[-1].content = "林岚把旧钥匙藏进钟楼暗格"
+    memories[-1].importance = 2
+    memories[-1].entity_tags = ["林岚", "旧钥匙", "钟楼"]
+    engine, embedding_service = _engine(memories)
+
+    result = asyncio.run(engine._load_memories(uuid4(), uuid4(), "寻找旧钥匙"))
+
+    assert result[0] == "林岚把旧钥匙藏进钟楼暗格"
+    assert embedding_service.calls == 0
+
+
+def test_hybrid_ranking_uses_relative_update_recency() -> None:
+    memories = [_memory(0), _memory(1)]
+    memories[0].updated_at = datetime(2026, 8, 1, tzinfo=timezone.utc)
+    memories[1].updated_at = memories[0].updated_at + timedelta(days=10)
+    engine, embedding_service = _engine(memories)
+
+    result = asyncio.run(engine._load_memories(uuid4(), uuid4(), "没有词汇命中"))
+
+    assert result[0] == "memory-1"
     assert embedding_service.calls == 0
 
 
@@ -148,6 +182,35 @@ def test_incompatible_embedding_version_is_not_compared_semantically() -> None:
 
     assert result[0] == "memory-0"
     assert memories[-1].content not in result
+
+
+def test_all_legacy_vectors_use_hybrid_ranking_and_skip_query_embedding() -> None:
+    memories = [
+        _memory(index, [1.0, 0.0])
+        for index in range(MEMORY_VECTOR_SEARCH_MIN_ITEMS + 1)
+    ]
+    for memory in memories:
+        memory.embedding_model = "legacy:unversioned"
+        memory.embedding_version = "legacy-v0"
+    memories[-1].content = "韩医生把旧钥匙锁进档案室"
+    memories[-1].entity_tags = ["韩医生", "旧钥匙", "档案室"]
+    engine, embedding_service = _engine(memories)
+
+    result = asyncio.run(engine._load_memories(uuid4(), uuid4(), "旧钥匙在哪里"))
+
+    assert result[0] == "韩医生把旧钥匙锁进档案室"
+    assert embedding_service.calls == 0
+
+
+def test_configured_threshold_controls_semantic_embedding_activation() -> None:
+    memories = [_memory(index, [1.0, 0.0]) for index in range(3)]
+    memories[-1].embedding = [0.0, 1.0]
+    engine, embedding_service = _engine(memories, threshold=2)
+
+    result = asyncio.run(engine._load_memories(uuid4(), uuid4(), "寻找钥匙"))
+
+    assert result[0] == "memory-2"
+    assert embedding_service.calls == 1
 
 
 def test_query_embedding_cache_records_direct_reuse() -> None:

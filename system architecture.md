@@ -2,7 +2,7 @@
 
 **Document status:** Production baseline
 
-**Architecture version:** 3.6
+**Architecture version:** 3.7
 
 **Last updated:** 17 August 2026
 
@@ -279,6 +279,8 @@ Embedding is selective. The system does not embed every conversational turn by d
 Embeddings are appropriate when content is accepted into long-term memory or when semantic retrieval is required. They are skipped when there are no eligible memories, when deterministic recent-context selection is sufficient, or when an identical content hash can reuse prior work.
 
 New long-term-memory candidates pass a deterministic admission boundary before embedding. Consequential event markers and references to known character or inventory entities contribute to an importance score; low-value transient actions are rejected. Normalized near-duplicate comparison suppresses paraphrases of recent branch memories, while disjoint known entity sets preserve otherwise similar events involving different characters. Accepted memories persist their computed importance and entity tags for ranking and operator inspection. The filter adds no model calls.
+
+Retrieval is hybrid within the authorized story and branch candidate set. Keyword n-grams, entity-tag overlap, importance, and relative update time are always available. Compatible vector similarity becomes an additional signal only above the deployment-configurable `MEMORY_VECTOR_SEARCH_MIN_ITEMS` threshold. Before creating a query embedding, the engine verifies that at least one candidate has the current provider-qualified model and version; legacy-only sets therefore remain useful without incurring an unusable embedding call.
 
 `TurnContext` owns state-snapshot, memory-retrieval, and query-embedding reuse within one audited request. It is reset at the start of every turn and is never shared across users or concurrent requests. State and relationship assembly derive from one cached snapshot read, while repeated retrieval with the same story, branch, and normalized query reuses an immutable result. The first unique embedding query records provider usage; a direct embedding-cache hit records zero billable tokens, zero cost, dimensions, and estimated avoided input tokens. This makes the optimization measurable without inflating quota consumption or billing reconciliation.
 
