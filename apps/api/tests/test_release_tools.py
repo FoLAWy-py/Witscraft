@@ -49,13 +49,13 @@ def test_release_manifest_is_non_sensitive_and_bound_to_source(monkeypatch, tmp_
     (tmp_path / "apps/web/.next/BUILD_ID").write_text("test-build")
     monkeypatch.setattr(module, "ROOT", tmp_path)
     monkeypatch.setattr(module, "_git", lambda *args: "a" * 40 if args[0] == "rev-parse" else "")
-    monkeypatch.setattr(module, "_migration_heads", lambda: ["0013"])
+    monkeypatch.setattr(module, "_migration_heads", lambda: ["0014"])
     monkeypatch.setattr(module, "_created_at", lambda: "2026-08-17T00:00:00Z")
 
     manifest = module.build_manifest()
 
     assert manifest["application_revision"] == "a" * 40
-    assert manifest["migration_heads"] == ["0013"]
+    assert manifest["migration_heads"] == ["0014"]
     assert set(manifest["dependency_locks"]) == {
         "apps/api/uv.lock",
         "apps/web/package-lock.json",

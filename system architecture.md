@@ -2,7 +2,7 @@
 
 **Document status:** Production baseline
 
-**Architecture version:** 3.5
+**Architecture version:** 3.6
 
 **Last updated:** 17 August 2026
 
@@ -199,7 +199,7 @@ PostgreSQL is the authoritative store. The principal entity groups are:
 
 UUIDs are used for externally referenced entities. Foreign keys and database cascades enforce ownership lifecycles, while application-level checks enforce user authorization.
 
-Embedding values are currently stored behind a pgvector-ready boundary. A future migration will move them to fixed-dimension vector columns with model, dimension, version, content hash, and embedding timestamp metadata.
+Embedding values remain in JSONB behind a pgvector-ready boundary, while migration `0014` adds provider-qualified model, dimension, operator-controlled version, normalized content hash, and UTC generation metadata. Application similarity runs only when all compatibility fields match. Legacy or incompatible vectors remain eligible for structured importance and recency ranking but are never compared across vector spaces. A future migration will move a selected production dimension to fixed-dimension vector columns.
 
 ### 6.1 Query and Index Strategy
 
@@ -284,7 +284,7 @@ New long-term-memory candidates pass a deterministic admission boundary before e
 
 Every model purpose has a central maximum input budget, default output budget, and hard output limit. The gateway applies these policies before provider execution to primary, auxiliary, fallback, streaming, and non-streaming requests. The effective output ceiling is the lower of the purpose limit and model capability. Oversized input is rejected before provider traffic. In addition, the shared turn auditor reserves one slot for each real provider request and stops retries, fallbacks, auxiliary calls, and external embeddings when the per-turn ceiling is reached. The current policy and values are maintained in `docs/model-cost-controls.md`.
 
-The production direction remains to add content hashes to the existing exact and approximate admission checks, record embedding model and dimensions with each memory, prevent comparisons across incompatible embedding versions, and re-embed asynchronously during model migrations.
+The production direction remains to migrate compatible embeddings to fixed-dimension pgvector columns after selecting the production dimension, and to re-embed legacy or superseded versions asynchronously during model migrations.
 
 Multi-model routing is supported by purpose. A multi-agent architecture is not the default because narrative generation is primarily a coordinated state-transition workflow, not an open-ended autonomous task graph. Additional agents are justified only when an independently measurable task, such as evaluation or complex planning, produces sufficient quality improvement to offset latency, cost, and failure complexity.
 
@@ -330,7 +330,7 @@ The current implementation uses structured application logs and PostgreSQL audit
 
 ## 12. Migration and Release Contract
 
-Alembic is the only production schema migration mechanism. Revision `0013` adds administrator roles, append-only quota reset events, and a user/time model-call index for weekly accounting.
+Alembic is the only production schema migration mechanism. Revision `0013` adds administrator roles, append-only quota reset events, and a user/time model-call index for weekly accounting. Revision `0014` adds versioned embedding compatibility metadata and a content-hash lookup index for long-term memories.
 
 The release order is:
 

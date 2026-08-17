@@ -41,6 +41,8 @@ Accepted candidates are compared with recent active memories after punctuation a
 
 The computed importance and matched entity tags are stored with accepted memories and used by retrieval ranking and inspection. These rules are local and deterministic: they do not add another model call, and rejected candidates never reach the embedding provider.
 
+Every accepted or manually refreshed embedding is bound to a normalized SHA-256 content hash, provider-qualified model identifier, vector dimensions, operator-controlled `EMBEDDING_VERSION`, and UTC generation time. Semantic ranking compares a query only with memories whose model, dimensions, and version all match. Migration `0014` labels existing vectors `legacy:unversioned` / `legacy-v0`, so they remain available to structured importance and recency ranking without being silently compared to a new vector space.
+
 ## Weekly allowance interaction
 
 Quota preflight uses estimated input plus the normalized maximum output. Purpose limits therefore bound both the possible provider charge and the amount reserved by preflight. Successful external usage is later reconciled from recorded provider tokens. Local deterministic embeddings, dry-run responses, failed calls, and cache-hit rows do not consume the weekly allowance.

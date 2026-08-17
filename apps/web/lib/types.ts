@@ -191,7 +191,9 @@ export type MemoryItemSummary = {
   importance: number;
   type?: string;
   has_embedding?: boolean;
+  embedding_model?: string | null;
   embedding_dimensions?: number;
+  embedding_version?: string | null;
 };
 
 export type CanonFactSummary = {

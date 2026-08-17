@@ -75,6 +75,7 @@ class Settings(BaseSettings):
     default_openai_model: str = "gpt-5.5"
     default_deepinfra_model: str = "Qwen/Qwen3-Max"
     openai_embedding_model: str = "text-embedding-3-large"
+    embedding_version: str = "v1"
     model_pricing: dict[str, dict[str, float]] = Field(default_factory=dict)
     model_pricing_version: str = "unconfigured"
     dry_run_llm: bool = False
@@ -212,6 +213,7 @@ def get_settings() -> Settings:
         "SMTP_PASSWORD": "smtp_password",
         "SMTP_FROM_EMAIL": "smtp_from_email",
         "FRONTEND_BASE_URL": "frontend_base_url",
+        "EMBEDDING_VERSION": "embedding_version",
     }
     for env_key, setting_name in text_settings.items():
         if env_key in env_md:

@@ -335,6 +335,7 @@ class MemoryItem(Base, TimestampMixin):
             postgresql_where=text("is_active IS TRUE"),
         ),
         Index("ix_memory_items_source_message", "source_message_id"),
+        Index("ix_memory_items_content_hash", "content_hash"),
     )
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
@@ -349,6 +350,11 @@ class MemoryItem(Base, TimestampMixin):
     entity_tags: Mapped[list] = mapped_column(JSONB, default=list)
     meta: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
     embedding: Mapped[list | None] = mapped_column(JSONB)
+    embedding_model: Mapped[str | None] = mapped_column(String(220))
+    embedding_dimensions: Mapped[int | None] = mapped_column(Integer)
+    embedding_version: Mapped[str | None] = mapped_column(String(80))
+    content_hash: Mapped[str | None] = mapped_column(String(64))
+    embedded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     source_message_id: Mapped[UUID | None] = mapped_column(ForeignKey("messages.id", ondelete="SET NULL"))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 

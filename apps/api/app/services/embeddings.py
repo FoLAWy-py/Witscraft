@@ -4,6 +4,8 @@ import hashlib
 import math
 import re
 import time
+from dataclasses import dataclass
+from datetime import datetime, timezone
 
 from openai import AsyncOpenAI
 
@@ -13,6 +15,15 @@ from app.services.token_estimator import estimate_tokens
 
 
 EMBEDDING_DIMENSIONS = 128
+
+
+@dataclass(frozen=True)
+class EmbeddingMetadata:
+    model: str
+    dimensions: int
+    version: str
+    content_hash: str
+    embedded_at: datetime
 
 
 class EmbeddingService:
@@ -123,6 +134,31 @@ class EmbeddingService:
             return "local", "deterministic-blake2b-128"
         return "openai", self.settings.openai_embedding_model
 
+    def metadata(self, text: str, vector: list[float]) -> EmbeddingMetadata:
+        provider, model = self._provider_and_model()
+        return EmbeddingMetadata(
+            model=f"{provider}:{model}",
+            dimensions=len(vector),
+            version=self.settings.embedding_version,
+            content_hash=embedding_content_hash(text),
+            embedded_at=datetime.now(timezone.utc),
+        )
+
+    def is_compatible(
+        self,
+        *,
+        model: str | None,
+        dimensions: int | None,
+        version: str | None,
+        vector: list[float],
+    ) -> bool:
+        provider, current_model = self._provider_and_model()
+        return (
+            model == f"{provider}:{current_model}"
+            and dimensions == len(vector)
+            and version == self.settings.embedding_version
+        )
+
     async def _record_call(
         self,
         *,
@@ -170,6 +206,11 @@ def deterministic_embed_text(text: str, dimensions: int = EMBEDDING_DIMENSIONS) 
     if norm == 0:
         return vector
     return [round(value / norm, 6) for value in vector]
+
+
+def embedding_content_hash(text: str) -> str:
+    normalized = re.sub(r"\s+", " ", text).strip()
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
 
 def cosine_similarity(left: list[float] | None, right: list[float] | None) -> float:

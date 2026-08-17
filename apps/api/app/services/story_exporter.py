@@ -212,7 +212,11 @@ def _memory_payload(memory: MemoryItem) -> dict:
         "recency_score": float(memory.recency_score or 0),
         "entity_tags": memory.entity_tags,
         "has_embedding": bool(memory.embedding),
-        "embedding_dimensions": len(memory.embedding or []),
+        "embedding_model": memory.embedding_model,
+        "embedding_dimensions": memory.embedding_dimensions or len(memory.embedding or []),
+        "embedding_version": memory.embedding_version,
+        "content_hash": memory.content_hash,
+        "embedded_at": memory.embedded_at.isoformat() if memory.embedded_at else None,
     }
 
 

@@ -109,6 +109,11 @@ async def clone_story_branch(
                 entity_tags=deepcopy(memory.entity_tags or []),
                 meta=deepcopy(memory.meta or {}),
                 embedding=deepcopy(memory.embedding),
+                embedding_model=memory.embedding_model,
+                embedding_dimensions=memory.embedding_dimensions,
+                embedding_version=memory.embedding_version,
+                content_hash=memory.content_hash,
+                embedded_at=memory.embedded_at,
                 source_message_id=_mapped_message_id(memory.source_message_id, message_ids),
                 is_active=memory.is_active,
             )

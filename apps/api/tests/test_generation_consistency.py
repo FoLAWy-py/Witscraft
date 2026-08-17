@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime, timezone
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -9,6 +10,7 @@ from starlette.requests import Request
 from app.db.models import GenerationRequest
 from app.routers.chat import _with_idempotency_header
 from app.schemas.chat import ChatRequest, ChatResponse, StoryState
+from app.services.embeddings import EmbeddingMetadata, embedding_content_hash
 from app.services.story_engine import PreparedMemory, StoryEngine
 
 
@@ -34,6 +36,15 @@ class TransactionCheckingEmbeddings:
         assert purpose == "embedding_memory"
         self.calls += 1
         return [[float(index)] for index, _ in enumerate(texts)]
+
+    def metadata(self, text: str, vector: list[float]) -> EmbeddingMetadata:
+        return EmbeddingMetadata(
+            model="local:test-embedding",
+            dimensions=len(vector),
+            version="test-v1",
+            content_hash=embedding_content_hash(text),
+            embedded_at=datetime(2026, 8, 17, tzinfo=timezone.utc),
+        )
 
 
 def _request(**updates) -> ChatRequest:
@@ -239,6 +250,9 @@ def test_embedding_runs_after_knowledge_read_transaction_is_released() -> None:
     assert prepared_memories[0].importance == 7
     assert prepared_memories[0].entity_tags == ("Mira", "sealed archive")
     assert prepared_memories[0].embedding == [0.0]
+    assert prepared_memories[0].embedding_model == "local:test-embedding"
+    assert prepared_memories[0].embedding_dimensions == 1
+    assert prepared_memories[0].embedding_version == "test-v1"
     assert prepared_facts == ["new fact"]
     assert embeddings.calls == 1
 
@@ -339,6 +353,11 @@ def test_prepared_memory_quality_metadata_is_persisted() -> None:
         importance=7,
         entity_tags=("Mira", "sealed archive"),
         embedding=[0.25, 0.75],
+        embedding_model="local:test-embedding",
+        embedding_dimensions=2,
+        embedding_version="test-v1",
+        content_hash=embedding_content_hash("Mira discovers the sealed archive"),
+        embedded_at=datetime(2026, 8, 17, tzinfo=timezone.utc),
     )
 
     added = engine._add_prepared_memories(
@@ -355,3 +374,7 @@ def test_prepared_memory_quality_metadata_is_persisted() -> None:
     assert row.importance == 7
     assert row.entity_tags == ["Mira", "sealed archive"]
     assert row.embedding == [0.25, 0.75]
+    assert row.embedding_model == "local:test-embedding"
+    assert row.embedding_dimensions == 2
+    assert row.embedding_version == "test-v1"
+    assert row.content_hash == prepared.content_hash

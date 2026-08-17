@@ -1290,10 +1290,17 @@ async def update_memory(
         story_id=memory.story_id,
         request_id=getattr(http_request.state, "request_id", None),
     )
-    memory.embedding = await EmbeddingService(settings, auditor=auditor).embed(
+    embedding_service = EmbeddingService(settings, auditor=auditor)
+    memory.embedding = await embedding_service.embed(
         content,
         purpose="embedding_memory_update",
     )
+    metadata = embedding_service.metadata(content, memory.embedding)
+    memory.embedding_model = metadata.model
+    memory.embedding_dimensions = metadata.dimensions
+    memory.embedding_version = metadata.version
+    memory.content_hash = metadata.content_hash
+    memory.embedded_at = metadata.embedded_at
     await session.commit()
 
     active_id = _parse_uuid(active_story_id or "", memory.story_id or DEFAULT_STORY_ID)
@@ -1535,7 +1542,9 @@ async def _load_memory_items(session: AsyncSession, story_id: UUID, branch_id: U
             "importance": memory.importance,
             "type": memory.memory_type,
             "has_embedding": bool(memory.embedding),
-            "embedding_dimensions": len(memory.embedding or []),
+            "embedding_model": memory.embedding_model,
+            "embedding_dimensions": memory.embedding_dimensions or len(memory.embedding or []),
+            "embedding_version": memory.embedding_version,
         }
         for memory in result.scalars().all()
     ]

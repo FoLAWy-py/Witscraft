@@ -37,7 +37,7 @@ from app.schemas.chat import ChatRequest, ChatResponse, StoryState
 from app.schemas.llm import ChatMessage, LLMRequest, LLMResponse
 from app.services.consistency_checker import check_response_consistency
 from app.services.context_assembler import ContextAssembly, assemble_story_context
-from app.services.embeddings import EmbeddingService, cosine_similarity
+from app.services.embeddings import EmbeddingService, cosine_similarity, embedding_content_hash
 from app.services.state_extractor import extract_story_updates_with_llm
 from app.services.turn_context import TurnContext
 
@@ -123,6 +123,11 @@ class PreparedMemory:
     importance: int
     entity_tags: tuple[str, ...]
     embedding: list[float]
+    embedding_model: str
+    embedding_dimensions: int
+    embedding_version: str
+    content_hash: str
+    embedded_at: datetime
 
 
 def _normalize_story_choices(value) -> list[str]:
@@ -1365,7 +1370,16 @@ class StoryEngine:
             else:
                 ranked = []
                 for index, memory in enumerate(memories):
-                    similarity = cosine_similarity(query_embedding, memory.embedding)
+                    similarity = (
+                        cosine_similarity(query_embedding, memory.embedding)
+                        if self.embedding_service.is_compatible(
+                            model=memory.embedding_model,
+                            dimensions=memory.embedding_dimensions,
+                            version=memory.embedding_version,
+                            vector=query_embedding,
+                        )
+                        else 0.0
+                    )
                     score = similarity + (float(memory.importance or 5) / 20)
                     ranked.append((score, -index, memory))
                 ranked.sort(key=lambda item: (item[0], item[1]), reverse=True)
@@ -1468,19 +1482,26 @@ class StoryEngine:
             if pending_memories
             else []
         )
-        prepared_memories = [
-            PreparedMemory(
-                content=memory,
-                importance=importance,
-                entity_tags=entity_tags,
-                embedding=embedding,
+        prepared_memories: list[PreparedMemory] = []
+        for (memory, importance, entity_tags), embedding in zip(
+            pending_memories,
+            embeddings,
+            strict=True,
+        ):
+            metadata = self.embedding_service.metadata(memory, embedding)
+            prepared_memories.append(
+                PreparedMemory(
+                    content=memory,
+                    importance=importance,
+                    entity_tags=entity_tags,
+                    embedding=embedding,
+                    embedding_model=metadata.model,
+                    embedding_dimensions=metadata.dimensions,
+                    embedding_version=metadata.version,
+                    content_hash=metadata.content_hash,
+                    embedded_at=metadata.embedded_at,
+                )
             )
-            for (memory, importance, entity_tags), embedding in zip(
-                pending_memories,
-                embeddings,
-                strict=True,
-            )
-        ]
         return prepared_memories, pending_facts
 
     async def _load_recent_memory_candidates(
@@ -1588,6 +1609,11 @@ class StoryEngine:
                     entity_tags=list(memory.entity_tags),
                     meta={"source": f"{source}_state_extractor"},
                     embedding=memory.embedding,
+                    embedding_model=memory.embedding_model,
+                    embedding_dimensions=memory.embedding_dimensions,
+                    embedding_version=memory.embedding_version,
+                    content_hash=memory.content_hash,
+                    embedded_at=memory.embedded_at,
                     source_message_id=source_message_id,
                     is_active=True,
                 )
@@ -1632,6 +1658,10 @@ class StoryEngine:
             .where(
                 MemoryItem.story_id == story_id,
                 MemoryItem.branch_id == branch_id,
+                or_(
+                    MemoryItem.content_hash == embedding_content_hash(content),
+                    MemoryItem.content_hash.is_(None),
+                ),
                 MemoryItem.content == content,
                 MemoryItem.is_active.is_(True),
             )

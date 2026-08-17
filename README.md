@@ -58,7 +58,7 @@ NEXT_ALLOWED_DEV_ORIGINS=<your-computer-lan-ip> npm run dev
 
 The backend reads local development secrets from the root `env.md` file. Do not commit real secrets into a public repository. A production process never reads `env.md`; it must receive environment variables or a `WITSCRAFT_SECRETS_FILE` deployment secret file.
 Database structure is versioned in `apps/api/migrations`; application startup does not mutate schema or seed users.
-Migration `0012` adds concurrently-built indexes for branch timelines, active memory/canon retrieval, workspace ownership filters, model-call inspection, and critical foreign-key maintenance. Migration `0013` adds administrator roles, global quota reset events, and the per-user model-call index used by weekly usage accounting. The rollback-only 230,000-row `EXPLAIN ANALYZE` benchmark is documented in `docs/database-performance.md`.
+Migration `0012` adds concurrently-built indexes for branch timelines, active memory/canon retrieval, workspace ownership filters, model-call inspection, and critical foreign-key maintenance. Migration `0013` adds administrator roles, global quota reset events, and the per-user model-call index used by weekly usage accounting. Migration `0014` adds model, dimension, version, content-hash, and timestamp metadata to memory embeddings and backfills existing rows as explicitly incompatible legacy vectors. The rollback-only 230,000-row `EXPLAIN ANALYZE` benchmark is documented in `docs/database-performance.md`.
 
 Operational probes have separate meanings: `/health/live` checks only process responsiveness, while `/health/ready` verifies required non-billable configuration, PostgreSQL connectivity, and the deployed Alembic revision. A release is not ready until the database revision matches the application migration head.
 
@@ -119,6 +119,7 @@ STREAM_CHECKPOINT_CHARACTERS=512
 GENERATION_STALE_SECONDS=900
 AUTH_LOGIN_THROTTLE_RETENTION_HOURS=24
 MODEL_CALL_RETENTION_DAYS=30
+EMBEDDING_VERSION=v1
 USER_WEEKLY_TOKEN_QUOTA=500000
 STORY_WEEKLY_TOKEN_QUOTA=250000
 USER_WEEKLY_TOKEN_SOFT_LIMIT_PERCENTAGE=80

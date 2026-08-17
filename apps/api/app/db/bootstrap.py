@@ -1,3 +1,5 @@
+import hashlib
+import re
 from uuid import UUID
 
 from sqlalchemy import select
@@ -25,6 +27,11 @@ DEFAULT_WORLD_ID = UUID("00000000-0000-0000-0000-000000000201")
 DEFAULT_STORY_ID = UUID("00000000-0000-0000-0000-000000000301")
 DEFAULT_BRANCH_ID = UUID("00000000-0000-0000-0000-000000000401")
 DEFAULT_CHARACTER_ID = UUID("00000000-0000-0000-0000-000000000501")
+
+
+def _content_hash(value: str) -> str:
+    normalized = re.sub(r"\s+", " ", value).strip()
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
 
 async def create_schema() -> None:
@@ -152,6 +159,7 @@ async def seed_demo_data(session: AsyncSession) -> None:
                 character_id=DEFAULT_CHARACTER_ID,
                 memory_type="plot_memory",
                 content="林岚曾在研究所走廊把旧钥匙交给主角，并叮嘱不要告诉韩医生。",
+                content_hash=_content_hash("林岚曾在研究所走廊把旧钥匙交给主角，并叮嘱不要告诉韩医生。"),
                 importance=9,
                 entity_tags=["林岚", "旧钥匙", "韩医生"],
             ),
@@ -161,6 +169,7 @@ async def seed_demo_data(session: AsyncSession) -> None:
                 branch_id=DEFAULT_BRANCH_ID,
                 memory_type="plot_memory",
                 content="旧钥匙可以打开地下二层档案室的侧门。",
+                content_hash=_content_hash("旧钥匙可以打开地下二层档案室的侧门。"),
                 importance=8,
                 entity_tags=["旧钥匙", "地下二层档案室"],
             ),
@@ -170,6 +179,7 @@ async def seed_demo_data(session: AsyncSession) -> None:
                 branch_id=DEFAULT_BRANCH_ID,
                 memory_type="plot_memory",
                 content="七号档案与林岚妹妹的死亡有关。",
+                content_hash=_content_hash("七号档案与林岚妹妹的死亡有关。"),
                 importance=8,
                 entity_tags=["七号档案", "林岚妹妹"],
             ),
