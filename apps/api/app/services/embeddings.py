@@ -120,7 +120,7 @@ class EmbeddingService:
     ) -> None:
         if self.auditor is None:
             return
-        provider, model = self._provider_and_model()
+        provider, model = self.provider_and_model()
         await self.auditor.record_embedding(
             provider=provider,
             model=model,
@@ -135,13 +135,13 @@ class EmbeddingService:
             cache_hit=True,
         )
 
-    def _provider_and_model(self) -> tuple[str, str]:
+    def provider_and_model(self) -> tuple[str, str]:
         if self.settings.dry_run_llm or self.client is None:
             return "local", LOCAL_EMBEDDING_MODEL
         return "openai", self.settings.openai_embedding_model
 
     def metadata(self, text: str, vector: list[float]) -> EmbeddingMetadata:
-        provider, model = self._provider_and_model()
+        provider, model = self.provider_and_model()
         return EmbeddingMetadata(
             model=f"{provider}:{model}",
             dimensions=len(vector),
@@ -158,7 +158,7 @@ class EmbeddingService:
         version: str | None,
         vector: list[float],
     ) -> bool:
-        provider, current_model = self._provider_and_model()
+        provider, current_model = self.provider_and_model()
         return (
             model == f"{provider}:{current_model}"
             and dimensions == len(vector)
@@ -173,7 +173,7 @@ class EmbeddingService:
         dimensions: int | None,
         version: str | None,
     ) -> bool:
-        provider, current_model = self._provider_and_model()
+        provider, current_model = self.provider_and_model()
         return (
             model == f"{provider}:{current_model}"
             and dimensions == self.settings.embedding_dimensions

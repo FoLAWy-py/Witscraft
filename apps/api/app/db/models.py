@@ -5,6 +5,7 @@ from pgvector.sqlalchemy import VECTOR
 from sqlalchemy import (
     Boolean,
     BigInteger,
+    CheckConstraint,
     DateTime,
     ForeignKey,
     Index,
@@ -373,6 +374,56 @@ class MemoryItem(Base, TimestampMixin):
     embedded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     source_message_id: Mapped[UUID | None] = mapped_column(ForeignKey("messages.id", ondelete="SET NULL"))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    embedding_task: Mapped["MemoryEmbeddingTask | None"] = relationship(
+        back_populates="memory",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        uselist=False,
+    )
+
+
+class MemoryEmbeddingTask(Base, TimestampMixin):
+    __tablename__ = "memory_embedding_tasks"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending', 'running', 'retry', 'succeeded', 'superseded', 'dead')",
+            name="ck_memory_embedding_tasks_status",
+        ),
+        CheckConstraint(
+            "attempts >= 0 AND max_attempts >= 1",
+            name="ck_memory_embedding_tasks_attempts",
+        ),
+        Index(
+            "ix_memory_embedding_tasks_claim",
+            "status",
+            "available_at",
+            "created_at",
+            postgresql_where=text("status IN ('pending', 'retry')"),
+        ),
+        Index(
+            "ix_memory_embedding_tasks_stale_lease",
+            "locked_at",
+            postgresql_where=text("status = 'running'"),
+        ),
+    )
+
+    memory_id: Mapped[UUID] = mapped_column(
+        ForeignKey("memory_items.id", ondelete="CASCADE"), primary_key=True
+    )
+    user_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    story_id: Mapped[UUID | None] = mapped_column(ForeignKey("stories.id", ondelete="CASCADE"))
+    expected_content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
+    attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    max_attempts: Mapped[int] = mapped_column(Integer, default=5, nullable=False)
+    available_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    lease_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+    locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_error: Mapped[str | None] = mapped_column(Text)
+    memory: Mapped[MemoryItem] = relationship(back_populates="embedding_task")
 
 
 class UserPreference(Base, TimestampMixin):

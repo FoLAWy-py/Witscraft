@@ -188,3 +188,29 @@ def test_development_environment_values_survive_missing_env_md_keys(
     assert settings.database_username == "environment-user"
     assert settings.database_password == "environment-password"
     assert settings.frontend_base_url == "http://ci.example.test:3000"
+
+
+def test_process_environment_overrides_development_env_md(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        config_module,
+        "_read_env_md",
+        lambda: {
+            "DATABASE_USERNAME": "local-file-user",
+            "DATABASE_PASSWORD": "local-file-password",
+            "MEMORY_EMBEDDING_WORKER_BATCH_SIZE": "99",
+        },
+    )
+    monkeypatch.setenv("DATABASE_USERNAME", "process-user")
+    monkeypatch.setenv("DATABASE_PASSWORD", "process-password")
+    monkeypatch.setenv("MEMORY_EMBEDDING_WORKER_BATCH_SIZE", "7")
+    get_settings.cache_clear()
+    try:
+        settings = get_settings()
+    finally:
+        get_settings.cache_clear()
+
+    assert settings.database_username == "process-user"
+    assert settings.database_password == "process-password"
+    assert settings.memory_embedding_worker_batch_size == 7

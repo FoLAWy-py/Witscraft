@@ -2,7 +2,7 @@
 
 **Document status:** Production baseline
 
-**Architecture version:** 3.15
+**Architecture version:** 3.16
 
 **Last updated:** 17 August 2026
 
@@ -34,6 +34,8 @@ flowchart LR
     Proxy --> Web["Next.js Production Server"]
     Proxy --> API["FastAPI Application"]
     API --> Database[("PostgreSQL")]
+    Worker["Memory Embedding Worker"] --> Database
+    Worker --> OpenAI
     API --> SMTP["SMTP Service"]
     API --> Gateway["LLM Gateway"]
     Gateway --> OpenAI["OpenAI Responses API"]
@@ -44,7 +46,7 @@ All browser traffic enters through the HTTPS reverse proxy. The reverse proxy ro
 
 ## 3. Deployment Topology
 
-The current production topology uses one Next.js process, one FastAPI process, and one PostgreSQL database. The processes are supervised by the host operating system and exposed through a reverse proxy.
+The current production topology uses one Next.js process, one FastAPI process, one memory embedding worker, and one PostgreSQL database. The processes are supervised by the host operating system; only the web and API processes are exposed through a reverse proxy.
 
 ```mermaid
 flowchart TB
@@ -54,6 +56,8 @@ flowchart TB
     FastAPI --> Postgres[("PostgreSQL")]
     FastAPI --> Providers["External Model Providers"]
     FastAPI --> Mail["SMTP"]
+    Worker["Embedding Worker"] --> Postgres
+    Worker --> Providers
 ```
 
 Production characteristics:
@@ -64,6 +68,7 @@ Production characteristics:
 - Production secrets are supplied through process environment variables or `WITSCRAFT_SECRETS_FILE`.
 - The production process does not read the development-only `env.md` compatibility file.
 - Uvicorn receives a bounded graceful-shutdown interval and disposes the SQLAlchemy connection pool during application shutdown.
+- The embedding worker has no network listener. PostgreSQL leases make interrupted tasks reclaimable after a bounded interval.
 
 The current single-process rate limiter and model circuit breaker are intentional constraints. Both must move to shared infrastructure before horizontal API scaling is enabled.
 
@@ -344,7 +349,7 @@ The current implementation uses structured application logs and PostgreSQL audit
 
 ## 12. Migration and Release Contract
 
-Alembic is the only production schema migration mechanism. Revision `0013` adds administrator roles, append-only quota reset events, and a user/time model-call index for weekly accounting. Revision `0014` adds versioned embedding compatibility metadata and a content-hash lookup index for long-term memories. Revision `0017` installs pgvector, adds fixed-dimension vector storage, and preserves a reversible legacy JSONB compatibility path.
+Alembic is the only production schema migration mechanism. Revision `0013` adds administrator roles, append-only quota reset events, and a user/time model-call index for weekly accounting. Revision `0014` adds versioned embedding compatibility metadata and a content-hash lookup index for long-term memories. Revision `0017` installs pgvector, adds fixed-dimension vector storage, and preserves a reversible legacy JSONB compatibility path. Revision `0018` adds durable memory embedding tasks, claim and stale-lease indexes, bounded attempt state, and cascading ownership references.
 
 The release order is:
 
@@ -365,7 +370,13 @@ migration revision sets to match that manifest before a release can be accepted.
 
 Application startup does not call `create_all`, seed data, or `alembic upgrade`. Readiness rejects a deployment whose database revision does not match the migration head shipped with the application.
 
-On `SIGTERM`, the process server stops accepting new work, waits up to the configured graceful interval for in-flight requests, and then closes the SQLAlchemy connection pool. Long-running generation remains bounded by the configured overall model timeout.
+On `SIGTERM`, the process server stops accepting new work, waits up to the configured graceful interval for in-flight requests, and then closes the SQLAlchemy connection pool. Long-running generation remains bounded by the configured overall model timeout. The worker completes its current provider call when allowed by its supervisor; if terminated first, its lease expires and another worker safely reclaims the task.
+
+## 12.1 Durable Memory Embedding Worker
+
+Accepted narrative memories and manual content edits store memory content and a pending embedding task in one transaction. The API response does not depend on provider availability. The worker claims tasks with `FOR UPDATE SKIP LOCKED`, commits a unique lease, performs one audited embedding operation, and writes the vector only if both the lease and normalized content hash remain current. Re-enqueueing content invalidates an older lease, deletion cascades to the task, and inactive memories are superseded without provider work.
+
+Failures use bounded exponential retry and sanitized error storage. Exhausted tasks remain as explicit dead letters. A controlled command can enqueue active rows with missing or incompatible model metadata in bounded batches; retrieval never triggers this re-indexing implicitly. Queue status, oldest eligible time, stale leases, and dead-letter count are metadata-only operational signals documented in `docs/background-jobs.md`. API readiness remains scoped to request serving, so worker supervision and queue-age alerts are separate production requirements.
 
 ## 13. Quality Gates
 
@@ -382,8 +393,8 @@ A successful workflow is required release evidence. CI also proves that a clean 
 The following constraints are known and accepted for the current deployment:
 
 - The API runs as one process; rate-limit and circuit-breaker state are process-local.
-- Long-running jobs execute within request orchestration rather than a durable worker queue.
-- Legacy embeddings with non-current dimensions remain in JSONB pending a controlled background re-embedding workflow.
+- Memory embedding is the first durable background-job class; other auxiliary work still executes within request orchestration.
+- Legacy embeddings with non-current dimensions remain in JSONB until an operator runs the bounded, cost-reviewed re-index workflow.
 - Daily encrypted local backup and application-level restoration drills are operational; approved off-site replication and independent recovery-key escrow remain P0 work.
 - A production-equivalent staging environment has not yet been established.
 - Metrics, tracing, and alerting are not yet connected to a dedicated observability platform.
@@ -395,7 +406,7 @@ Evolution should occur in this order:
 1. Complete backup, restoration, staging, and release automation.
 2. Add browser end-to-end coverage and production-equivalent staging validation to the existing CI baseline.
 3. Add approved live-provider captures and production tenant/concurrency latency evidence before enabling HNSW.
-4. Add durable background jobs where retries and operational visibility require them.
+4. Move additional retry-sensitive auxiliary work to the proven durable-job pattern when evidence justifies it.
 5. Move coordination state to shared infrastructure before adding API replicas.
 6. Add specialist models or agents only after evaluation data demonstrates a net quality benefit.
 
@@ -408,6 +419,7 @@ Evolution should occur in this order:
 | Provider-neutral LLM Gateway | Isolates provider parameter, streaming, retry, and error differences |
 | Explicit generation ledger | Prevents duplicate narrative writes and duplicate model spend |
 | Selective embeddings | Controls cost and avoids low-value vector work on every turn |
+| Durable leased embedding tasks | Removes provider latency from player requests and makes retry, stale-write prevention, and dead letters observable |
 | Purpose-level gateway budgets | Bounds input, output, quota preflight, and fallback spend for every model task |
 | Request-scoped context cache | Reuses snapshot, retrieval, and audited embedding work without crossing tenant or turn boundaries |
 | Soft weekly warning and hard turn ceiling | Warns before weekly exhaustion and stops abnormal provider-call amplification |

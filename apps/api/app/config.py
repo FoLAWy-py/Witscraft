@@ -84,6 +84,10 @@ class Settings(BaseSettings):
     )
     embedding_version: str = EMBEDDING_VERSION
     memory_vector_search_min_items: int = Field(default=40, ge=1, le=10000)
+    memory_embedding_task_max_attempts: int = Field(default=5, ge=1, le=20)
+    memory_embedding_worker_batch_size: int = Field(default=25, ge=1, le=500)
+    memory_embedding_worker_poll_seconds: float = Field(default=5.0, gt=0, le=300)
+    memory_embedding_worker_lease_seconds: int = Field(default=300, ge=30, le=3600)
     model_pricing: dict[str, dict[str, float]] = Field(default_factory=dict)
     model_pricing_version: str = "unconfigured"
     dry_run_llm: bool = False
@@ -233,20 +237,22 @@ def get_settings() -> Settings:
         "EMBEDDING_VERSION": "embedding_version",
     }
     for env_key, setting_name in text_settings.items():
-        if env_key in env_md:
+        if env_key in env_md and env_key not in os.environ:
             overrides[setting_name] = env_md[env_key]
-    deepinfra_key = env_md.get("DEEPINFRA_API_KEY") or env_md.get("DEEP_INFRA_APIKEY")
+    deepinfra_key = None
+    if not {"DEEPINFRA_API_KEY", "DEEP_INFRA_APIKEY"}.intersection(os.environ):
+        deepinfra_key = env_md.get("DEEPINFRA_API_KEY") or env_md.get("DEEP_INFRA_APIKEY")
     if deepinfra_key:
         overrides["deepinfra_api_key"] = deepinfra_key
-    if "SMTP_PORT" in env_md:
+    if "SMTP_PORT" in env_md and "SMTP_PORT" not in os.environ:
         overrides["smtp_port"] = int(env_md["SMTP_PORT"])
-    if "EMBEDDING_DIMENSIONS" in env_md:
+    if "EMBEDDING_DIMENSIONS" in env_md and "EMBEDDING_DIMENSIONS" not in os.environ:
         overrides["embedding_dimensions"] = int(env_md["EMBEDDING_DIMENSIONS"])
-    if env_md.get("MODEL_PRICING"):
+    if env_md.get("MODEL_PRICING") and "MODEL_PRICING" not in os.environ:
         overrides["model_pricing"] = json.loads(env_md["MODEL_PRICING"])
-    if env_md.get("MODEL_PRICING_VERSION"):
+    if env_md.get("MODEL_PRICING_VERSION") and "MODEL_PRICING_VERSION" not in os.environ:
         overrides["model_pricing_version"] = env_md["MODEL_PRICING_VERSION"]
-    if env_md.get("AUTH_COOKIE_SECURE"):
+    if env_md.get("AUTH_COOKIE_SECURE") and "AUTH_COOKIE_SECURE" not in os.environ:
         overrides["auth_cookie_secure"] = env_md["AUTH_COOKIE_SECURE"]
     numeric_settings = {
         "LLM_CONNECT_TIMEOUT_SECONDS": ("llm_connect_timeout_seconds", float),
@@ -268,6 +274,22 @@ def get_settings() -> Settings:
         ),
         "MODEL_CALL_RETENTION_DAYS": ("model_call_retention_days", int),
         "MEMORY_VECTOR_SEARCH_MIN_ITEMS": ("memory_vector_search_min_items", int),
+        "MEMORY_EMBEDDING_TASK_MAX_ATTEMPTS": (
+            "memory_embedding_task_max_attempts",
+            int,
+        ),
+        "MEMORY_EMBEDDING_WORKER_BATCH_SIZE": (
+            "memory_embedding_worker_batch_size",
+            int,
+        ),
+        "MEMORY_EMBEDDING_WORKER_POLL_SECONDS": (
+            "memory_embedding_worker_poll_seconds",
+            float,
+        ),
+        "MEMORY_EMBEDDING_WORKER_LEASE_SECONDS": (
+            "memory_embedding_worker_lease_seconds",
+            int,
+        ),
         "USER_WEEKLY_TOKEN_QUOTA": ("user_weekly_token_quota", int),
         "STORY_WEEKLY_TOKEN_QUOTA": ("story_weekly_token_quota", int),
         "USER_WEEKLY_TOKEN_SOFT_LIMIT_PERCENTAGE": (
@@ -277,6 +299,6 @@ def get_settings() -> Settings:
         "RATE_LIMIT_ADMIN_RESET_REQUESTS": ("rate_limit_admin_reset_requests", int),
     }
     for env_key, (setting_name, parser) in numeric_settings.items():
-        if env_key in env_md:
+        if env_key in env_md and env_key not in os.environ:
             overrides[setting_name] = parser(env_md[env_key])
     return Settings(**overrides)

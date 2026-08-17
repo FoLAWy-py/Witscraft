@@ -1,5 +1,4 @@
 import asyncio
-from datetime import datetime, timezone
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -7,10 +6,10 @@ import pytest
 from fastapi import HTTPException
 from starlette.requests import Request
 
-from app.db.models import GenerationRequest
+from app.config import Settings
+from app.db.models import GenerationRequest, MemoryEmbeddingTask, MemoryItem
 from app.routers.chat import _with_idempotency_header
 from app.schemas.chat import ChatRequest, ChatResponse, StoryState
-from app.services.embeddings import EmbeddingMetadata, embedding_content_hash
 from app.services.story_engine import PreparedMemory, StoryEngine
 
 
@@ -30,22 +29,13 @@ class TransactionCheckingEmbeddings:
     def __init__(self, session: CommitTrackingSession):
         self.session = session
         self.calls = 0
+        self.settings = Settings(dry_run_llm=True)
 
     async def embed_many(self, texts: list[str], *, purpose: str) -> list[list[float]]:
         assert self.session.commits == 1
         assert purpose == "embedding_memory"
         self.calls += 1
         return [[float(index)] for index, _ in enumerate(texts)]
-
-    def metadata(self, text: str, vector: list[float]) -> EmbeddingMetadata:
-        return EmbeddingMetadata(
-            model="local:test-embedding",
-            dimensions=len(vector),
-            version="test-v1",
-            content_hash=embedding_content_hash(text),
-            embedded_at=datetime(2026, 8, 17, tzinfo=timezone.utc),
-        )
-
 
 def _request(**updates) -> ChatRequest:
     values = {
@@ -211,7 +201,7 @@ def test_conflicting_idempotency_header_and_body_is_rejected() -> None:
     assert caught.value.status_code == 409
 
 
-def test_embedding_runs_after_knowledge_read_transaction_is_released() -> None:
+def test_knowledge_preparation_does_not_call_embedding_provider() -> None:
     engine = object.__new__(StoryEngine)
     session = CommitTrackingSession()
     embeddings = TransactionCheckingEmbeddings(session)
@@ -249,12 +239,8 @@ def test_embedding_runs_after_knowledge_read_transaction_is_released() -> None:
     assert prepared_memories[0].content == "Mira discovers the sealed archive and obtains its key"
     assert prepared_memories[0].importance == 7
     assert prepared_memories[0].entity_tags == ("Mira", "sealed archive")
-    assert prepared_memories[0].embedding == [0.0]
-    assert prepared_memories[0].embedding_model == "local:test-embedding"
-    assert prepared_memories[0].embedding_dimensions == 1
-    assert prepared_memories[0].embedding_version == "test-v1"
     assert prepared_facts == ["new fact"]
-    assert embeddings.calls == 1
+    assert embeddings.calls == 0
 
 
 def test_low_value_and_near_duplicate_memories_skip_embedding() -> None:
@@ -342,7 +328,7 @@ def test_near_duplicate_filter_preserves_similar_events_for_different_entities()
         "Lena discovers the sealed archive and obtains its key"
     ]
     assert prepared_memories[0].entity_tags == ("Lena",)
-    assert embeddings.calls == 1
+    assert embeddings.calls == 0
 
 
 def test_prepared_memory_quality_metadata_is_persisted() -> None:
@@ -359,13 +345,8 @@ def test_prepared_memory_quality_metadata_is_persisted() -> None:
         content="Mira discovers the sealed archive",
         importance=7,
         entity_tags=("Mira", "sealed archive"),
-        embedding=[0.25, 0.75],
-        embedding_model="local:test-embedding",
-        embedding_dimensions=2,
-        embedding_version="test-v1",
-        content_hash=embedding_content_hash("Mira discovers the sealed archive"),
-        embedded_at=datetime(2026, 8, 17, tzinfo=timezone.utc),
     )
+    engine.embedding_service = SimpleNamespace(settings=Settings(dry_run_llm=True))
 
     added = engine._add_prepared_memories(
         story,
@@ -376,12 +357,14 @@ def test_prepared_memory_quality_metadata_is_persisted() -> None:
     )
 
     assert added == [prepared.content]
-    assert len(session.added) == 1
-    row = session.added[0]
+    assert len(session.added) == 2
+    row = next(item for item in session.added if isinstance(item, MemoryItem))
+    task = next(item for item in session.added if isinstance(item, MemoryEmbeddingTask))
     assert row.importance == 7
     assert row.entity_tags == ["Mira", "sealed archive"]
-    assert row.embedding == [0.25, 0.75]
-    assert row.embedding_model == "local:test-embedding"
-    assert row.embedding_dimensions == 2
-    assert row.embedding_version == "test-v1"
-    assert row.content_hash == prepared.content_hash
+    assert row.embedding is None
+    assert row.embedding_vector is None
+    assert row.content_hash is not None
+    assert task.memory is row
+    assert task.expected_content_hash == row.content_hash
+    assert task.status == "pending"

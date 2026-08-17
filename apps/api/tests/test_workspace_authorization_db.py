@@ -8,7 +8,16 @@ from sqlalchemy import delete
 from starlette.requests import Request
 
 from app.config import Settings
-from app.db.models import CanonFact, Character, MemoryItem, Story, StoryBranch, User, World
+from app.db.models import (
+    CanonFact,
+    Character,
+    MemoryEmbeddingTask,
+    MemoryItem,
+    Story,
+    StoryBranch,
+    User,
+    World,
+)
 from app.db.session import AsyncSessionLocal, engine as db_engine
 from app.routers.workspace import (
     export_story,
@@ -30,6 +39,7 @@ from app.schemas.chat import (
 )
 from app.embedding_config import EMBEDDING_VECTOR_DIMENSIONS, LOCAL_EMBEDDING_MODEL
 from app.services.embeddings import embedding_content_hash, stored_embedding
+from app.services.memory_embedding_tasks import process_memory_embedding_batch
 from app.services.story_engine import StoryEngine
 
 
@@ -302,15 +312,16 @@ def test_memory_edit_reuses_or_refreshes_embedding_and_rejects_duplicates() -> N
                     }
                 )
                 settings = Settings(dry_run_llm=True)
+                active_story_id = str(story.id)
 
                 await update_memory(
                     str(editable.id),
                     UpdateMemoryRequest(content="Mira keeps the brass key", importance=8),
                     http_request,
-                    str(story.id),
+                    active_story_id,
                     session,
                     settings,
-                    user.id,
+                    user_id,
                 )
                 await session.refresh(editable)
                 assert editable.importance == 8
@@ -322,31 +333,47 @@ def test_memory_edit_reuses_or_refreshes_embedding_and_rejects_duplicates() -> N
                     str(editable.id),
                     UpdateMemoryRequest(content=changed_content, importance=7),
                     http_request,
-                    str(story.id),
+                    active_story_id,
                     session,
                     settings,
-                    user.id,
+                    user_id,
                 )
                 await session.refresh(editable)
                 assert editable.content == changed_content
                 assert editable.entity_tags == []
                 assert editable.embedding is None
+                assert stored_embedding(editable) is None
+                assert editable.embedding_model is None
+                assert editable.embedding_dimensions is None
+                assert editable.embedding_version is None
+                assert editable.content_hash == embedding_content_hash(changed_content)
+                assert editable.embedded_at is None
+                task = await session.get(MemoryEmbeddingTask, editable.id)
+                assert task is not None
+                assert task.status == "pending"
+                await session.rollback()
+
+                counts = await process_memory_embedding_batch(settings, limit=1)
+                assert counts == {"succeeded": 1}
+                await session.refresh(editable)
+                await session.refresh(task)
                 assert len(stored_embedding(editable) or []) == EMBEDDING_VECTOR_DIMENSIONS
                 assert editable.embedding_model == f"local:{LOCAL_EMBEDDING_MODEL}"
                 assert editable.embedding_dimensions == EMBEDDING_VECTOR_DIMENSIONS
                 assert editable.embedding_version == settings.embedding_version
                 assert editable.content_hash == embedding_content_hash(changed_content)
                 assert editable.embedded_at > original_embedded_at
+                assert task.status == "succeeded"
 
                 with pytest.raises(HTTPException) as caught:
                     await update_memory(
                         str(editable.id),
                         UpdateMemoryRequest(content="  The archive door is sealed  ", importance=9),
                         http_request,
-                        str(story.id),
+                        active_story_id,
                         session,
                         settings,
-                        user.id,
+                        user_id,
                     )
                 assert caught.value.status_code == 409
                 await session.refresh(editable)

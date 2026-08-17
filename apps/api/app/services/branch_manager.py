@@ -4,6 +4,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import Settings
 from app.db.models import (
     CanonFact,
     MemoryItem,
@@ -14,6 +15,10 @@ from app.db.models import (
     StoryStateSnapshot,
     StorySummary,
 )
+from app.services.memory_embedding_tasks import (
+    memory_embedding_is_compatible,
+    new_memory_embedding_task,
+)
 
 
 async def clone_story_branch(
@@ -23,6 +28,7 @@ async def clone_story_branch(
     source_branch: StoryBranch,
     user_id: UUID,
     name: str,
+    settings: Settings,
 ) -> StoryBranch:
     message_result = await session.execute(
         select(Message)
@@ -96,29 +102,42 @@ async def clone_story_branch(
         )
     )
     for memory in memory_result.scalars().all():
-        session.add(
-            MemoryItem(
-                user_id=memory.user_id or user_id,
-                story_id=story.id,
-                branch_id=branch.id,
-                character_id=memory.character_id,
-                memory_type=memory.memory_type,
-                content=memory.content,
-                importance=memory.importance,
-                recency_score=memory.recency_score,
-                entity_tags=deepcopy(memory.entity_tags or []),
-                meta=deepcopy(memory.meta or {}),
-                embedding=deepcopy(memory.embedding),
-                embedding_vector=deepcopy(memory.embedding_vector),
-                embedding_model=memory.embedding_model,
-                embedding_dimensions=memory.embedding_dimensions,
-                embedding_version=memory.embedding_version,
-                content_hash=memory.content_hash,
-                embedded_at=memory.embedded_at,
-                source_message_id=_mapped_message_id(memory.source_message_id, message_ids),
-                is_active=memory.is_active,
-            )
+        cloned_memory = MemoryItem(
+            id=uuid4(),
+            user_id=memory.user_id or user_id,
+            story_id=story.id,
+            branch_id=branch.id,
+            character_id=memory.character_id,
+            memory_type=memory.memory_type,
+            content=memory.content,
+            importance=memory.importance,
+            recency_score=memory.recency_score,
+            entity_tags=deepcopy(memory.entity_tags or []),
+            meta=deepcopy(memory.meta or {}),
+            embedding=deepcopy(memory.embedding),
+            embedding_vector=deepcopy(memory.embedding_vector),
+            embedding_model=memory.embedding_model,
+            embedding_dimensions=memory.embedding_dimensions,
+            embedding_version=memory.embedding_version,
+            content_hash=memory.content_hash,
+            embedded_at=memory.embedded_at,
+            source_message_id=_mapped_message_id(memory.source_message_id, message_ids),
+            is_active=memory.is_active,
         )
+        session.add(cloned_memory)
+        if memory.is_active and not memory_embedding_is_compatible(memory, settings):
+            cloned_memory.embedding = None
+            cloned_memory.embedding_vector = None
+            cloned_memory.embedding_model = None
+            cloned_memory.embedding_dimensions = None
+            cloned_memory.embedding_version = None
+            cloned_memory.embedded_at = None
+            session.add(
+                new_memory_embedding_task(
+                    cloned_memory,
+                    max_attempts=settings.memory_embedding_task_max_attempts,
+                )
+            )
 
     fact_result = await session.execute(
         select(CanonFact).where(

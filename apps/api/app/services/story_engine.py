@@ -41,9 +41,9 @@ from app.services.embeddings import (
     EmbeddingService,
     cosine_similarity,
     embedding_content_hash,
-    embedding_storage_values,
     stored_embedding,
 )
+from app.services.memory_embedding_tasks import new_memory_embedding_task
 from app.services.state_extractor import extract_story_updates_with_llm
 from app.services.turn_context import TurnContext
 
@@ -128,12 +128,6 @@ class PreparedMemory:
     content: str
     importance: int
     entity_tags: tuple[str, ...]
-    embedding: list[float]
-    embedding_model: str
-    embedding_dimensions: int
-    embedding_version: str
-    content_hash: str
-    embedded_at: datetime
 
 
 def _normalize_story_choices(value) -> list[str]:
@@ -1676,34 +1670,14 @@ class StoryEngine:
                 pending_facts.append(fact)
 
         await self.session.commit()
-        embeddings = (
-            await self.embedding_service.embed_many(
-                [memory for memory, _, _ in pending_memories],
-                purpose="embedding_memory",
+        prepared_memories = [
+            PreparedMemory(
+                content=memory,
+                importance=importance,
+                entity_tags=entity_tags,
             )
-            if pending_memories
-            else []
-        )
-        prepared_memories: list[PreparedMemory] = []
-        for (memory, importance, entity_tags), embedding in zip(
-            pending_memories,
-            embeddings,
-            strict=True,
-        ):
-            metadata = self.embedding_service.metadata(memory, embedding)
-            prepared_memories.append(
-                PreparedMemory(
-                    content=memory,
-                    importance=importance,
-                    entity_tags=entity_tags,
-                    embedding=embedding,
-                    embedding_model=metadata.model,
-                    embedding_dimensions=metadata.dimensions,
-                    embedding_version=metadata.version,
-                    content_hash=metadata.content_hash,
-                    embedded_at=metadata.embedded_at,
-                )
-            )
+            for memory, importance, entity_tags in pending_memories
+        ]
         return prepared_memories, pending_facts
 
     async def _load_recent_memory_candidates(
@@ -1809,27 +1783,25 @@ class StoryEngine:
         source: str,
     ) -> list[str]:
         for memory in memories:
-            legacy_embedding, vector_embedding = embedding_storage_values(memory.embedding)
+            row = MemoryItem(
+                id=uuid4(),
+                user_id=story.user_id,
+                story_id=story.id,
+                branch_id=branch.id,
+                character_id=story.main_character_id,
+                memory_type=f"{source}_state_extraction",
+                content=memory.content,
+                importance=memory.importance,
+                entity_tags=list(memory.entity_tags),
+                meta={"source": f"{source}_state_extractor"},
+                source_message_id=source_message_id,
+                is_active=True,
+            )
+            self.session.add(row)
             self.session.add(
-                MemoryItem(
-                    user_id=story.user_id,
-                    story_id=story.id,
-                    branch_id=branch.id,
-                    character_id=story.main_character_id,
-                    memory_type=f"{source}_state_extraction",
-                    content=memory.content,
-                    importance=memory.importance,
-                    entity_tags=list(memory.entity_tags),
-                    meta={"source": f"{source}_state_extractor"},
-                    embedding=legacy_embedding,
-                    embedding_vector=vector_embedding,
-                    embedding_model=memory.embedding_model,
-                    embedding_dimensions=memory.embedding_dimensions,
-                    embedding_version=memory.embedding_version,
-                    content_hash=memory.content_hash,
-                    embedded_at=memory.embedded_at,
-                    source_message_id=source_message_id,
-                    is_active=True,
+                new_memory_embedding_task(
+                    row,
+                    max_attempts=self.embedding_service.settings.memory_embedding_task_max_attempts,
                 )
             )
         return [memory.content for memory in memories]

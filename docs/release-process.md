@@ -27,7 +27,7 @@ The target PostgreSQL 17 installation must provide the pgvector extension before
 3. Back up the database and verify the encrypted artifact and manifest.
 4. Apply `uv run alembic upgrade head` as a separate, recorded operation.
 5. Deploy the application artifact built from the manifest revision.
-6. Start the API and web processes with operator-controlled configuration.
+6. Start the API, memory embedding worker, and web processes with operator-controlled configuration. The worker command and queue checks are defined in `docs/background-jobs.md`.
 7. Run the non-mutating health and migration smoke check:
 
    ```bash
@@ -39,7 +39,7 @@ The target PostgreSQL 17 installation must provide the pgvector extension before
 8. In staging, use a dedicated synthetic account to verify login, story loading, one dry-run
    generation, cancellation, branch switching, regeneration, and export. Never use recovered user
    content or a billable provider for this gate.
-9. Observe error rate, readiness, model failures, database saturation, and logs for the agreed
+9. Observe error rate, readiness, model failures, memory embedding queue age/dead letters, database saturation, and logs for the agreed
    release window before declaring the release complete.
 
 Smoke URLs are runtime arguments and must not be committed. HTTPS is mandatory except for an

@@ -51,8 +51,9 @@ from app.schemas.chat import (
     WorkspaceResponse,
 )
 from app.schemas.llm import ChatMessage, LLMRequest
-from app.services.embeddings import EmbeddingService, embedding_content_hash, stored_embedding
+from app.services.embeddings import embedding_content_hash, stored_embedding
 from app.services.branch_manager import clone_story_branch
+from app.services.memory_embedding_tasks import enqueue_memory_embedding
 from app.services.session_summarizer import generate_session_summary
 from app.services.quota_service import QuotaExceededError
 from app.services.model_route_service import load_user_purpose_routes
@@ -836,6 +837,7 @@ async def create_branch(
     story_id: str,
     request: CreateBranchRequest,
     session: AsyncSession = Depends(get_session),
+    settings: Settings = Depends(get_settings),
     user_id: UUID = Depends(get_verified_user_id),
 ) -> WorkspaceResponse:
     requested_story_id = _parse_uuid(story_id, DEFAULT_STORY_ID)
@@ -854,6 +856,7 @@ async def create_branch(
         source_branch=source_branch,
         user_id=user_id,
         name=request.name.strip() or "新分支",
+        settings=settings,
     )
     story.current_branch_id = branch.id
     await session.commit()
@@ -881,6 +884,7 @@ async def duplicate_branch(
     branch_id: str,
     request: CreateBranchRequest,
     session: AsyncSession = Depends(get_session),
+    settings: Settings = Depends(get_settings),
     user_id: UUID = Depends(get_verified_user_id),
 ) -> WorkspaceResponse:
     story, source_branch = await _get_story_branch_for_user(session, story_id, branch_id, user_id)
@@ -890,6 +894,7 @@ async def duplicate_branch(
         source_branch=source_branch,
         user_id=user_id,
         name=request.name.strip() or f"{source_branch.name} copy",
+        settings=settings,
     )
     await session.commit()
     return await workspace(story_id=str(story.id), session=session, user_id=user_id)
@@ -1321,24 +1326,11 @@ async def update_memory(
         memory.embedding_version = None
         memory.content_hash = None
         memory.embedded_at = None
-        auditor = CallAuditor(
-            settings,
-            user_id=user_id,
-            story_id=memory.story_id,
-            request_id=getattr(http_request.state, "request_id", None),
+        await enqueue_memory_embedding(
+            session,
+            memory,
+            max_attempts=settings.memory_embedding_task_max_attempts,
         )
-        embedding_service = EmbeddingService(settings, auditor=auditor)
-        embedding = await embedding_service.embed(
-            content,
-            purpose="embedding_memory_update",
-        )
-        memory.embedding_vector = embedding
-        metadata = embedding_service.metadata(content, embedding)
-        memory.embedding_model = metadata.model
-        memory.embedding_dimensions = metadata.dimensions
-        memory.embedding_version = metadata.version
-        memory.content_hash = metadata.content_hash
-        memory.embedded_at = metadata.embedded_at
     await session.commit()
 
     active_id = _parse_uuid(active_story_id or "", memory.story_id or DEFAULT_STORY_ID)

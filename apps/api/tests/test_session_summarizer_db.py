@@ -5,7 +5,17 @@ from uuid import UUID, uuid4
 import pytest
 from sqlalchemy import delete, select
 
-from app.db.models import Message, Story, StoryBranch, StorySummary, User, World
+from app.config import Settings
+from app.db.models import (
+    MemoryEmbeddingTask,
+    MemoryItem,
+    Message,
+    Story,
+    StoryBranch,
+    StorySummary,
+    User,
+    World,
+)
 from app.db.session import AsyncSessionLocal, engine as db_engine
 from app.schemas.llm import LLMRequest, LLMResponse
 from app.services.branch_manager import clone_story_branch
@@ -163,12 +173,27 @@ def test_cumulative_summary_lineage_is_branch_scoped_and_idempotent() -> None:
                 assert other.from_message_id == other_message.id
                 assert other.message_count == 1
 
+                pending_memory = MemoryItem(
+                    id=uuid4(),
+                    user_id=user.id,
+                    story_id=story.id,
+                    branch_id=main_branch.id,
+                    memory_type="branch_clone_contract",
+                    content="Mira discovers an unmarked passage.",
+                    entity_tags=["Mira"],
+                    meta={},
+                    is_active=True,
+                )
+                session.add(pending_memory)
+                await session.commit()
+
                 cloned_branch = await clone_story_branch(
                     session,
                     story=story,
                     source_branch=main_branch,
                     user_id=user.id,
                     name="Cloned",
+                    settings=Settings(dry_run_llm=True),
                 )
                 await session.commit()
                 cloned_summaries = list(
@@ -186,6 +211,16 @@ def test_cumulative_summary_lineage_is_branch_scoped_and_idempotent() -> None:
                 assert cloned_summaries[0].parent_summary_id is None
                 assert cloned_summaries[1].parent_summary_id == cloned_summaries[0].id
                 assert {summary.id for summary in cloned_summaries}.isdisjoint({first.id, second.id})
+                cloned_memory = await session.scalar(
+                    select(MemoryItem).where(
+                        MemoryItem.branch_id == cloned_branch.id,
+                        MemoryItem.content == pending_memory.content,
+                    )
+                )
+                assert cloned_memory is not None
+                embedding_task = await session.get(MemoryEmbeddingTask, cloned_memory.id)
+                assert embedding_task is not None
+                assert embedding_task.status == "pending"
         finally:
             if user_id is not None:
                 async with AsyncSessionLocal() as cleanup:
