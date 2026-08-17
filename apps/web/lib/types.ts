@@ -79,6 +79,14 @@ export type AdminUserQuota = QuotaUsage & {
   created_at: string;
 };
 
+export type AdminQuotaResetEvent = {
+  id: string;
+  administrator_email: string | null;
+  administrator_name: string | null;
+  reason: string;
+  effective_at: string;
+};
+
 export type AdminOverview = {
   total_users: number;
   administrator_count: number;
@@ -86,7 +94,12 @@ export type AdminOverview = {
   period_started_at: string;
   resets_at: string;
   total_used_tokens: number;
+  filtered_users: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
   users: AdminUserQuota[];
+  reset_events: AdminQuotaResetEvent[];
 };
 
 export type QuotaResetResponse = {

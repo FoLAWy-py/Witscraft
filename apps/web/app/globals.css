@@ -3175,6 +3175,81 @@ html.theme-transition textarea {
   font-size: 12px;
 }
 
+.adminAuditSection {
+  padding: 18px 0;
+  border-bottom: 1px solid #cfd4cf;
+}
+
+.adminAuditSection > header,
+.adminAuditSection > header > span {
+  display: flex;
+  align-items: center;
+}
+
+.adminAuditSection > header {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.adminAuditSection > header > span {
+  gap: 7px;
+  color: #27665d;
+}
+
+.adminAuditSection h2,
+.adminAuditSection small,
+.adminAuditSection p {
+  margin: 0;
+}
+
+.adminAuditSection h2 {
+  color: #20231f;
+  font-size: 14px;
+}
+
+.adminAuditSection > header > small {
+  color: #70766f;
+  font-size: 10px;
+}
+
+.adminAuditList {
+  max-height: 190px;
+  margin: 10px 0 0;
+  padding: 0;
+  overflow-y: auto;
+  border-top: 1px solid #e2e5e1;
+  list-style: none;
+}
+
+.adminAuditList li {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  gap: 14px;
+  padding: 9px 0;
+  border-bottom: 1px solid #e2e5e1;
+  font-size: 11px;
+}
+
+.adminAuditList time {
+  color: #626961;
+}
+
+.adminAuditList li > span,
+.adminAuditList li > span > small {
+  display: block;
+}
+
+.adminAuditList li > span > small {
+  margin-top: 2px;
+  color: #70766f;
+}
+
+.adminEmptyState {
+  margin-top: 10px !important;
+  color: #70766f;
+  font-size: 11px;
+}
+
 .adminUserSection {
   margin-top: 24px;
 }
@@ -3189,6 +3264,82 @@ html.theme-transition textarea {
 .adminUserSection > header span {
   color: #626961;
   font-size: 11px;
+}
+
+.adminUserToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.adminSearchForm {
+  width: min(470px, 100%);
+  height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid #cfd4cf;
+  border-radius: 7px;
+  padding-left: 9px;
+  background: #fff;
+  color: #70766f;
+}
+
+.adminSearchForm input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #20231f;
+  font: inherit;
+}
+
+.adminSearchForm input::placeholder {
+  color: #8a9089;
+}
+
+.adminSearchForm .plainIcon {
+  width: 26px;
+  height: 26px;
+}
+
+.adminSearchForm .cmdButton {
+  height: 32px;
+  border-width: 0 0 0 1px;
+  border-radius: 0 6px 6px 0;
+}
+
+.adminRoleFilter {
+  height: 34px;
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid #cfd4cf;
+  border-radius: 7px;
+  background: #fff;
+}
+
+.adminRoleFilter button {
+  border: 0;
+  border-right: 1px solid #e2e5e1;
+  padding: 0 10px;
+  background: transparent;
+  color: #626961;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.adminRoleFilter button:last-child {
+  border-right: 0;
+}
+
+.adminRoleFilter button[aria-pressed="true"] {
+  background: #e0eee9;
+  color: #27665d;
 }
 
 .adminTableWrap {
@@ -3239,6 +3390,12 @@ html.theme-transition textarea {
 .adminTable td > b,
 .adminTable td > small {
   display: block;
+}
+
+.adminEmptyRow td {
+  padding: 24px 12px;
+  color: #70766f;
+  text-align: center;
 }
 
 .adminAccountCell {
@@ -3294,6 +3451,22 @@ html.theme-transition textarea {
   color: #27665d;
   font-size: 10px;
   font-weight: 700;
+}
+
+.adminPagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 9px;
+  color: #626961;
+  font-size: 10px;
+}
+
+.adminPagination .plainIcon {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #cfd4cf;
 }
 
 .adminStateShell {
@@ -3854,6 +4027,29 @@ html.theme-transition textarea {
     right: 8px;
   }
 
+  .adminAuditList li {
+    grid-template-columns: 1fr;
+    gap: 3px;
+  }
+
+  .adminUserToolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .adminSearchForm {
+    width: 100%;
+  }
+
+  .adminRoleFilter {
+    width: 100%;
+  }
+
+  .adminRoleFilter button {
+    flex: 1;
+    padding: 0 6px;
+  }
+
   .adminTableWrap {
     overflow: hidden;
   }
@@ -3881,6 +4077,20 @@ html.theme-transition textarea {
 
   .adminTable tr:last-child {
     border-bottom: 0;
+  }
+
+  .adminTable .adminEmptyRow {
+    display: block;
+    padding: 0;
+  }
+
+  .adminTable .adminEmptyRow td {
+    display: block;
+    padding: 24px 12px;
+  }
+
+  .adminTable .adminEmptyRow td::before {
+    display: none;
   }
 
   .adminTable td {
@@ -3939,6 +4149,10 @@ html.theme-transition textarea {
   .adminTokenCell,
   .adminResetCell {
     align-self: end;
+  }
+
+  .adminPagination {
+    justify-content: center;
   }
 
   .adminResetCell {

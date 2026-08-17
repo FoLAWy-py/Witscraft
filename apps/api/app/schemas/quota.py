@@ -21,6 +21,14 @@ class AdminUserQuotaResponse(QuotaResponse):
     created_at: datetime
 
 
+class AdminQuotaResetEventResponse(BaseModel):
+    id: str
+    administrator_email: str | None
+    administrator_name: str | None
+    reason: str
+    effective_at: datetime
+
+
 class AdminOverviewResponse(BaseModel):
     total_users: int
     administrator_count: int
@@ -28,7 +36,12 @@ class AdminOverviewResponse(BaseModel):
     period_started_at: datetime
     resets_at: datetime
     total_used_tokens: int
+    filtered_users: int
+    page: int
+    page_size: int
+    total_pages: int
     users: list[AdminUserQuotaResponse]
+    reset_events: list[AdminQuotaResetEventResponse]
 
 
 class QuotaResetRequest(BaseModel):

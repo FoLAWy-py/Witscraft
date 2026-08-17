@@ -2,7 +2,7 @@
 
 **Document status:** Production baseline
 
-**Architecture version:** 2.3
+**Architecture version:** 2.4
 
 **Last updated:** 17 August 2026
 
@@ -99,7 +99,7 @@ Machine-specific deployment files and live secrets are intentionally excluded fr
 
 ### 5.1 Web Application
 
-The Next.js application provides the writing workspace, authentication views, story and branch management, model routing settings, weekly quota visibility, account data export, and account deletion controls. A separate `/admin` route provides account-level usage governance without exposing narrative content.
+The Next.js application provides the writing workspace, authentication views, story and branch management, model routing settings, weekly quota visibility, account data export, and account deletion controls. A separate `/admin` route provides searchable, role-filtered, paginated account-level usage governance and bounded reset audit history without exposing narrative content.
 
 The current interface is implemented as a cohesive App Router workspace rather than a collection of independently deployed frontends. It communicates exclusively with the FastAPI API through the typed client in `apps/web/lib/api.ts`.
 
@@ -288,7 +288,7 @@ Standard users receive a configurable weekly allowance through `USER_WEEKLY_TOKE
 
 The provider-neutral gateway performs a preflight check using estimated input plus maximum output before contacting a provider. Rejection returns HTTP `429` and the next reset boundary. Administrators are exempt from the allowance.
 
-A manual global reset creates an append-only `QuotaResetEvent`; historical `ModelCall` records remain intact. The latest reset within the current calendar week becomes the effective period start. The administrator overview reads account usage through one grouped aggregate query and never joins narrative content.
+A manual global reset creates an append-only `QuotaResetEvent`; historical `ModelCall` records remain intact. The latest reset within the current calendar week becomes the effective period start. The administrator overview separates global metrics from the bounded account list: global counts and token usage retain tenant-wide meaning, while search, role filters, and pagination affect only the returned user page. Per-page usage is read through a grouped aggregate query, and the latest 10 reset events provide operator, reason, and effective-time auditability. None of these queries join narrative content.
 
 This is a preflight and reconciliation design rather than a reservation ledger. The single-process deployment can admit simultaneous requests that together exceed the remaining allowance by a bounded amount. Strict multi-worker enforcement requires durable token reservations before horizontal scaling.
 
@@ -376,6 +376,7 @@ Evolution should occur in this order:
 | Explicit generation ledger | Prevents duplicate narrative writes and duplicate model spend |
 | Selective embeddings | Controls cost and avoids low-value vector work on every turn |
 | Backend-owned roles and weekly quotas | Enforces least privilege and gives users a predictable spend boundary |
+| Bounded administrator account queries | Preserves global metric meaning while preventing unbounded account payloads |
 | Single orchestrator by default | Keeps authorization and state transitions deterministic and observable |
 | Explicit Alembic deployment step | Prevents application startup from mutating production schema |
 | Separate liveness and readiness | Distinguishes process availability from dependency and migration safety |

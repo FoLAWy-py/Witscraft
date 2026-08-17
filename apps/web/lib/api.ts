@@ -152,8 +152,19 @@ export async function getMyQuota(): Promise<QuotaUsage> {
   return requestJson<QuotaUsage>(`${API_BASE_URL}/api/quota/me`, { cache: "no-store" });
 }
 
-export async function getAdminOverview(): Promise<AdminOverview> {
-  return requestJson<AdminOverview>(`${API_BASE_URL}/api/admin/overview`, {
+export async function getAdminOverview(options: {
+  search?: string;
+  role?: "all" | "admin" | "standard";
+  page?: number;
+  pageSize?: number;
+} = {}): Promise<AdminOverview> {
+  const params = new URLSearchParams({
+    search: options.search ?? "",
+    role: options.role ?? "all",
+    page: String(options.page ?? 1),
+    page_size: String(options.pageSize ?? 25)
+  });
+  return requestJson<AdminOverview>(`${API_BASE_URL}/api/admin/overview?${params}`, {
     cache: "no-store"
   });
 }

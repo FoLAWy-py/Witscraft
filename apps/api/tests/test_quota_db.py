@@ -9,7 +9,7 @@ from app.auth import get_admin_user
 from app.config import Settings
 from app.db.models import ModelCall, QuotaResetEvent, User
 from app.db.session import AsyncSessionLocal, engine
-from app.routers.admin import reset_all_quotas
+from app.routers.admin import overview, reset_all_quotas
 from app.schemas.quota import QuotaResetRequest
 from app.services.quota_service import QuotaExceededError, ensure_quota, quota_snapshot
 
@@ -90,6 +90,48 @@ def test_weekly_quota_reset_and_admin_bypass() -> None:
                 assert admin_snapshot.unlimited is True
                 assert admin_snapshot.limit_tokens is None
 
+                standard_overview = await overview(
+                    search="Quota",
+                    role="standard",
+                    page=1,
+                    page_size=10,
+                    _admin=admin,
+                    session=session,
+                    settings=settings,
+                )
+                assert standard_overview.filtered_users == 1
+                assert standard_overview.users[0].id == str(regular_id)
+                assert standard_overview.users[0].used_tokens == 900
+                assert standard_overview.total_users >= 2
+                assert standard_overview.administrator_count >= 1
+
+                paged_overview = await overview(
+                    search="Quota",
+                    role="all",
+                    page=2,
+                    page_size=1,
+                    _admin=admin,
+                    session=session,
+                    settings=settings,
+                )
+                assert paged_overview.filtered_users == 2
+                assert paged_overview.page == 2
+                assert paged_overview.total_pages == 2
+                assert len(paged_overview.users) == 1
+                assert paged_overview.total_users == standard_overview.total_users
+
+                literal_wildcard_overview = await overview(
+                    search="%",
+                    role="all",
+                    page=1,
+                    page_size=10,
+                    _admin=admin,
+                    session=session,
+                    settings=settings,
+                )
+                assert literal_wildcard_overview.filtered_users == 0
+                assert literal_wildcard_overview.users == []
+
                 reset = await reset_all_quotas(
                     QuotaResetRequest(reason="Integration test reset"), admin, session
                 )
@@ -97,6 +139,19 @@ def test_weekly_quota_reset_and_admin_bypass() -> None:
                 reset_snapshot = await quota_snapshot(session, regular, settings)
                 assert reset_snapshot.used_tokens == 0
                 assert reset_snapshot.remaining_tokens == 1000
+
+                reset_overview = await overview(
+                    search="Quota",
+                    role="all",
+                    page=1,
+                    page_size=10,
+                    _admin=admin,
+                    session=session,
+                    settings=settings,
+                )
+                assert reset_overview.reset_events[0].id == str(reset_id)
+                assert reset_overview.reset_events[0].administrator_email == admin.email
+                assert reset_overview.reset_events[0].reason == "Integration test reset"
 
                 assert (await get_admin_user(admin_id, session)).id == admin_id
                 with pytest.raises(HTTPException) as forbidden:

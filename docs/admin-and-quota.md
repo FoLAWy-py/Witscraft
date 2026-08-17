@@ -57,7 +57,20 @@ Manual reset is global by design. Per-user exceptions are not currently supporte
 | `GET /api/admin/overview` | Administrator | Aggregated account usage for the current quota window |
 | `POST /api/admin/quota/reset-all` | Administrator | Begin a new global quota window |
 
-The administrator overview aggregates usage in one grouped database query. It does not load narrative records or model content.
+The administrator overview uses bounded grouped queries for global and current-page usage. It does not load narrative records or model content.
+
+`GET /api/admin/overview` accepts bounded list controls:
+
+| Parameter | Values | Default |
+| --- | --- | --- |
+| `search` | Account display name or email, up to 120 characters | Empty |
+| `role` | `all`, `admin`, or `standard` | `all` |
+| `page` | Positive integer | `1` |
+| `page_size` | `10` to `100` | `25` |
+
+Global account, administrator, and token totals always cover the complete tenant. Search, role, and pagination affect only the returned account list and its `filtered_users` count, preventing a filtered view from changing the meaning of governance metrics.
+
+The overview also returns the latest 10 global reset events with their effective time, reason, and executing administrator identity. The event remains after an administrator account is deleted, but its actor is then shown as deleted because the foreign key is cleared; reset history never includes narrative or model content.
 
 ## Operational Checks
 
