@@ -1,4 +1,4 @@
-# Security checks
+# CI and security checks
 
 The `Security` GitHub Actions workflow runs for pull requests and pushes to `main`.
 It is a release gate: do not deploy a revision while any job is failing.
@@ -8,10 +8,15 @@ It is a release gate: do not deploy a revision while any job is failing.
 - TruffleHog scans the complete committed Git history for secret candidates. Verification is disabled so suspected credentials are never sent to a provider API.
 - `pip-audit` checks the installed Python dependency graph created from `uv.lock`.
 - `npm audit` checks production and development packages from `package-lock.json` and fails at high severity.
-- Production API tests ensure schema documentation is disabled and unhandled exceptions do not expose tracebacks or exception messages.
+- Ruff checks the API, tests, and Alembic migration source.
+- A temporary PostgreSQL 17 database is upgraded from empty state to the current Alembic head. `alembic check` then rejects ORM changes that do not have a matching migration.
+- The complete backend test suite runs against that migrated PostgreSQL database, including authorization, quota, lifecycle, reliability, and security integration coverage. External model traffic is disabled in CI.
+- ESLint and TypeScript validate the frontend before its production build.
 - The production frontend build is rejected if public static assets contain sourcemaps, source-map directives, private-key headers, or server-only secret variable names.
 
 All third-party GitHub Actions are pinned to immutable commit SHAs. Tool versions are explicit so a scanner update cannot silently change a previously reproducible result.
+
+The workflow is necessary release evidence, but repository branch protection and the deployment operator must also require its successful result. GitHub Actions alone cannot prevent a privileged operator from deploying an unverified revision.
 
 ## Local commands
 
@@ -21,12 +26,18 @@ Run the dependency checks with network access:
 cd apps/api
 uv sync --frozen --all-extras
 uv run --with pip-audit==2.10.1 pip-audit --local
+uv run ruff check app tests migrations
+uv run alembic upgrade head
+uv run alembic check
+uv run pytest -q
 ```
 
 ```bash
 cd apps/web
 npm ci
 npm audit --audit-level=high
+npm run lint
+npm run typecheck
 npm run build:production
 cd ../..
 python3 scripts/check-production-artifacts.py

@@ -2,7 +2,7 @@
 
 **Document status:** Production baseline
 
-**Architecture version:** 2.4
+**Architecture version:** 2.5
 
 **Last updated:** 17 August 2026
 
@@ -90,7 +90,7 @@ Witscraft/
 │       └── package-lock.json
 ├── docs/                            # Operational and policy documentation
 ├── scripts/                         # Development and verification utilities
-└── .github/workflows/               # Automated security gates
+└── .github/workflows/               # Automated quality and security gates
 ```
 
 Machine-specific deployment files and live secrets are intentionally excluded from version control.
@@ -340,9 +340,11 @@ On `SIGTERM`, the process server stops accepting new work, waits up to the confi
 
 ## 13. Quality Gates
 
-The repository currently enforces or documents Python tests, Ruff checks, Alembic schema-drift checks, TypeScript type checking, ESLint, reproducible production builds, dependency vulnerability audits, full-history offline secret scanning, and production browser-artifact inspection.
+For every pull request and push to `main`, GitHub Actions provisions an empty PostgreSQL 17 database, upgrades it through the complete Alembic history, rejects ORM-to-migration drift, and runs the full backend test suite. The same workflow runs Ruff, TypeScript type checking, ESLint, reproducible production builds, dependency vulnerability audits, full-history offline secret scanning, and production browser-artifact inspection. External model traffic is disabled in CI.
 
 Database authorization and lifecycle behavior use real PostgreSQL integration tests. Provider adapters use focused tests and controlled live validation when API expenditure is explicitly permitted.
+
+A successful workflow is required release evidence. Branch protection and the deployment procedure must require that result; CI does not replace staging validation, authenticated smoke tests, or post-deployment observation.
 
 ## 14. Current Constraints and Approved Evolution
 
@@ -360,7 +362,7 @@ The following constraints are known and accepted for the current deployment:
 Evolution should occur in this order:
 
 1. Complete backup, restoration, staging, and release automation.
-2. Establish continuous integration for the complete test matrix.
+2. Add browser end-to-end coverage and production-equivalent staging validation to the existing CI baseline.
 3. Introduce pgvector schema and retrieval-version controls.
 4. Add durable background jobs where retries and operational visibility require them.
 5. Move coordination state to shared infrastructure before adding API replicas.
@@ -382,6 +384,7 @@ Evolution should occur in this order:
 | Separate liveness and readiness | Distinguishes process availability from dependency and migration safety |
 | Workload-shaped PostgreSQL indexes | Accelerates branch and ownership reads while partial indexes constrain write amplification |
 | Public-key encrypted logical backups | Keeps decryption material out of the unattended backup process and supports isolated recovery drills |
+| PostgreSQL-backed CI migration gate | Proves an empty database can reach migration head and rejects unversioned schema changes before release |
 | Offline secret verification | Prevents suspected credentials from being transmitted to third parties |
 
 This architecture is the production baseline for subsequent implementation and operational planning.

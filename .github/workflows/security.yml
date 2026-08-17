@@ -32,11 +32,33 @@ jobs:
           extra_args: --no-verification --results=unverified --fail-on-scan-errors
 
   backend:
-    name: Python dependency and production checks
+    name: Backend quality and PostgreSQL checks
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17.6-bookworm
+        env:
+          POSTGRES_USER: witscraft-ci
+          POSTGRES_PASSWORD: witscraft-ci-password
+          POSTGRES_DB: witscraft-ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U witscraft-ci -d witscraft-ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     defaults:
       run:
         working-directory: apps/api
+    env:
+      APP_ENVIRONMENT: test
+      DATABASE_USERNAME: witscraft-ci
+      DATABASE_PASSWORD: witscraft-ci-password
+      DATABASE_HOST: 127.0.0.1
+      DATABASE_PORT: 5432
+      DATABASE_NAME: witscraft-ci
+      DRY_RUN_LLM: "true"
     steps:
       - name: Check out repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -51,12 +73,14 @@ jobs:
         run: uv sync --frozen --all-extras
       - name: Audit installed dependencies
         run: uv run --with pip-audit==2.10.1 pip-audit --local
-      - name: Verify production security boundaries
-        run: uv run pytest -q tests/test_security_boundaries.py tests/test_health.py
-        env:
-          DATABASE_USERNAME: ci-user
-          DATABASE_PASSWORD: ci-password
-          DATABASE_NAME: witscraft-ci
+      - name: Lint backend
+        run: uv run ruff check app tests migrations
+      - name: Upgrade empty database to migration head
+        run: uv run alembic upgrade head
+      - name: Reject model and migration drift
+        run: uv run alembic check
+      - name: Run complete backend test suite
+        run: uv run pytest -q
 
   frontend:
     name: Node dependency and artifact checks
