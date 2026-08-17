@@ -93,6 +93,35 @@ class EmbeddingService:
         )
         return vectors
 
+    async def record_cache_hit(
+        self,
+        text: str,
+        vector: list[float],
+        *,
+        purpose: str = "embedding",
+    ) -> None:
+        if self.auditor is None:
+            return
+        provider, model = self._provider_and_model()
+        await self.auditor.record_embedding(
+            provider=provider,
+            model=model,
+            purpose=purpose,
+            input_count=1,
+            input_characters=len(text),
+            input_tokens=0,
+            avoided_input_tokens=estimate_tokens(text),
+            dimensions=len(vector),
+            status="succeeded",
+            latency_ms=0,
+            cache_hit=True,
+        )
+
+    def _provider_and_model(self) -> tuple[str, str]:
+        if self.settings.dry_run_llm or self.client is None:
+            return "local", "deterministic-blake2b-128"
+        return "openai", self.settings.openai_embedding_model
+
     async def _record_call(
         self,
         *,

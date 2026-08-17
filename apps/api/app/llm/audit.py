@@ -129,8 +129,13 @@ class CallAuditor:
         error: BaseException | None = None,
         cache_hit: bool = False,
         token_usage_estimated: bool = False,
+        avoided_input_tokens: int = 0,
     ) -> str | None:
-        cost = self._estimate_cost(provider, model, input_tokens, None, embedding=True)
+        cost = (
+            Decimal("0")
+            if cache_hit
+            else self._estimate_cost(provider, model, input_tokens, None, embedding=True)
+        )
         call_id = uuid4()
         row = ModelCall(
             id=call_id,
@@ -154,6 +159,7 @@ class CallAuditor:
             request={
                 "input_count": input_count,
                 "input_characters": input_characters,
+                "avoided_input_tokens": avoided_input_tokens,
             },
             response={"dimensions": dimensions},
             error=self._safe_error(error),

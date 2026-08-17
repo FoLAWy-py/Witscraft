@@ -9,7 +9,7 @@ from openai import APIConnectionError, APIStatusError, APITimeoutError, RateLimi
 from app.config import Settings
 from app.llm.audit import CallAuditor
 from app.llm.deepinfra_adapter import DeepInfraAdapter
-from app.llm.model_registry import choose_model, fallback_models, get_model
+from app.llm.model_registry import choose_model, fallback_models, get_model, purpose_budget
 from app.llm.openai_adapter import OpenAIAdapter
 from app.schemas.llm import LLMRequest, LLMResponse, StoryPurpose
 
@@ -22,6 +22,10 @@ class _CircuitState:
 
 
 class CircuitOpenError(RuntimeError):
+    pass
+
+
+class PurposeInputBudgetExceededError(ValueError):
     pass
 
 
@@ -42,6 +46,8 @@ class LLMGateway:
         }
 
     async def generate(self, request: LLMRequest) -> LLMResponse:
+        request = self.normalize_request(request)
+        self._validate_input_budget(request)
         last_error: BaseException | None = None
         attempt_number = 0
         for candidate in self._candidates(request):
@@ -98,6 +104,8 @@ class LLMGateway:
         raise RuntimeError("No configured model is available for this request")
 
     async def stream(self, request: LLMRequest) -> AsyncIterator[str]:
+        request = self.normalize_request(request)
+        self._validate_input_budget(request)
         self.last_stream_call_id = None
         self.last_stream_cost_estimate = None
         self.last_stream_provider = None
@@ -287,22 +295,38 @@ class LLMGateway:
 
     def request_for_purpose(self, purpose: StoryPurpose, messages: list) -> LLMRequest:
         option = choose_model(purpose)
+        budget = purpose_budget(purpose)
         return LLMRequest(
             provider=option.provider, model=option.model, messages=messages, purpose=purpose,
-            max_output_tokens=option.default_max_output_tokens,
+            max_output_tokens=budget.default_output_tokens,
             temperature=option.temperature, top_p=option.top_p,
             reasoning_effort=option.reasoning_effort,
         )
 
     def normalize_request(self, request: LLMRequest) -> LLMRequest:
         option = get_model(request.model)
-        if option is None:
-            return request
-        return request.model_copy(
-            update={
-                "max_output_tokens": min(request.max_output_tokens, option.hard_max_output_tokens),
-                "temperature": request.temperature or option.temperature,
-                "top_p": request.top_p or option.top_p,
-                "reasoning_effort": request.reasoning_effort or option.reasoning_effort,
-            }
-        )
+        budget = purpose_budget(request.purpose)
+        output_limit = budget.hard_output_tokens
+        if option is not None:
+            output_limit = min(output_limit, option.hard_max_output_tokens)
+        updates = {"max_output_tokens": min(request.max_output_tokens, output_limit)}
+        if option is not None:
+            updates.update(
+                {
+                    "temperature": request.temperature or option.temperature,
+                    "top_p": request.top_p or option.top_p,
+                    "reasoning_effort": request.reasoning_effort or option.reasoning_effort,
+                }
+            )
+        return request.model_copy(update=updates)
+
+    @staticmethod
+    def _validate_input_budget(request: LLMRequest) -> None:
+        from app.services.token_estimator import estimate_tokens
+
+        estimated_input = sum(estimate_tokens(message.content) for message in request.messages)
+        limit = purpose_budget(request.purpose).max_input_tokens
+        if estimated_input > limit:
+            raise PurposeInputBudgetExceededError(
+                f"{request.purpose} input exceeds its {limit}-token budget"
+            )

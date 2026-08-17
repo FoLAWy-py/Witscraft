@@ -34,6 +34,11 @@ export type ModelHealth = {
 export type ProvidersResponse = {
   models: ModelOption[];
   purpose_defaults: Record<StoryPurpose, string>;
+  purpose_budgets: Record<StoryPurpose, {
+    max_input_tokens: number;
+    default_output_tokens: number;
+    hard_output_tokens: number;
+  }>;
   purpose_routes: Partial<Record<StoryPurpose, string>>;
   availability: {
     openai: boolean;

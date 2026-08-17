@@ -10,7 +10,7 @@ from app.auth import get_verified_user_id
 from app.config import Settings, get_settings
 from app.db.session import get_session
 from app.llm.audit import CallAuditor
-from app.llm.router import LLMGateway
+from app.llm.router import LLMGateway, PurposeInputBudgetExceededError
 from app.schemas.chat import ChatRequest, ChatResponse
 from app.services.story_engine import StoryEngine
 from app.services.quota_service import QuotaExceededError
@@ -53,6 +53,9 @@ async def send_chat(
     except asyncio.CancelledError as error:
         await engine.fail_active_generation(error, cancelled=True)
         raise
+    except PurposeInputBudgetExceededError as error:
+        await engine.fail_active_generation(error)
+        raise HTTPException(status_code=413, detail=str(error)) from error
     except Exception as error:
         await engine.fail_active_generation(error)
         raise
@@ -89,6 +92,10 @@ async def stream_chat(
                 "status": 429,
                 "detail": "Weekly AI token quota exceeded",
             }
+            yield f"event: error\ndata: {json.dumps(event)}\n\n"
+        except PurposeInputBudgetExceededError as error:
+            await engine.fail_active_generation(error)
+            event = {"type": "error", "status": 413, "detail": str(error)}
             yield f"event: error\ndata: {json.dumps(event)}\n\n"
         except Exception as error:
             await engine.fail_active_generation(error)

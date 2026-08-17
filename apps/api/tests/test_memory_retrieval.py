@@ -5,6 +5,7 @@ from uuid import uuid4
 from app.config import Settings
 from app.services.embeddings import EmbeddingService, cosine_similarity
 from app.services.story_engine import MEMORY_VECTOR_SEARCH_MIN_ITEMS, StoryEngine
+from app.services.turn_context import TurnContext
 
 
 class FakeScalarResult:
@@ -35,10 +36,14 @@ class CountingEmbeddingService:
     def __init__(self, vector=None):
         self.vector = vector or [0.0, 1.0]
         self.calls = 0
+        self.cache_hits = 0
 
     async def embed(self, _text, **_kwargs):
         self.calls += 1
         return self.vector
+
+    async def record_cache_hit(self, _text, _vector, **_kwargs):
+        self.cache_hits += 1
 
 
 def _engine(memories) -> tuple[StoryEngine, CountingEmbeddingService]:
@@ -46,7 +51,7 @@ def _engine(memories) -> tuple[StoryEngine, CountingEmbeddingService]:
     engine.session = FakeSession(memories)
     embedding_service = CountingEmbeddingService()
     engine.embedding_service = embedding_service
-    engine._query_embedding_cache = {}
+    engine.turn_context = TurnContext()
     return engine, embedding_service
 
 
@@ -93,6 +98,7 @@ def test_large_memory_set_reuses_query_embedding_and_ranks_semantically() -> Non
     assert first[0] == f"memory-{MEMORY_VECTOR_SEARCH_MIN_ITEMS}"
     assert second == first
     assert embedding_service.calls == 1
+    assert embedding_service.cache_hits == 1
 
 
 def test_embedding_batch_uses_one_deterministic_pass_in_dry_run() -> None:

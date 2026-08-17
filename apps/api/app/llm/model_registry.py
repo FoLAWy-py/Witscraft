@@ -1,4 +1,13 @@
+from dataclasses import asdict, dataclass
+
 from app.schemas.llm import ModelOption, StoryPurpose
+
+
+@dataclass(frozen=True)
+class PurposeBudget:
+    max_input_tokens: int
+    default_output_tokens: int
+    hard_output_tokens: int
 
 
 MODEL_REGISTRY: list[ModelOption] = [
@@ -100,6 +109,16 @@ PURPOSE_DEFAULTS: dict[StoryPurpose, str] = {
 }
 
 
+PURPOSE_BUDGETS: dict[StoryPurpose, PurposeBudget] = {
+    "critical_story_generation": PurposeBudget(16000, 4800, 8192),
+    "normal_chat": PurposeBudget(10000, 2400, 4096),
+    "state_update": PurposeBudget(8000, 1000, 1800),
+    "event_extraction": PurposeBudget(6000, 800, 1400),
+    "summary_generation": PurposeBudget(12000, 1200, 1800),
+    "consistency_check": PurposeBudget(12000, 1200, 2400),
+}
+
+
 PURPOSE_FALLBACKS: dict[StoryPurpose, list[str]] = {
     "critical_story_generation": ["Qwen/Qwen3-235B-A22B-Instruct-2507", "gpt-5.5"],
     "normal_chat": ["Qwen/Qwen3-235B-A22B-Instruct-2507", "zai-org/GLM-5.2"],
@@ -124,6 +143,14 @@ def choose_model(purpose: StoryPurpose) -> ModelOption:
     if model is None:
         raise RuntimeError(f"Model registry is missing default model {preferred}")
     return model
+
+
+def purpose_budget(purpose: StoryPurpose) -> PurposeBudget:
+    return PURPOSE_BUDGETS[purpose]
+
+
+def serialized_purpose_budgets() -> dict[StoryPurpose, dict[str, int]]:
+    return {purpose: asdict(budget) for purpose, budget in PURPOSE_BUDGETS.items()}
 
 
 def fallback_models(purpose: StoryPurpose, current_model: str) -> list[ModelOption]:

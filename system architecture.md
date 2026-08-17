@@ -2,7 +2,7 @@
 
 **Document status:** Production baseline
 
-**Architecture version:** 2.5
+**Architecture version:** 2.6
 
 **Last updated:** 17 August 2026
 
@@ -159,7 +159,7 @@ flowchart LR
     DI --> Chat["OpenAI-Compatible Chat API"]
 ```
 
-The gateway owns provider-specific parameter translation, timeouts, bounded retries, error classification, purpose-specific fallback selection, process-local circuit breaking, streaming normalization, and model-call audit metadata.
+The gateway owns provider-specific parameter translation, purpose-level input and output budgets, timeouts, bounded retries, error classification, purpose-specific fallback selection, process-local circuit breaking, streaming normalization, and model-call audit metadata.
 
 Provider SDK retries are disabled. Authentication failures, invalid parameters, content rejection, and user cancellation are not retried. Streaming may retry or select a fallback only before the first visible content chunk.
 
@@ -278,7 +278,11 @@ Embedding is selective. The system does not embed every conversational turn by d
 
 Embeddings are appropriate when content is accepted into long-term memory or when semantic retrieval is required. They are skipped when there are no eligible memories, when deterministic recent-context selection is sufficient, or when an identical content hash can reuse prior work.
 
-The production direction is to hash and deduplicate content before embedding, cache query embeddings within a request, record embedding model and dimensions, prevent comparisons across incompatible embedding versions, and re-embed asynchronously during model migrations.
+`TurnContext` owns query embedding reuse within one audited request. It is reset at the start of every turn. The first unique query records provider usage; a cache hit records zero billable tokens, zero cost, dimensions, and estimated avoided input tokens. This makes the optimization measurable without inflating quota consumption or billing reconciliation.
+
+Every model purpose has a central maximum input budget, default output budget, and hard output limit. The gateway applies these policies before provider execution to primary, auxiliary, fallback, streaming, and non-streaming requests. The effective output ceiling is the lower of the purpose limit and model capability. Oversized input is rejected before provider traffic. The current policy and values are maintained in `docs/model-cost-controls.md`.
+
+The production direction remains to hash and deduplicate persisted content before embedding, record embedding model and dimensions with each memory, prevent comparisons across incompatible embedding versions, and re-embed asynchronously during model migrations.
 
 Multi-model routing is supported by purpose. A multi-agent architecture is not the default because narrative generation is primarily a coordinated state-transition workflow, not an open-ended autonomous task graph. Additional agents are justified only when an independently measurable task, such as evaluation or complex planning, produces sufficient quality improvement to offset latency, cost, and failure complexity.
 
@@ -377,6 +381,8 @@ Evolution should occur in this order:
 | Provider-neutral LLM Gateway | Isolates provider parameter, streaming, retry, and error differences |
 | Explicit generation ledger | Prevents duplicate narrative writes and duplicate model spend |
 | Selective embeddings | Controls cost and avoids low-value vector work on every turn |
+| Purpose-level gateway budgets | Bounds input, output, quota preflight, and fallback spend for every model task |
+| Audited request-scoped embedding cache | Measures avoided embedding work without crossing tenant or turn boundaries |
 | Backend-owned roles and weekly quotas | Enforces least privilege and gives users a predictable spend boundary |
 | Bounded administrator account queries | Preserves global metric meaning while preventing unbounded account payloads |
 | Single orchestrator by default | Keeps authorization and state transitions deterministic and observable |

@@ -106,3 +106,30 @@ def test_embedding_calls_share_audit_context_and_are_free_in_dry_run() -> None:
     assert row.purpose == "embedding_memory"
     assert row.request["input_count"] == 2
     assert float(row.cost_estimate) == 0.0
+
+
+def test_embedding_cache_hit_records_avoided_usage_at_zero_cost() -> None:
+    settings = Settings(
+        openai_api_key="test-key",
+        model_pricing={
+            "openai:text-embedding-3-large": {"embedding_per_million": 1.0}
+        },
+    )
+    auditor = CapturingAuditor(settings)
+    service = EmbeddingService(settings, auditor=auditor)
+
+    asyncio.run(
+        service.record_cache_hit(
+            "重复查询",
+            [0.1, 0.2],
+            purpose="embedding_query",
+        )
+    )
+
+    row = auditor.rows[0]
+    assert row.provider == "openai"
+    assert row.cache_hit is True
+    assert row.input_tokens == 0
+    assert row.request["avoided_input_tokens"] > 0
+    assert row.response["dimensions"] == 2
+    assert float(row.cost_estimate) == 0.0

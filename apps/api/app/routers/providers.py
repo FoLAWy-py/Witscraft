@@ -11,7 +11,12 @@ from app.config import Settings, get_settings
 from app.db.models import ModelHealthCheck, UserModelRoute
 from app.db.session import get_session
 from app.llm.audit import CallAuditor
-from app.llm.model_registry import PURPOSE_DEFAULTS, get_model, list_models
+from app.llm.model_registry import (
+    PURPOSE_DEFAULTS,
+    get_model,
+    list_models,
+    serialized_purpose_budgets,
+)
 from app.llm.router import LLMGateway
 from app.schemas.llm import ChatMessage, LLMRequest, ProviderName, StoryPurpose
 from app.services.quota_service import QuotaExceededError
@@ -108,6 +113,7 @@ async def providers(
     return {
         "models": [model.model_dump() for model in list_models()],
         "purpose_defaults": PURPOSE_DEFAULTS,
+        "purpose_budgets": serialized_purpose_budgets(),
         "purpose_routes": await _load_routes(session, user_id),
         "availability": {
             "openai": bool(settings.openai_api_key),

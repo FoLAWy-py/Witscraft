@@ -17,6 +17,7 @@ apps/
 - [`docs/database-performance.md`](./docs/database-performance.md): repeatable PostgreSQL query-plan benchmark and index policy
 - [`docs/backup-recovery.md`](./docs/backup-recovery.md): encrypted backup operation, restore procedure, RPO/RTO, and drill evidence
 - [`docs/admin-and-quota.md`](./docs/admin-and-quota.md): administrator permission boundary, weekly AI allowance, and reset operation
+- [`docs/model-cost-controls.md`](./docs/model-cost-controls.md): purpose-level model budgets, embedding cache metrics, and quota interaction
 - [`docs/security-checks.md`](./docs/security-checks.md): dependency, secret, and production artifact security gates
 
 ## Local Development
@@ -81,6 +82,8 @@ The current backend default for every story purpose is `Qwen/Qwen3-Max`. The reg
 ## Model Call Auditing
 
 Migration `0009` records LLM and embedding calls with a shared request/turn ID, status, token usage, latency and optional versioned cost estimate. Prompt and response text are not stored in the audit row.
+
+Query embedding reuse is scoped to one turn. A cache hit records zero billable tokens and zero estimated cost while preserving the estimated avoided input tokens for operational analysis. Purpose-specific input and output limits are enforced centrally by the LLM Gateway; see [`docs/model-cost-controls.md`](./docs/model-cost-controls.md).
 
 Set `MODEL_PRICING_VERSION` and `MODEL_PRICING` in the production environment to enable cost estimates. Rates are supplied per million tokens and are intentionally not hardcoded in the repository:
 

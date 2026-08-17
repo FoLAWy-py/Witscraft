@@ -36,6 +36,7 @@ from app.services.consistency_checker import check_response_consistency
 from app.services.context_assembler import ContextAssembly, assemble_story_context
 from app.services.embeddings import EmbeddingService, cosine_similarity
 from app.services.state_extractor import extract_story_updates_with_llm
+from app.services.turn_context import TurnContext
 
 
 STORY_CHOICES_MARKER = "[STORY_CHOICES]"
@@ -108,7 +109,7 @@ class StoryEngine:
             llm_gateway.settings,
             auditor=llm_gateway.auditor,
         )
-        self._query_embedding_cache: dict[str, list[float]] = {}
+        self.turn_context = TurnContext()
         self._active_generation_id: UUID | None = None
 
     async def send(self, request: ChatRequest) -> ChatResponse:
@@ -1122,6 +1123,7 @@ class StoryEngine:
         raise HTTPException(status_code=404, detail="Story not found")
 
     def _begin_audit_turn(self, story_id: UUID) -> None:
+        self.turn_context = TurnContext()
         auditor = getattr(self.llm_gateway, "auditor", None)
         if auditor is not None:
             auditor.begin_turn(story_id)
@@ -1273,15 +1275,24 @@ class StoryEngine:
         normalized = query.strip()
         if not normalized:
             return []
-        cache = getattr(self, "_query_embedding_cache", None)
-        if cache is None:
-            cache = {}
-            self._query_embedding_cache = cache
+        turn_context = getattr(self, "turn_context", None)
+        if turn_context is None:
+            turn_context = TurnContext()
+            self.turn_context = turn_context
+        cache = turn_context.query_embeddings
         if normalized not in cache:
             cache[normalized] = await self.embedding_service.embed(
                 normalized,
                 purpose="embedding_query",
             )
+        else:
+            record_cache_hit = getattr(self.embedding_service, "record_cache_hit", None)
+            if record_cache_hit is not None:
+                await record_cache_hit(
+                    normalized,
+                    cache[normalized],
+                    purpose="embedding_query",
+                )
         return cache[normalized]
 
     async def _load_canon_facts(self, story_id: UUID, branch_id: UUID) -> list[str]:

@@ -5,7 +5,7 @@ import pytest
 
 from app.config import Settings
 from app.llm.audit import CallAuditor
-from app.llm.router import LLMGateway, _CIRCUITS
+from app.llm.router import LLMGateway, PurposeInputBudgetExceededError, _CIRCUITS
 from app.schemas.llm import ChatMessage, LLMRequest, LLMResponse
 
 
@@ -161,3 +161,30 @@ def test_stream_does_not_retry_after_first_visible_chunk() -> None:
     with pytest.raises(asyncio.TimeoutError):
         asyncio.run(collect())
     assert adapter.calls == 1
+
+
+def test_purpose_budget_sets_default_and_clamps_explicit_output() -> None:
+    gateway = LLMGateway(Settings())
+    default_request = gateway.request_for_purpose(
+        "state_update",
+        [ChatMessage(role="user", content="test")],
+    )
+    oversized = default_request.model_copy(update={"max_output_tokens": 9000})
+
+    assert default_request.max_output_tokens == 1000
+    assert gateway.normalize_request(oversized).max_output_tokens == 1800
+
+
+def test_input_budget_rejects_request_before_provider_call() -> None:
+    settings = Settings(llm_max_fallbacks=0)
+    adapter = ModelAwareAdapter()
+    gateway = LLMGateway(settings)
+    gateway.adapters["deepinfra"] = adapter
+    request = _request().model_copy(
+        update={"messages": [ChatMessage(role="user", content="长" * 8001)]}
+    )
+
+    with pytest.raises(PurposeInputBudgetExceededError, match="state_update"):
+        asyncio.run(gateway.generate(request))
+
+    assert adapter.calls == []

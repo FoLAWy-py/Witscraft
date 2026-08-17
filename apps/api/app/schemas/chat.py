@@ -15,7 +15,7 @@ class StoryState(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    message: str
+    message: str = Field(max_length=4000)
     story_id: str
     branch_id: str | None = None
     provider: ProviderName | None = None
