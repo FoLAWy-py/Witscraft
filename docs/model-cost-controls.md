@@ -33,6 +33,14 @@ The first unique query records a normal embedding call. Reuse records a second a
 
 Cache-hit rows therefore measure optimization value without consuming the weekly token allowance or inflating provider cost reconciliation.
 
+## Long-term memory admission
+
+Extracted memory is filtered before embedding or persistence. A deterministic importance score rewards consequential event language and references to known characters or inventory entities from the current state. Short, generic actions that do not reach the acceptance threshold are discarded.
+
+Accepted candidates are compared with recent active memories after punctuation and whitespace normalization. High textual similarity is treated as a duplicate unless both memories have known, disjoint entity sets; this prevents a repeated paraphrase from incurring another embedding while preserving similar events that happened to different characters. Exact duplicate checks remain branch-scoped across the complete active set.
+
+The computed importance and matched entity tags are stored with accepted memories and used by retrieval ranking and inspection. These rules are local and deterministic: they do not add another model call, and rejected candidates never reach the embedding provider.
+
 ## Weekly allowance interaction
 
 Quota preflight uses estimated input plus the normalized maximum output. Purpose limits therefore bound both the possible provider charge and the amount reserved by preflight. Successful external usage is later reconciled from recorded provider tokens. Local deterministic embeddings, dry-run responses, failed calls, and cache-hit rows do not consume the weekly allowance.

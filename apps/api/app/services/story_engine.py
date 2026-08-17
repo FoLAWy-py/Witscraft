@@ -5,7 +5,9 @@ import re
 import time
 from collections.abc import AsyncIterator
 from contextlib import suppress
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from difflib import SequenceMatcher
 from uuid import UUID, uuid4
 
 import anyio
@@ -48,6 +50,79 @@ STORY_CHOICES_PATTERN = re.compile(
 MEMORY_RESULT_LIMIT = 8
 MEMORY_VECTOR_SEARCH_MIN_ITEMS = 40
 MEMORY_CANDIDATE_LIMIT = 128
+MEMORY_ACCEPTANCE_THRESHOLD = 5
+MEMORY_DUPLICATE_SIMILARITY = 0.88
+MEMORY_EVENT_MARKERS = (
+    "发现",
+    "得知",
+    "揭露",
+    "确认",
+    "决定",
+    "承诺",
+    "背叛",
+    "救下",
+    "死亡",
+    "失踪",
+    "获得",
+    "拾到",
+    "拿到",
+    "交给",
+    "失去",
+    "摧毁",
+    "解锁",
+    "打开",
+    "关闭",
+    "逃离",
+    "抵达",
+    "离开",
+    "改变",
+    "成为",
+    "拒绝",
+    "同意",
+    "袭击",
+    "受伤",
+    "牺牲",
+    "discovers",
+    "learns",
+    "reveals",
+    "confirms",
+    "decides",
+    "promises",
+    "betrays",
+    "rescues",
+    "dies",
+    "vanishes",
+    "obtains",
+    "loses",
+    "destroys",
+    "unlocks",
+    "escapes",
+    "arrives",
+    "leaves",
+)
+MEMORY_CONSEQUENCE_MARKERS = (
+    "因此",
+    "导致",
+    "从此",
+    "不再",
+    "首次",
+    "终于",
+    "永久",
+    "秘密",
+    "真相",
+    "therefore",
+    "permanently",
+    "secret",
+    "truth",
+)
+
+
+@dataclass(frozen=True)
+class PreparedMemory:
+    content: str
+    importance: int
+    entity_tags: tuple[str, ...]
+    embedding: list[float]
 
 
 def _normalize_story_choices(value) -> list[str]:
@@ -208,6 +283,11 @@ class StoryEngine:
             branch,
             extraction.memories,
             extraction.canon_facts,
+            entity_names=self._memory_entity_names(
+                extraction.state,
+                extraction.relationships,
+                perspective_character,
+            ),
         )
 
         assistant_message = target_message or Message(
@@ -841,6 +921,11 @@ class StoryEngine:
             branch,
             extraction.memories,
             extraction.canon_facts,
+            entity_names=self._memory_entity_names(
+                extraction.state,
+                extraction.relationships,
+                perspective_character,
+            ),
         )
 
         if assistant_message is None:
@@ -1336,13 +1421,36 @@ class StoryEngine:
         branch: StoryBranch,
         memories: list[str],
         canon_facts: list[str],
-    ) -> tuple[list[tuple[str, list[float]]], list[str]]:
-        pending_memories: list[str] = []
-        for memory in memories:
+        *,
+        entity_names: list[str] | None = None,
+    ) -> tuple[list[PreparedMemory], list[str]]:
+        recent_memories = (
+            await self._load_recent_memory_candidates(story.id, branch.id) if memories else []
+        )
+        comparison_memories = [
+            (item.content, tuple(item.entity_tags or [])) for item in recent_memories
+        ]
+        pending_memories: list[tuple[str, int, tuple[str, ...]]] = []
+        for raw_memory in memories:
+            memory = self._normalize_memory_text(raw_memory)
+            entity_tags = self._memory_entity_tags(memory, entity_names or [])
+            importance = self._memory_importance(memory, entity_tags)
+            if importance < MEMORY_ACCEPTANCE_THRESHOLD:
+                continue
+            if any(
+                self._memory_is_near_duplicate(
+                    memory,
+                    entity_tags,
+                    existing_content,
+                    existing_entities,
+                )
+                for existing_content, existing_entities in comparison_memories
+            ):
+                continue
             if await self._memory_exists(story.id, branch.id, memory):
                 continue
-            if memory not in pending_memories:
-                pending_memories.append(memory)
+            pending_memories.append((memory, importance, entity_tags))
+            comparison_memories.append((memory, entity_tags))
 
         pending_facts: list[str] = []
         for fact in canon_facts:
@@ -1352,21 +1460,122 @@ class StoryEngine:
                 pending_facts.append(fact)
 
         await self.session.commit()
-        embeddings = await self.embedding_service.embed_many(
-            pending_memories,
-            purpose="embedding_memory",
+        embeddings = (
+            await self.embedding_service.embed_many(
+                [memory for memory, _, _ in pending_memories],
+                purpose="embedding_memory",
+            )
+            if pending_memories
+            else []
         )
-        return list(zip(pending_memories, embeddings, strict=True)), pending_facts
+        prepared_memories = [
+            PreparedMemory(
+                content=memory,
+                importance=importance,
+                entity_tags=entity_tags,
+                embedding=embedding,
+            )
+            for (memory, importance, entity_tags), embedding in zip(
+                pending_memories,
+                embeddings,
+                strict=True,
+            )
+        ]
+        return prepared_memories, pending_facts
+
+    async def _load_recent_memory_candidates(
+        self,
+        story_id: UUID,
+        branch_id: UUID,
+    ) -> list[MemoryItem]:
+        result = await self.session.execute(
+            select(MemoryItem)
+            .where(
+                MemoryItem.story_id == story_id,
+                MemoryItem.branch_id == branch_id,
+                MemoryItem.is_active.is_(True),
+            )
+            .order_by(desc(MemoryItem.updated_at))
+            .limit(MEMORY_CANDIDATE_LIMIT)
+        )
+        return list(result.scalars().all())
+
+    @staticmethod
+    def _memory_entity_names(
+        state: StoryState,
+        relationships: list[dict],
+        perspective_character: str | None,
+    ) -> list[str]:
+        names: list[str] = []
+        for value in [
+            perspective_character,
+            *state.inventory,
+            *(relationship.get("from") for relationship in relationships),
+            *(relationship.get("to") for relationship in relationships),
+        ]:
+            cleaned = str(value or "").strip()
+            if len(cleaned) >= 2 and cleaned not in names:
+                names.append(cleaned)
+        return names
+
+    @staticmethod
+    def _normalize_memory_text(value: str) -> str:
+        return re.sub(r"\s+", " ", value).strip(" \t\r\n，。！？；：,.!?;:\"'`*-")
+
+    @staticmethod
+    def _memory_entity_tags(content: str, entity_names: list[str]) -> tuple[str, ...]:
+        normalized = content.casefold()
+        return tuple(
+            entity
+            for entity in entity_names
+            if entity.casefold() in normalized
+        )
+
+    @staticmethod
+    def _memory_importance(content: str, entity_tags: tuple[str, ...]) -> int:
+        if not content:
+            return 0
+        normalized = content.casefold()
+        importance = 1
+        if len(content) >= 16:
+            importance += 1
+        if entity_tags:
+            importance += 2
+        if any(marker in normalized for marker in MEMORY_EVENT_MARKERS):
+            importance += 3
+        if any(marker in normalized for marker in MEMORY_CONSEQUENCE_MARKERS):
+            importance += 1
+        return min(importance, 10)
+
+    @staticmethod
+    def _memory_is_near_duplicate(
+        content: str,
+        entity_tags: tuple[str, ...],
+        existing_content: str,
+        existing_entities: tuple[str, ...],
+    ) -> bool:
+        normalized = re.sub(r"[^\w]+", "", content.casefold())
+        existing_normalized = re.sub(r"[^\w]+", "", existing_content.casefold())
+        if not normalized or not existing_normalized:
+            return False
+        if entity_tags and existing_entities and set(entity_tags).isdisjoint(existing_entities):
+            return False
+        if normalized == existing_normalized:
+            return True
+        return (
+            SequenceMatcher(None, normalized, existing_normalized).ratio()
+            >= MEMORY_DUPLICATE_SIMILARITY
+        )
 
     def _add_prepared_memories(
         self,
         story: Story,
         branch: StoryBranch,
         source_message_id: UUID,
-        memories: list[tuple[str, list[float]]],
+        memories: list[PreparedMemory],
         source: str,
     ) -> list[str]:
-        for memory, embedding in memories:
+        for memory in memories:
             self.session.add(
                 MemoryItem(
                     user_id=story.user_id,
@@ -1374,16 +1583,16 @@ class StoryEngine:
                     branch_id=branch.id,
                     character_id=story.main_character_id,
                     memory_type=f"{source}_state_extraction",
-                    content=memory,
-                    importance=6,
-                    entity_tags=[],
+                    content=memory.content,
+                    importance=memory.importance,
+                    entity_tags=list(memory.entity_tags),
                     meta={"source": f"{source}_state_extractor"},
-                    embedding=embedding,
+                    embedding=memory.embedding,
                     source_message_id=source_message_id,
                     is_active=True,
                 )
             )
-        return [memory for memory, _ in memories]
+        return [memory.content for memory in memories]
 
     @staticmethod
     def _merge_memory_results(existing: list[str], added: list[str]) -> list[str]:

@@ -86,6 +86,8 @@ Migration `0009` records LLM and embedding calls with a shared request/turn ID, 
 
 Query embedding reuse is scoped to one turn. A cache hit records zero billable tokens and zero estimated cost while preserving the estimated avoided input tokens for operational analysis. Purpose-specific input and output limits are enforced centrally by the LLM Gateway; see [`docs/model-cost-controls.md`](./docs/model-cost-controls.md).
 
+Long-term-memory candidates are scored and checked for normalized near-duplicates before embedding. Low-value transient actions are discarded, while accepted memories retain computed importance and current character/inventory entity tags for retrieval ranking. The admission filter is deterministic and does not make an additional model call.
+
 Set `MODEL_PRICING_VERSION` and `MODEL_PRICING` in the production environment to enable cost estimates. Rates are supplied per million tokens and are intentionally not hardcoded in the repository:
 
 ```text

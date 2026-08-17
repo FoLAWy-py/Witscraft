@@ -9,15 +9,19 @@ from starlette.requests import Request
 from app.db.models import GenerationRequest
 from app.routers.chat import _with_idempotency_header
 from app.schemas.chat import ChatRequest, ChatResponse, StoryState
-from app.services.story_engine import StoryEngine
+from app.services.story_engine import PreparedMemory, StoryEngine
 
 
 class CommitTrackingSession:
     def __init__(self):
         self.commits = 0
+        self.added = []
 
     async def commit(self) -> None:
         self.commits += 1
+
+    def add(self, value) -> None:
+        self.added.append(value)
 
 
 class TransactionCheckingEmbeddings:
@@ -209,18 +213,145 @@ def test_embedding_runs_after_knowledge_read_transaction_is_released() -> None:
     async def fact_exists(_story_id, _branch_id, content: str) -> bool:
         return content == "known fact"
 
+    async def recent_memories(_story_id, _branch_id):
+        return []
+
     engine._memory_exists = memory_exists
     engine._canon_fact_exists = fact_exists
+    engine._load_recent_memory_candidates = recent_memories
 
     prepared_memories, prepared_facts = asyncio.run(
         engine._prepare_extracted_knowledge(
             SimpleNamespace(id=uuid4()),
             SimpleNamespace(id=uuid4()),
-            ["already known", "new memory", "new memory"],
+            [
+                "already known",
+                "Mira discovers the sealed archive and obtains its key.",
+                "Mira discovers the sealed archive and obtains its key.",
+            ],
             ["known fact", "new fact", "new fact"],
+            entity_names=["Mira", "sealed archive"],
         )
     )
 
-    assert prepared_memories == [("new memory", [0.0])]
+    assert len(prepared_memories) == 1
+    assert prepared_memories[0].content == "Mira discovers the sealed archive and obtains its key"
+    assert prepared_memories[0].importance == 7
+    assert prepared_memories[0].entity_tags == ("Mira", "sealed archive")
+    assert prepared_memories[0].embedding == [0.0]
     assert prepared_facts == ["new fact"]
     assert embeddings.calls == 1
+
+
+def test_low_value_and_near_duplicate_memories_skip_embedding() -> None:
+    engine = object.__new__(StoryEngine)
+    session = CommitTrackingSession()
+    embeddings = TransactionCheckingEmbeddings(session)
+    engine.session = session
+    engine.embedding_service = embeddings
+
+    async def memory_exists(_story_id, _branch_id, _content: str) -> bool:
+        return False
+
+    async def fact_exists(_story_id, _branch_id, _content: str) -> bool:
+        return False
+
+    async def recent_memories(_story_id, _branch_id):
+        return [
+            SimpleNamespace(
+                content="Mira discovers the sealed archive and obtains its key.",
+                entity_tags=["Mira", "sealed archive"],
+            )
+        ]
+
+    engine._memory_exists = memory_exists
+    engine._canon_fact_exists = fact_exists
+    engine._load_recent_memory_candidates = recent_memories
+
+    prepared_memories, _ = asyncio.run(
+        engine._prepare_extracted_knowledge(
+            SimpleNamespace(id=uuid4()),
+            SimpleNamespace(id=uuid4()),
+            [
+                "Mira nods quietly.",
+                "Mira discovers the sealed archive, and obtains its key!",
+            ],
+            [],
+            entity_names=["Mira", "sealed archive"],
+        )
+    )
+
+    assert prepared_memories == []
+    assert embeddings.calls == 0
+
+
+def test_near_duplicate_filter_preserves_similar_events_for_different_entities() -> None:
+    engine = object.__new__(StoryEngine)
+    session = CommitTrackingSession()
+    embeddings = TransactionCheckingEmbeddings(session)
+    engine.session = session
+    engine.embedding_service = embeddings
+
+    async def never_exists(_story_id, _branch_id, _content: str) -> bool:
+        return False
+
+    async def recent_memories(_story_id, _branch_id):
+        return [
+            SimpleNamespace(
+                content="Mira discovers the sealed archive and obtains its key.",
+                entity_tags=["Mira"],
+            )
+        ]
+
+    engine._memory_exists = never_exists
+    engine._canon_fact_exists = never_exists
+    engine._load_recent_memory_candidates = recent_memories
+
+    prepared_memories, _ = asyncio.run(
+        engine._prepare_extracted_knowledge(
+            SimpleNamespace(id=uuid4()),
+            SimpleNamespace(id=uuid4()),
+            ["Lena discovers the sealed archive and obtains its key."],
+            [],
+            entity_names=["Mira", "Lena"],
+        )
+    )
+
+    assert [memory.content for memory in prepared_memories] == [
+        "Lena discovers the sealed archive and obtains its key"
+    ]
+    assert prepared_memories[0].entity_tags == ("Lena",)
+    assert embeddings.calls == 1
+
+
+def test_prepared_memory_quality_metadata_is_persisted() -> None:
+    engine = object.__new__(StoryEngine)
+    session = CommitTrackingSession()
+    engine.session = session
+    story = SimpleNamespace(
+        id=uuid4(),
+        user_id=uuid4(),
+        main_character_id=uuid4(),
+    )
+    branch = SimpleNamespace(id=uuid4())
+    prepared = PreparedMemory(
+        content="Mira discovers the sealed archive",
+        importance=7,
+        entity_tags=("Mira", "sealed archive"),
+        embedding=[0.25, 0.75],
+    )
+
+    added = engine._add_prepared_memories(
+        story,
+        branch,
+        uuid4(),
+        [prepared],
+        "llm",
+    )
+
+    assert added == [prepared.content]
+    assert len(session.added) == 1
+    row = session.added[0]
+    assert row.importance == 7
+    assert row.entity_tags == ["Mira", "sealed archive"]
+    assert row.embedding == [0.25, 0.75]
