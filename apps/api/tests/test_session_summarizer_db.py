@@ -1,6 +1,6 @@
 import asyncio
 from datetime import datetime, timedelta, timezone
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy import delete, select
@@ -14,6 +14,7 @@ from app.services.session_summarizer import (
     SUMMARY_TRIGGER_USER_REQUESTED,
     generate_session_summary,
 )
+from app.services.story_engine import StoryEngine
 
 
 class FakeSummaryGateway:
@@ -71,8 +72,10 @@ def test_cumulative_summary_lineage_is_branch_scoped_and_idempotent() -> None:
                 story.current_branch_id = main_branch.id
 
                 started = datetime(2026, 8, 17, 8, 0, tzinfo=timezone.utc)
+                message_id_base = uuid4().int & ~0xFF
                 first_messages = [
                     Message(
+                        id=UUID(int=message_id_base + 1),
                         story_id=story.id,
                         branch_id=main_branch.id,
                         role="user",
@@ -81,12 +84,13 @@ def test_cumulative_summary_lineage_is_branch_scoped_and_idempotent() -> None:
                         created_at=started,
                     ),
                     Message(
+                        id=UUID(int=message_id_base + 2),
                         story_id=story.id,
                         branch_id=main_branch.id,
                         role="assistant",
                         content="The brass clock stops.",
                         meta={},
-                        created_at=started + timedelta(seconds=1),
+                        created_at=started,
                     ),
                 ]
                 session.add_all(first_messages)
@@ -110,15 +114,25 @@ def test_cumulative_summary_lineage_is_branch_scoped_and_idempotent() -> None:
                 assert first.trigger == SUMMARY_TRIGGER_USER_REQUESTED
 
                 new_message = Message(
+                    id=UUID(int=message_id_base + 3),
                     story_id=story.id,
                     branch_id=main_branch.id,
                     role="assistant",
                     content="Lena reveals the clock key.",
                     meta={},
-                    created_at=started + timedelta(seconds=2),
+                    created_at=started,
                 )
                 session.add(new_message)
                 await session.commit()
+
+                engine = StoryEngine.__new__(StoryEngine)
+                engine.session = session
+                recent = await engine._load_recent_messages(
+                    story.id,
+                    main_branch.id,
+                    after_message_id=first_messages[-1].id,
+                )
+                assert recent == [{"role": "assistant", "content": new_message.content}]
 
                 second = await generate_session_summary(session, gateway, story, main_branch)
                 assert second.parent_summary_id == first.id

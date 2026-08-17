@@ -12,7 +12,7 @@ from uuid import UUID, uuid4
 
 import anyio
 from fastapi import HTTPException
-from sqlalchemy import case, delete, desc, or_, select, update
+from sqlalchemy import and_, case, delete, desc, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -1848,12 +1848,19 @@ class StoryEngine:
         if after_message_id is not None:
             covered_message = await self.session.get(Message, after_message_id)
             if covered_message is not None:
-                query = query.where(Message.created_at > covered_message.created_at)
+                query = query.where(
+                    or_(
+                        Message.created_at > covered_message.created_at,
+                        and_(
+                            Message.created_at == covered_message.created_at,
+                            Message.id > covered_message.id,
+                        ),
+                    )
+                )
         result = await self.session.execute(
             query
             .order_by(
                 desc(Message.created_at),
-                case((Message.role == "assistant", 0), (Message.role == "user", 1), else_=2),
                 desc(Message.id),
             )
             .limit(10)

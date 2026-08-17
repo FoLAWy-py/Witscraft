@@ -31,7 +31,7 @@ Before production backups are enabled, the operator must define a maximum backup
 
 ## Model-provider transfer
 
-For generation requests, the selected OpenAI or DeepInfra-compatible provider receives the assembled prompt required for that turn. This can include the current user message, recent story messages, relevant world and character data, state, canon facts, preferences, summaries, and retrieved memories within configured context budgets.
+For generation requests, the selected OpenAI or DeepInfra-compatible provider receives the assembled prompt required for that turn. This can include the current user message, recent story messages, relevant world and character data, state, canon facts, preferences, summaries, and retrieved memories within dynamically allocated context budgets. The authenticated context-preview endpoint reports selected source categories and token estimates but does not create a provider call.
 
 When semantic memory retrieval requires a remote embedding, OpenAI receives only the text being embedded. Small or empty memory sets bypass query embedding, and embeddings are not generated on every conversation turn.
 

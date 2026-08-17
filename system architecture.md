@@ -2,7 +2,7 @@
 
 **Document status:** Production baseline
 
-**Architecture version:** 3.9
+**Architecture version:** 3.10
 
 **Last updated:** 17 August 2026
 
@@ -140,11 +140,11 @@ Context construction is separated into deterministic stages:
 
 1. Load the authorized story, branch, world, character, and current state.
 2. Load recent messages, summaries, canon facts, preferences, and eligible memories.
-3. Apply explicit section budgets using conservative token estimation.
+3. Allocate a shared section pool dynamically using conservative token estimation.
 4. Deduplicate current input and previously represented information.
 5. Render a provider-neutral message sequence.
 
-The current user message appears exactly once as the final user message. Historical and memory sections are budgeted independently so one oversized section cannot consume the complete context window.
+The current user message appears exactly once as the final user message. Context sections share a deterministic 5,460-token ceiling beneath a 9,000-token input target and fixed render reserve. The allocator protects minimum continuity budgets, redistributes unused capacity up to per-section maxima, and shrinks the pool for a large player message. World, character, state, canon, preferences, custom instructions, cumulative summary, memories, and recent messages all enforce the resulting allocation. Preview evidence includes estimator identity, demand, allocation, selected tokens, authoritative source, dropped counts, and truncation reason for each section.
 
 Session summaries are branch-local cumulative checkpoints. Generation is currently an explicit player operation rather than a per-turn side effect. A new summary receives the previous cumulative summary and only messages beyond its deterministic `(created_at, id)` coverage boundary, then stores a complete replacement. `parent_summary_id`, the full from/to message range, prompt version, actual provider/model, trigger, cumulative message count, and source-token estimate make lineage and cost auditable. A branch clone remaps summary parents and message boundaries; a request with no new messages is rejected before model execution.
 

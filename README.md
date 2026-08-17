@@ -90,6 +90,8 @@ Long-term-memory candidates are scored and checked for normalized near-duplicate
 
 Session summaries are currently created only by an explicit player action, never automatically on every turn. Each new summary is a cumulative replacement that incorporates the prior branch summary plus only newly uncovered messages. It records its parent, complete covered range, prompt version, actual provider/model, trigger, source-token estimate, and cumulative message count. Repeating the action without new messages returns HTTP `409` before a model call.
 
+Story context uses one deterministic 5,460-token section pool under a conservative 9,000-token input target. Minimum allocations protect current state and continuity signals, while unused capacity is redistributed up to per-section maxima. A long player message automatically reduces the section pool. The context-preview endpoint reports estimator identity, demand, allocation, selected tokens, source, dropped counts, and a truncation reason for every section; the state snapshot itself is trimmed rather than merely reporting an unenforced budget.
+
 Set `MODEL_PRICING_VERSION` and `MODEL_PRICING` in the production environment to enable cost estimates. Rates are supplied per million tokens and are intentionally not hardcoded in the repository:
 
 ```text

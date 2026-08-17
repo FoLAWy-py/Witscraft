@@ -67,4 +67,10 @@ Session summaries are user-triggered and are not generated on every narrative tu
 
 Each summary stores the prompt version, actual provider and model after fallback resolution, generation trigger, parent summary, covered message range, cumulative message count, and conservative source-token estimate. Branch duplication remaps both message boundaries and parent-summary lineage to the new branch.
 
+## Dynamic context budgets
+
+Narrative context uses a 5,460-token shared section ceiling beneath a conservative 9,000-token input target, leaving a fixed rendering reserve for system rules, labels, and formatting. The current player message is measured first and reduces the available section pool when large. A deterministic two-stage allocator gives each demanded section a protected minimum, then redistributes remaining capacity in continuity-first rounds up to explicit maxima.
+
+World, character, state, canon, preferences, story instructions, cumulative summary, memories, and recent messages are all trimmed against their actual allocation. Context preview returns the conservative estimator version, provider-calibration status, full demand, allocation, selected estimate, authoritative source, dropped item counts, and `dynamic_section_budget` when content was truncated. The final rendered prompt estimate remains independently visible and the LLM Gateway still enforces the purpose hard limit.
+
 These controls are intentionally deterministic. Model or prompt changes should modify the central budget table only after regression evidence demonstrates a quality need.
