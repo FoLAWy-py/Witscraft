@@ -87,7 +87,54 @@ def test_authenticated_interactive_novel_api_journey(monkeypatch) -> None:
                     "default_output_tokens": 2400,
                     "hard_output_tokens": 4096,
                 }
+                assert catalog_payload["route_history"] == []
                 assert "deepinfra_base_url" not in catalog_payload
+
+                empty_revert = await client.post("/api/providers/routes/revert")
+                assert empty_revert.status_code == 409
+
+                changed_routes = dict(catalog_payload["purpose_defaults"])
+                route_update = await client.put(
+                    "/api/providers/routes",
+                    json={"routes": changed_routes},
+                )
+                assert route_update.status_code == 200, route_update.text
+                update_payload = route_update.json()
+                assert update_payload["effective_routes"]["normal_chat"]["model"] == (
+                    "Qwen/Qwen3-Max"
+                )
+                assert update_payload["route_change"]["action"] == "update"
+                assert update_payload["route_change"]["before_routes"]["normal_chat"] == (
+                    "zai-org/GLM-5.2"
+                )
+
+                route_history = await client.get("/api/providers/routes/history")
+                assert route_history.status_code == 200, route_history.text
+                assert route_history.json()["route_history"][0]["id"] == (
+                    update_payload["route_change"]["id"]
+                )
+
+                route_revert = await client.post("/api/providers/routes/revert")
+                assert route_revert.status_code == 200, route_revert.text
+                revert_payload = route_revert.json()
+                assert revert_payload["effective_routes"]["normal_chat"]["model"] == (
+                    "zai-org/GLM-5.2"
+                )
+                assert revert_payload["route_change"]["action"] == "revert"
+                assert revert_payload["route_change"]["restored_change_id"] == (
+                    update_payload["route_change"]["id"]
+                )
+                no_op_update = await client.put(
+                    "/api/providers/routes",
+                    json={"routes": revert_payload["purpose_routes"]},
+                )
+                assert no_op_update.status_code == 200, no_op_update.text
+                assert no_op_update.json()["route_change"] is None
+                route_history = await client.get("/api/providers/routes/history")
+                assert [item["action"] for item in route_history.json()["route_history"]] == [
+                    "revert",
+                    "update",
+                ]
 
                 created = await client.post(
                     "/api/workspace/stories",

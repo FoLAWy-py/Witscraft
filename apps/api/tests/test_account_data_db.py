@@ -20,6 +20,7 @@ from app.db.models import (
     StoryBranch,
     User,
     UserModelRoute,
+    UserModelRouteChange,
     UserPreference,
     World,
 )
@@ -119,6 +120,12 @@ def test_account_export_and_deletion_lifecycle() -> None:
                             provider="deepinfra",
                             model="Qwen/Qwen3-Max",
                         ),
+                        UserModelRouteChange(
+                            user_id=user.id,
+                            action="update",
+                            before_routes={"normal_chat": "zai-org/GLM-5.2"},
+                            after_routes={"normal_chat": "Qwen/Qwen3-Max"},
+                        ),
                         ModelCall(
                             user_id=user.id,
                             story_id=story.id,
@@ -140,6 +147,7 @@ def test_account_export_and_deletion_lifecycle() -> None:
                 assert export["stories"][0]["title"] == "Private story"
                 assert export["messages"][0]["content"] == "Private story message"
                 assert export["memories"][0]["content"] == "Private memory"
+                assert export["model_route_changes"][0]["action"] == "update"
                 assert "password_hash" not in encoded
                 assert "token_hash" not in encoded
                 assert "private-session-token" not in encoded
@@ -191,6 +199,7 @@ def test_account_export_and_deletion_lifecycle() -> None:
                     (MemoryItem, MemoryItem.user_id),
                     (UserPreference, UserPreference.user_id),
                     (UserModelRoute, UserModelRoute.user_id),
+                    (UserModelRouteChange, UserModelRouteChange.user_id),
                     (ModelCall, ModelCall.user_id),
                 ):
                     count = await verification.scalar(

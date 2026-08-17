@@ -25,6 +25,8 @@ The API resolves a validated saved user route for each purpose and falls back to
 
 Clients submit the purpose, not an independently assembled provider/model pair. The provider catalogue returns `effective_routes` with the provider, model, source, and effective budgets for every purpose, and context preview reports the route that would author the next narrative turn. Optional legacy hints are accepted only when both fields are present and match that route; otherwise the API returns HTTP `409` before story mutation or provider execution. Provider health tests remain an explicit operator-selected model probe and do not change saved routes.
 
+Route changes are serialized per account and store complete before/after snapshots atomically with the active route rows. Saving the current effective configuration is a no-op and does not create a misleading audit event. The authenticated history endpoint is bounded to 100 entries per request. Undo restores the latest event's prior snapshot and records a linked `revert` event, preserving both cost-policy provenance and the ability to reverse an accidental rollback.
+
 ## Embedding reuse
 
 `TurnContext` owns query embedding reuse for one request/turn. The context is reset whenever a new audited turn begins, so cached narrative inputs cannot cross requests, stories, users, or turns.

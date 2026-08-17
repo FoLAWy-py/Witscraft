@@ -23,6 +23,7 @@ from app.db.models import (
     StorySummary,
     User,
     UserModelRoute,
+    UserModelRouteChange,
     UserPreference,
     World,
 )
@@ -98,6 +99,14 @@ async def build_account_export_payload(session: AsyncSession, user: User) -> dic
         "model_routes": [
             _serialize(row, exclude={"user_id"})
             for row in await _rows(session, UserModelRoute, UserModelRoute.user_id == user.id)
+        ],
+        "model_route_changes": [
+            _serialize(row, exclude={"user_id", "sequence"})
+            for row in await _rows(
+                session,
+                UserModelRouteChange,
+                UserModelRouteChange.user_id == user.id,
+            )
         ],
         "model_calls": [
             _serialize(row, exclude={"user_id"})

@@ -116,7 +116,8 @@ async function installApiFixture(page: Page) {
           max_input_tokens: budgets[purpose].max_input_tokens,
           default_output_tokens: budgets[purpose].default_output_tokens,
           hard_output_tokens: budgets[purpose].hard_output_tokens
-        }]))
+        }])),
+        route_history: []
       });
     }
     if (path.endsWith("/api/workspace/preferences")) {

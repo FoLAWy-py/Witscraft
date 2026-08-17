@@ -63,8 +63,8 @@ import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { ApiError, StreamInterruptedError, confirmEmailVerification, confirmPasswordReset, createBranch, createCharacter, createStory, createWorld, deleteAccount, deleteBranch, deleteCharacter, deleteStory, deleteWorld, downloadAccountExport, downloadStoryExport, duplicateBranch, generateSessionSummary, getAuthSessions, getCurrentUser, getMyQuota, getProviders, getUserPreferences, getWorkspace, login, logout, register, requestEmailVerification, requestPasswordReset, revokeAuthSession, selectStoryWorld, sendStoryMessage, streamStoryInterview, streamStoryMessage, switchBranch, testProviderModel, updateBranch, updateCanonFact, updateCharacter, updateMemoryItem, updateModelRoutes, updateStory, updateUserPreferences, updateWorld } from "@/lib/api";
-import type { AuthSessionSummary, AuthUser, CanonFactSummary, ChatResponse, ConsistencyCheck, CreateStoryInput, LoginInput, MemoryItemSummary, ModelOption, ProvidersResponse, QuotaUsage, RegisterInput, SessionSummary, StoryInterviewMessage, StoryPurpose, StoryState, UserPreference, WorkspaceResponse } from "@/lib/types";
+import { ApiError, StreamInterruptedError, confirmEmailVerification, confirmPasswordReset, createBranch, createCharacter, createStory, createWorld, deleteAccount, deleteBranch, deleteCharacter, deleteStory, deleteWorld, downloadAccountExport, downloadStoryExport, duplicateBranch, generateSessionSummary, getAuthSessions, getCurrentUser, getMyQuota, getProviders, getUserPreferences, getWorkspace, login, logout, register, requestEmailVerification, requestPasswordReset, revertModelRoutes, revokeAuthSession, selectStoryWorld, sendStoryMessage, streamStoryInterview, streamStoryMessage, switchBranch, testProviderModel, updateBranch, updateCanonFact, updateCharacter, updateMemoryItem, updateModelRoutes, updateStory, updateUserPreferences, updateWorld } from "@/lib/api";
+import type { AuthSessionSummary, AuthUser, CanonFactSummary, ChatResponse, ConsistencyCheck, CreateStoryInput, LoginInput, MemoryItemSummary, ModelOption, ModelRouteChange, ProvidersResponse, QuotaUsage, RegisterInput, SessionSummary, StoryInterviewMessage, StoryPurpose, StoryState, UserPreference, WorkspaceResponse } from "@/lib/types";
 
 type View = "story" | "settings";
 type MobileTab = "library" | "story" | "inspector";
@@ -269,6 +269,7 @@ export default function Home() {
   const [routeModels, setRouteModels] = useState<Partial<Record<StoryPurpose, string>>>({});
   const [savedRouteModels, setSavedRouteModels] = useState<Partial<Record<StoryPurpose, string>>>({});
   const [savingRoutes, setSavingRoutes] = useState(false);
+  const [routeHistory, setRouteHistory] = useState<ModelRouteChange[]>([]);
   const routeSaveVersionRef = useRef(0);
   const [routeNotice, setRouteNotice] = useState<string | null>(null);
   const [routeError, setRouteError] = useState<string | null>(null);
@@ -536,6 +537,7 @@ export default function Home() {
     getProviders()
       .then((data) => {
         setProviders(data);
+        setRouteHistory(data.route_history);
         const qwen = data.models.find((model) => model.model === "Qwen/Qwen3-Max");
         setSelectedModel((current) => (data.models.some((model) => model.model === current) ? current : qwen?.model ?? data.models[0]?.model ?? ""));
         const nextRoutes: Partial<Record<StoryPurpose, string>> = {};
@@ -810,6 +812,9 @@ export default function Home() {
         if (version !== routeSaveVersionRef.current) return;
         setRouteModels(response.purpose_routes);
         setSavedRouteModels(response.purpose_routes);
+        if (response.route_change) {
+          setRouteHistory((current) => [response.route_change!, ...current].slice(0, 10));
+        }
         setRouteNotice("模型路由已自动保存。切换设备或重新登录后仍会恢复。");
       } catch (caught) {
         if (version !== routeSaveVersionRef.current) return;
@@ -840,6 +845,28 @@ export default function Home() {
     setRouteModels(providers.purpose_defaults);
     setRouteNotice("已载入系统默认路由，正在自动保存。");
     setRouteError(null);
+  }
+
+  async function handleRevertRoutes() {
+    if (savingRoutes || routeDirty || !routeHistory.length) return;
+    routeSaveVersionRef.current += 1;
+    setSavingRoutes(true);
+    setRouteError(null);
+    setRouteNotice("正在撤销最近一次模型路由变更…");
+    try {
+      const response = await revertModelRoutes();
+      setRouteModels(response.purpose_routes);
+      setSavedRouteModels(response.purpose_routes);
+      if (response.route_change) {
+        setRouteHistory((current) => [response.route_change!, ...current].slice(0, 10));
+      }
+      setRouteNotice("已撤销最近一次模型路由变更；撤销操作已写入审计历史。");
+    } catch (caught) {
+      setRouteError(caught instanceof ApiError ? caught.message : "撤销模型路由失败，请稍后重试。");
+      setRouteNotice(null);
+    } finally {
+      setSavingRoutes(false);
+    }
   }
 
   async function handleTestModel(model: ModelOption) {
@@ -1712,6 +1739,7 @@ export default function Home() {
           routeDirty={routeDirty}
           savingRoutes={savingRoutes}
           routeNotice={routeNotice}
+          routeHistory={routeHistory}
           routeError={routeError}
           checkingModelId={checkingModelId}
           modelHealthNotice={modelHealthNotice}
@@ -1725,6 +1753,7 @@ export default function Home() {
           onSelectRouteModel={setRouteModel}
           onRestoreSavedRoutes={handleRestoreSavedRoutes}
           onUseDefaultRoutes={handleUseDefaultRoutes}
+          onRevertRoutes={() => void handleRevertRoutes()}
           onTestModel={(model) => void handleTestModel(model)}
           onChangePreference={setPreferenceValue}
           onSavePreferences={handleSavePreferences}
@@ -3792,6 +3821,7 @@ function SettingsView({
   routeDirty,
   savingRoutes,
   routeNotice,
+  routeHistory,
   routeError,
   checkingModelId,
   modelHealthNotice,
@@ -3805,6 +3835,7 @@ function SettingsView({
   onSelectRouteModel,
   onRestoreSavedRoutes,
   onUseDefaultRoutes,
+  onRevertRoutes,
   onTestModel,
   onChangePreference,
   onSavePreferences,
@@ -3832,6 +3863,7 @@ function SettingsView({
   routeDirty: boolean;
   savingRoutes: boolean;
   routeNotice: string | null;
+  routeHistory: ModelRouteChange[];
   routeError: string | null;
   checkingModelId: string | null;
   modelHealthNotice: string | null;
@@ -3845,6 +3877,7 @@ function SettingsView({
   onSelectRouteModel: (purpose: StoryPurpose, model: string) => void;
   onRestoreSavedRoutes: () => void;
   onUseDefaultRoutes: () => void;
+  onRevertRoutes: () => void;
   onTestModel: (model: ModelOption) => void;
   onChangePreference: (preferenceType: string, content: string) => void;
   onSavePreferences: () => void;
@@ -4100,7 +4133,15 @@ function SettingsView({
             <button className="cmdButton" type="button" onClick={onUseDefaultRoutes} disabled={savingRoutes || !providers}>
               <Route size={13} /> {uiText(uiLanguage, "使用默认值", "Use defaults")}
             </button>
+            <button className="cmdButton" type="button" onClick={onRevertRoutes} disabled={savingRoutes || routeDirty || !routeHistory.length}>
+              <GitFork size={13} /> {uiText(uiLanguage, "撤销最近变更", "Undo latest change")}
+            </button>
           </div>
+          {routeHistory[0] && (
+            <div className="routingNotice">
+              {uiText(uiLanguage, "最近变更", "Latest change")}: {routeHistory[0].action === "revert" ? uiText(uiLanguage, "撤销", "Undo") : uiText(uiLanguage, "更新", "Update")} · {formatStoryUpdated(routeHistory[0].created_at, uiLanguage)}
+            </div>
+          )}
           {routeNotice && <div className="routingNotice" role="status">{routeNotice}</div>}
           {routeError && <div className="authError" role="alert">{routeError}</div>}
         </Panel>

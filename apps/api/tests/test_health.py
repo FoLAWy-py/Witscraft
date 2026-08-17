@@ -73,4 +73,4 @@ def test_readiness_returns_503_without_exposing_internal_errors() -> None:
 
 
 def test_expected_migration_revision_matches_repository_head() -> None:
-    assert expected_migration_heads() == ("0015",)
+    assert expected_migration_heads() == ("0016",)

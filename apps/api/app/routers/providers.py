@@ -1,14 +1,14 @@
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_verified_user_id
 from app.config import Settings, get_settings
-from app.db.models import ModelHealthCheck, UserModelRoute
+from app.db.models import ModelHealthCheck, User, UserModelRoute, UserModelRouteChange
 from app.db.session import get_session
 from app.llm.audit import CallAuditor
 from app.llm.model_registry import (
@@ -69,6 +69,61 @@ async def _load_health(session: AsyncSession) -> dict[str, dict]:
     return {check.model: _serialize_health(check) for check in result.scalars().all()}
 
 
+def _effective_route_models(routes: dict[StoryPurpose, str]) -> dict[StoryPurpose, str]:
+    return {purpose: routes.get(purpose, model) for purpose, model in PURPOSE_DEFAULTS.items()}
+
+
+def _serialize_route_change(change: UserModelRouteChange) -> dict:
+    return {
+        "id": str(change.id),
+        "action": change.action,
+        "before_routes": change.before_routes,
+        "after_routes": change.after_routes,
+        "restored_change_id": (
+            str(change.restored_change_id) if change.restored_change_id else None
+        ),
+        "created_at": change.created_at.isoformat(),
+    }
+
+
+async def _load_route_history(
+    session: AsyncSession,
+    user_id: UUID,
+    *,
+    limit: int = 10,
+) -> list[UserModelRouteChange]:
+    result = await session.execute(
+        select(UserModelRouteChange)
+        .where(UserModelRouteChange.user_id == user_id)
+        .order_by(UserModelRouteChange.sequence.desc())
+        .limit(limit)
+    )
+    return list(result.scalars().all())
+
+
+async def _replace_routes(
+    session: AsyncSession,
+    user_id: UUID,
+    routes: dict[StoryPurpose, str],
+) -> None:
+    await session.execute(delete(UserModelRoute).where(UserModelRoute.user_id == user_id))
+    for purpose, model_slug in routes.items():
+        model = get_model(model_slug)
+        if model is None:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Model route {model_slug} is no longer registered",
+            )
+        session.add(
+            UserModelRoute(
+                user_id=user_id,
+                purpose=purpose,
+                provider=model.provider,
+                model=model.model,
+            )
+        )
+
+
 async def _record_health(
     session: AsyncSession,
     *,
@@ -102,12 +157,14 @@ async def providers(
 ) -> dict:
     purpose_routes = await load_user_purpose_routes(session, user_id)
     gateway = LLMGateway(settings, purpose_routes=purpose_routes)
+    history = await _load_route_history(session, user_id)
     return {
         "models": [model.model_dump() for model in list_models()],
         "purpose_defaults": PURPOSE_DEFAULTS,
         "purpose_budgets": serialized_purpose_budgets(),
         "purpose_routes": purpose_routes,
         "effective_routes": gateway.route_manifest(),
+        "route_history": [_serialize_route_change(change) for change in history],
         "availability": {
             "openai": bool(settings.openai_api_key),
             "deepinfra": bool(settings.deepinfra_api_key),
@@ -124,6 +181,16 @@ async def update_routes(
     session: AsyncSession = Depends(get_session),
     user_id: UUID = Depends(get_verified_user_id),
 ) -> dict:
+    await session.execute(select(User.id).where(User.id == user_id).with_for_update())
+    current_saved_routes = await load_user_purpose_routes(session, user_id)
+    current_routes = _effective_route_models(current_saved_routes)
+    if request.routes == current_routes:
+        gateway = LLMGateway(settings, purpose_routes=current_saved_routes)
+        return {
+            "purpose_routes": current_saved_routes,
+            "effective_routes": gateway.route_manifest(),
+            "route_change": None,
+        }
     health_result = await session.execute(
         select(ModelHealthCheck).where(ModelHealthCheck.model.in_(request.routes.values()))
     )
@@ -138,20 +205,16 @@ async def update_routes(
             status_code=409,
             detail=f"{model.label if model else unavailable[0]} was recently confirmed unavailable. Run its health check again before selecting it.",
         )
-    await session.execute(delete(UserModelRoute).where(UserModelRoute.user_id == user_id))
-    for purpose, model_slug in request.routes.items():
-        model = get_model(model_slug)
-        if model is None:
-            raise ValueError(f"Unknown model: {model_slug}")
-        session.add(
-            UserModelRoute(
-                user_id=user_id,
-                purpose=purpose,
-                provider=model.provider,
-                model=model.model,
-            )
-        )
+    await _replace_routes(session, user_id, request.routes)
+    change = UserModelRouteChange(
+        user_id=user_id,
+        action="update",
+        before_routes=current_routes,
+        after_routes=request.routes,
+    )
+    session.add(change)
     await session.commit()
+    await session.refresh(change)
     purpose_routes = await load_user_purpose_routes(session, user_id)
     return {
         "purpose_routes": purpose_routes,
@@ -159,6 +222,56 @@ async def update_routes(
             settings,
             purpose_routes=purpose_routes,
         ).route_manifest(),
+        "route_change": _serialize_route_change(change),
+    }
+
+
+@router.get("/routes/history")
+async def route_history(
+    limit: int = Query(default=20, ge=1, le=100),
+    session: AsyncSession = Depends(get_session),
+    user_id: UUID = Depends(get_verified_user_id),
+) -> dict:
+    history = await _load_route_history(session, user_id, limit=limit)
+    return {"route_history": [_serialize_route_change(change) for change in history]}
+
+
+@router.post("/routes/revert")
+async def revert_routes(
+    settings: Settings = Depends(get_settings),
+    session: AsyncSession = Depends(get_session),
+    user_id: UUID = Depends(get_verified_user_id),
+) -> dict:
+    await session.execute(select(User.id).where(User.id == user_id).with_for_update())
+    history = await _load_route_history(session, user_id, limit=1)
+    if not history:
+        raise HTTPException(status_code=409, detail="No model route change is available to undo")
+    restored_change = history[0]
+    target_routes = restored_change.before_routes
+    if set(target_routes) != set(PURPOSE_DEFAULTS):
+        raise HTTPException(status_code=409, detail="The previous route snapshot is incomplete")
+    current_routes = _effective_route_models(
+        await load_user_purpose_routes(session, user_id)
+    )
+    await _replace_routes(session, user_id, target_routes)
+    change = UserModelRouteChange(
+        user_id=user_id,
+        action="revert",
+        before_routes=current_routes,
+        after_routes=target_routes,
+        restored_change_id=restored_change.id,
+    )
+    session.add(change)
+    await session.commit()
+    await session.refresh(change)
+    purpose_routes = await load_user_purpose_routes(session, user_id)
+    return {
+        "purpose_routes": purpose_routes,
+        "effective_routes": LLMGateway(
+            settings,
+            purpose_routes=purpose_routes,
+        ).route_manifest(),
+        "route_change": _serialize_route_change(change),
     }
 
 

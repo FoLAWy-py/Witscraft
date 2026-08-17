@@ -301,6 +301,12 @@ export async function updateModelRoutes(routes: Record<StoryPurpose, string>): P
   });
 }
 
+export async function revertModelRoutes(): Promise<ModelRoutesResponse> {
+  return requestJson<ModelRoutesResponse>(`${API_BASE_URL}/api/providers/routes/revert`, {
+    method: "POST"
+  });
+}
+
 export async function getWorkspace(storyId?: string, branchId?: string): Promise<WorkspaceResponse> {
   const url = new URL(`${API_BASE_URL}/api/workspace`);
   if (storyId) url.searchParams.set("story_id", storyId);

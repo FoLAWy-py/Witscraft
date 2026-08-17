@@ -165,6 +165,8 @@ The gateway owns provider-specific parameter translation, purpose-level route re
 
 The browser submits a purpose and never independently selects the effective provider/model for story generation. The provider catalogue exposes the resolved route, source, and effective budgets for every purpose, while context preview includes the selected narrative route. Optional legacy route hints must match the backend result or the request is rejected before story mutation. Provider credentials and infrastructure base URLs are never part of this browser contract.
 
+Purpose-route updates acquire an account row lock, replace the complete route set, and append an immutable before/after audit snapshot in one transaction. A no-op creates no history row. Undo restores the previous effective snapshot and appends a linked undo event instead of deleting history, so every active configuration remains explainable and a rollback can itself be reversed. History queries are tenant-scoped, bounded, exported with the account, and deleted by the account foreign-key cascade.
+
 Provider SDK retries are disabled. Authentication failures, invalid parameters, content rejection, and user cancellation are not retried. Streaming may retry or select a fallback only before the first visible content chunk.
 
 ### 5.6 Authentication and Authorization

@@ -3,9 +3,11 @@ from uuid import UUID, uuid4
 
 from sqlalchemy import (
     Boolean,
+    BigInteger,
     DateTime,
     ForeignKey,
     Index,
+    Identity,
     Integer,
     Numeric,
     String,
@@ -391,6 +393,35 @@ class UserModelRoute(Base, TimestampMixin):
     purpose: Mapped[str] = mapped_column(String(80), nullable=False)
     provider: Mapped[str] = mapped_column(String(40), nullable=False)
     model: Mapped[str] = mapped_column(String(180), nullable=False)
+
+
+class UserModelRouteChange(Base):
+    __tablename__ = "user_model_route_changes"
+    __table_args__ = (
+        Index(
+            "ix_user_model_route_changes_user_sequence",
+            "user_id",
+            text("sequence DESC"),
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    sequence: Mapped[int] = mapped_column(
+        BigInteger,
+        Identity(),
+        unique=True,
+        nullable=False,
+    )
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    action: Mapped[str] = mapped_column(String(20), nullable=False)
+    before_routes: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    after_routes: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    restored_change_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("user_model_route_changes.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
 
 class ModelHealthCheck(Base):

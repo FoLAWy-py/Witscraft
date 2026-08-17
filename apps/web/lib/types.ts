@@ -31,6 +31,15 @@ export type ModelHealth = {
   fresh: boolean;
 };
 
+export type ModelRouteChange = {
+  id: string;
+  action: "update" | "revert";
+  before_routes: Record<StoryPurpose, string>;
+  after_routes: Record<StoryPurpose, string>;
+  restored_change_id?: string | null;
+  created_at: string;
+};
+
 export type ProvidersResponse = {
   models: ModelOption[];
   purpose_defaults: Record<StoryPurpose, string>;
@@ -49,6 +58,7 @@ export type ProvidersResponse = {
     default_output_tokens: number;
     hard_output_tokens: number;
   }>;
+  route_history: ModelRouteChange[];
   availability: {
     openai: boolean;
     deepinfra: boolean;
@@ -63,8 +73,9 @@ export type ModelHealthResponse = {
 };
 
 export type ModelRoutesResponse = {
-  purpose_routes: Record<StoryPurpose, string>;
+  purpose_routes: Partial<Record<StoryPurpose, string>>;
   effective_routes: ProvidersResponse["effective_routes"];
+  route_change: ModelRouteChange | null;
 };
 
 export type AuthUser = {
