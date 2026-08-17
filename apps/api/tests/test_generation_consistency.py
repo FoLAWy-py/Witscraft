@@ -270,13 +270,16 @@ def test_low_value_and_near_duplicate_memories_skip_embedding() -> None:
     async def fact_exists(_story_id, _branch_id, _content: str) -> bool:
         return False
 
+    existing = SimpleNamespace(
+        content="Mira discovers the sealed archive and obtains its key.",
+        importance=3,
+        recency_score=0.2,
+        entity_tags=["Mira"],
+        embedding=[0.75],
+    )
+
     async def recent_memories(_story_id, _branch_id):
-        return [
-            SimpleNamespace(
-                content="Mira discovers the sealed archive and obtains its key.",
-                entity_tags=["Mira", "sealed archive"],
-            )
-        ]
+        return [existing]
 
     engine._memory_exists = memory_exists
     engine._canon_fact_exists = fact_exists
@@ -297,6 +300,10 @@ def test_low_value_and_near_duplicate_memories_skip_embedding() -> None:
 
     assert prepared_memories == []
     assert embeddings.calls == 0
+    assert existing.importance == 7
+    assert existing.entity_tags == ["Mira", "sealed archive"]
+    assert existing.recency_score == 1.0
+    assert existing.embedding == [0.75]
 
 
 def test_near_duplicate_filter_preserves_similar_events_for_different_entities() -> None:

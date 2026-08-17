@@ -2,7 +2,7 @@
 
 **Document status:** Production baseline
 
-**Architecture version:** 3.7
+**Architecture version:** 3.8
 
 **Last updated:** 17 August 2026
 
@@ -279,6 +279,8 @@ Embedding is selective. The system does not embed every conversational turn by d
 Embeddings are appropriate when content is accepted into long-term memory or when semantic retrieval is required. They are skipped when there are no eligible memories, when deterministic recent-context selection is sufficient, or when an identical content hash can reuse prior work.
 
 New long-term-memory candidates pass a deterministic admission boundary before embedding. Consequential event markers and references to known character or inventory entities contribute to an importance score; low-value transient actions are rejected. Normalized near-duplicate comparison suppresses paraphrases of recent branch memories, while disjoint known entity sets preserve otherwise similar events involving different characters. Accepted memories persist their computed importance and entity tags for ranking and operator inspection. The filter adds no model calls.
+
+A repeated extracted event refreshes the existing row's importance, entity tags, and recency without changing its content or embedding. Manual importance-only edits also preserve the vector. Manual content edits reject exact active duplicates before provider work, clear content-derived entity tags, and replace the vector and compatibility metadata atomically with the new content. A failed embedding cannot persist a content/vector mismatch.
 
 Retrieval is hybrid within the authorized story and branch candidate set. Keyword n-grams, entity-tag overlap, importance, and relative update time are always available. Compatible vector similarity becomes an additional signal only above the deployment-configurable `MEMORY_VECTOR_SEARCH_MIN_ITEMS` threshold. Before creating a query embedding, the engine verifies that at least one candidate has the current provider-qualified model and version; legacy-only sets therefore remain useful without incurring an unusable embedding call.
 

@@ -1528,8 +1528,8 @@ class StoryEngine:
         recent_memories = (
             await self._load_recent_memory_candidates(story.id, branch.id) if memories else []
         )
-        comparison_memories = [
-            (item.content, tuple(item.entity_tags or [])) for item in recent_memories
+        comparison_memories: list[tuple[str, tuple[str, ...], MemoryItem | None]] = [
+            (item.content, tuple(item.entity_tags or []), item) for item in recent_memories
         ]
         pending_memories: list[tuple[str, int, tuple[str, ...]]] = []
         for raw_memory in memories:
@@ -1538,20 +1538,37 @@ class StoryEngine:
             importance = self._memory_importance(memory, entity_tags)
             if importance < MEMORY_ACCEPTANCE_THRESHOLD:
                 continue
+            duplicate = next(
+                (
+                    existing
+                    for existing_content, existing_entities, existing in comparison_memories
+                    if self._memory_is_near_duplicate(
+                        memory,
+                        entity_tags,
+                        existing_content,
+                        existing_entities,
+                    )
+                ),
+                None,
+            )
+            if duplicate is not None:
+                self._refresh_duplicate_memory(duplicate, importance, entity_tags)
+                continue
             if any(
-                self._memory_is_near_duplicate(
+                existing is None
+                and self._memory_is_near_duplicate(
                     memory,
                     entity_tags,
                     existing_content,
                     existing_entities,
                 )
-                for existing_content, existing_entities in comparison_memories
+                for existing_content, existing_entities, existing in comparison_memories
             ):
                 continue
             if await self._memory_exists(story.id, branch.id, memory):
                 continue
             pending_memories.append((memory, importance, entity_tags))
-            comparison_memories.append((memory, entity_tags))
+            comparison_memories.append((memory, entity_tags, None))
 
         pending_facts: list[str] = []
         for fact in canon_facts:
@@ -1674,6 +1691,16 @@ class StoryEngine:
             SequenceMatcher(None, normalized, existing_normalized).ratio()
             >= MEMORY_DUPLICATE_SIMILARITY
         )
+
+    @staticmethod
+    def _refresh_duplicate_memory(
+        existing: MemoryItem,
+        importance: int,
+        entity_tags: tuple[str, ...],
+    ) -> None:
+        existing.importance = max(int(existing.importance or 0), importance)
+        existing.entity_tags = list(dict.fromkeys([*(existing.entity_tags or []), *entity_tags]))
+        existing.recency_score = 1.0
 
     def _add_prepared_memories(
         self,

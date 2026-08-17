@@ -5,7 +5,7 @@ from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
-from sqlalchemy import case, delete, desc, func, select, update
+from sqlalchemy import case, delete, desc, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_verified_user_id
@@ -51,7 +51,7 @@ from app.schemas.chat import (
     WorkspaceResponse,
 )
 from app.schemas.llm import ChatMessage, LLMRequest
-from app.services.embeddings import EmbeddingService
+from app.services.embeddings import EmbeddingService, embedding_content_hash
 from app.services.branch_manager import clone_story_branch
 from app.services.session_summarizer import generate_session_summary
 from app.services.quota_service import QuotaExceededError
@@ -1282,25 +1282,53 @@ async def update_memory(
     if not content:
         raise HTTPException(status_code=422, detail="Memory content cannot be empty")
 
+    content_hash = embedding_content_hash(content)
+    duplicate_id = await session.scalar(
+        select(MemoryItem.id)
+        .where(
+            MemoryItem.id != memory.id,
+            MemoryItem.user_id == user_id,
+            MemoryItem.story_id == memory.story_id,
+            MemoryItem.branch_id == memory.branch_id,
+            MemoryItem.is_active.is_(True),
+            or_(
+                MemoryItem.content_hash == content_hash,
+                MemoryItem.content == content,
+            ),
+        )
+        .limit(1)
+    )
+    if duplicate_id is not None:
+        raise HTTPException(status_code=409, detail="An active memory with this content already exists")
+
+    content_changed = memory.content_hash != content_hash
     memory.content = content
     memory.importance = request.importance
-    auditor = CallAuditor(
-        settings,
-        user_id=user_id,
-        story_id=memory.story_id,
-        request_id=getattr(http_request.state, "request_id", None),
-    )
-    embedding_service = EmbeddingService(settings, auditor=auditor)
-    memory.embedding = await embedding_service.embed(
-        content,
-        purpose="embedding_memory_update",
-    )
-    metadata = embedding_service.metadata(content, memory.embedding)
-    memory.embedding_model = metadata.model
-    memory.embedding_dimensions = metadata.dimensions
-    memory.embedding_version = metadata.version
-    memory.content_hash = metadata.content_hash
-    memory.embedded_at = metadata.embedded_at
+    if content_changed:
+        memory.entity_tags = []
+        memory.embedding = None
+        memory.embedding_model = None
+        memory.embedding_dimensions = None
+        memory.embedding_version = None
+        memory.content_hash = None
+        memory.embedded_at = None
+        auditor = CallAuditor(
+            settings,
+            user_id=user_id,
+            story_id=memory.story_id,
+            request_id=getattr(http_request.state, "request_id", None),
+        )
+        embedding_service = EmbeddingService(settings, auditor=auditor)
+        memory.embedding = await embedding_service.embed(
+            content,
+            purpose="embedding_memory_update",
+        )
+        metadata = embedding_service.metadata(content, memory.embedding)
+        memory.embedding_model = metadata.model
+        memory.embedding_dimensions = metadata.dimensions
+        memory.embedding_version = metadata.version
+        memory.content_hash = metadata.content_hash
+        memory.embedded_at = metadata.embedded_at
     await session.commit()
 
     active_id = _parse_uuid(active_story_id or "", memory.story_id or DEFAULT_STORY_ID)

@@ -28,6 +28,7 @@ from app.schemas.chat import (
     UpdateStoryRequest,
     UpdateWorldRequest,
 )
+from app.services.embeddings import embedding_content_hash
 from app.services.story_engine import StoryEngine
 
 
@@ -228,6 +229,130 @@ def test_cross_user_workspace_resource_matrix_is_denied() -> None:
             if user_ids:
                 async with AsyncSessionLocal() as cleanup:
                     await cleanup.execute(delete(User).where(User.id.in_(user_ids)))
+                    await cleanup.commit()
+            await db_engine.dispose()
+
+    asyncio.run(scenario())
+
+
+def test_memory_edit_reuses_or_refreshes_embedding_and_rejects_duplicates() -> None:
+    async def scenario() -> None:
+        marker = uuid4().hex
+        user_id = None
+        try:
+            async with AsyncSessionLocal() as session:
+                user = User(
+                    email=f"memory-edit-{marker}@example.invalid",
+                    display_name="memory-editor",
+                    email_verified_at=datetime.now(timezone.utc),
+                )
+                session.add(user)
+                await session.flush()
+                user_id = user.id
+                world = World(user_id=user.id, name="memory-world", rules={}, lorebook=[], tone={})
+                session.add(world)
+                await session.flush()
+                story = Story(user_id=user.id, world_id=world.id, title="memory-story")
+                session.add(story)
+                await session.flush()
+                branch = StoryBranch(story_id=story.id, name="main")
+                session.add(branch)
+                await session.flush()
+                story.current_branch_id = branch.id
+
+                original_embedded_at = datetime(2026, 8, 1, tzinfo=timezone.utc)
+                editable = MemoryItem(
+                    user_id=user.id,
+                    story_id=story.id,
+                    branch_id=branch.id,
+                    memory_type="test",
+                    content="Mira keeps the brass key",
+                    importance=5,
+                    entity_tags=["Mira", "brass key"],
+                    meta={},
+                    embedding=[0.25],
+                    embedding_model="local:deterministic-blake2b-128",
+                    embedding_dimensions=1,
+                    embedding_version="v1",
+                    content_hash=embedding_content_hash("Mira keeps the brass key"),
+                    embedded_at=original_embedded_at,
+                )
+                duplicate = MemoryItem(
+                    user_id=user.id,
+                    story_id=story.id,
+                    branch_id=branch.id,
+                    memory_type="test",
+                    content="The archive door is sealed",
+                    importance=6,
+                    entity_tags=["archive"],
+                    meta={},
+                    content_hash=embedding_content_hash("The archive door is sealed"),
+                )
+                session.add_all([editable, duplicate])
+                await session.commit()
+
+                http_request = Request(
+                    {
+                        "type": "http",
+                        "method": "PATCH",
+                        "path": "/",
+                        "headers": [],
+                        "state": {"request_id": f"memory-edit-{marker}"},
+                    }
+                )
+                settings = Settings(dry_run_llm=True)
+
+                await update_memory(
+                    str(editable.id),
+                    UpdateMemoryRequest(content="Mira keeps the brass key", importance=8),
+                    http_request,
+                    str(story.id),
+                    session,
+                    settings,
+                    user.id,
+                )
+                await session.refresh(editable)
+                assert editable.importance == 8
+                assert editable.embedding == [0.25]
+                assert editable.embedded_at == original_embedded_at
+
+                changed_content = "Lena carries the silver compass"
+                await update_memory(
+                    str(editable.id),
+                    UpdateMemoryRequest(content=changed_content, importance=7),
+                    http_request,
+                    str(story.id),
+                    session,
+                    settings,
+                    user.id,
+                )
+                await session.refresh(editable)
+                assert editable.content == changed_content
+                assert editable.entity_tags == []
+                assert len(editable.embedding or []) == 128
+                assert editable.embedding_model == "local:deterministic-blake2b-128"
+                assert editable.embedding_dimensions == 128
+                assert editable.embedding_version == settings.embedding_version
+                assert editable.content_hash == embedding_content_hash(changed_content)
+                assert editable.embedded_at > original_embedded_at
+
+                with pytest.raises(HTTPException) as caught:
+                    await update_memory(
+                        str(editable.id),
+                        UpdateMemoryRequest(content="  The archive door is sealed  ", importance=9),
+                        http_request,
+                        str(story.id),
+                        session,
+                        settings,
+                        user.id,
+                    )
+                assert caught.value.status_code == 409
+                await session.refresh(editable)
+                assert editable.content == changed_content
+        finally:
+            if user_id is not None:
+                async with AsyncSessionLocal() as cleanup:
+                    await cleanup.execute(delete(User).where(User.id == user_id))
                     await cleanup.commit()
             await db_engine.dispose()
 
