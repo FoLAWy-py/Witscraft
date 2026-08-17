@@ -2,7 +2,7 @@
 
 **Document status:** Production baseline
 
-**Architecture version:** 2.7
+**Architecture version:** 2.8
 
 **Last updated:** 17 August 2026
 
@@ -348,7 +348,7 @@ On `SIGTERM`, the process server stops accepting new work, waits up to the confi
 
 For every pull request and push to `main`, GitHub Actions provisions an empty PostgreSQL 17 database, upgrades it through the complete Alembic history, rejects ORM-to-migration drift, and runs the full backend test suite. The same workflow runs Ruff, TypeScript type checking, ESLint, reproducible production builds, dependency vulnerability audits, full-history offline secret scanning, and production browser-artifact inspection. External model traffic is disabled in CI.
 
-Database authorization and lifecycle behavior use real PostgreSQL integration tests. Provider adapters use focused tests and controlled live validation when API expenditure is explicitly permitted.
+Database authorization and lifecycle behavior use real PostgreSQL integration tests. Provider adapters use deterministic fake-client contracts that exercise OpenAI Responses and DeepInfra Chat Completions parameter mapping, structured output options, token usage, stream filtering, split timeout configuration, disabled SDK retries, and exception propagation. Gateway tests separately prove transient and permanent HTTP status classification. Controlled live validation remains optional when API expenditure is explicitly permitted; CI never requires provider credentials.
 
 A successful workflow is required release evidence. Branch protection and the deployment procedure must require that result; CI does not replace staging validation, authenticated smoke tests, or post-deployment observation.
 
@@ -386,6 +386,7 @@ Evolution should occur in this order:
 | Purpose-level gateway budgets | Bounds input, output, quota preflight, and fallback spend for every model task |
 | Audited request-scoped embedding cache | Measures avoided embedding work without crossing tenant or turn boundaries |
 | Soft weekly warning and hard turn ceiling | Warns before weekly exhaustion and stops abnormal provider-call amplification |
+| Fake-client provider contracts | Detects SDK and provider protocol regressions without credentials, network variance, or model spend |
 | Backend-owned roles and weekly quotas | Enforces least privilege and gives users a predictable spend boundary |
 | Bounded administrator account queries | Preserves global metric meaning while preventing unbounded account payloads |
 | Single orchestrator by default | Keeps authorization and state transitions deterministic and observable |

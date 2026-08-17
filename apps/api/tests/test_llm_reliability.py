@@ -1,7 +1,9 @@
 import asyncio
 import time
 
+import httpx
 import pytest
+from openai import APIStatusError
 
 from app.config import Settings
 from app.llm.audit import CallAuditor, TurnCallBudgetExceededError
@@ -211,3 +213,21 @@ def test_per_turn_call_budget_stops_retry_and_fallback_chain() -> None:
     auditor.begin_turn()
     response = asyncio.run(gateway.generate(_request()))
     assert response.text == "ok"
+
+
+@pytest.mark.parametrize("status_code", [408, 409, 429, 500, 503])
+def test_transient_provider_statuses_are_retryable(status_code: int) -> None:
+    request = httpx.Request("POST", "https://provider.example/v1/generate")
+    response = httpx.Response(status_code, request=request)
+    error = APIStatusError("provider error", response=response, body=None)
+
+    assert LLMGateway._is_retryable(error) is True
+
+
+@pytest.mark.parametrize("status_code", [400, 401, 403, 404, 422])
+def test_permanent_provider_statuses_are_not_retryable(status_code: int) -> None:
+    request = httpx.Request("POST", "https://provider.example/v1/generate")
+    response = httpx.Response(status_code, request=request)
+    error = APIStatusError("provider error", response=response, body=None)
+
+    assert LLMGateway._is_retryable(error) is False
