@@ -2,12 +2,18 @@
 import argparse
 import asyncio
 import json
+import sys
+from pathlib import Path
 from uuid import UUID
 
 from sqlalchemy import text
 
-from app.db.session import engine
-from app.embedding_config import EMBEDDING_VECTOR_DIMENSIONS
+
+API_DIR = Path(__file__).resolve().parents[1] / "apps" / "api"
+sys.path.insert(0, str(API_DIR))
+
+from app.db.session import engine  # noqa: E402
+from app.embedding_config import EMBEDDING_VECTOR_DIMENSIONS  # noqa: E402
 
 
 CONTRACT_MEMORY_ID = UUID("00000000-0000-0000-0000-000000001017")
