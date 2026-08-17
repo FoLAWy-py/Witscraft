@@ -76,7 +76,7 @@ jobs:
       - name: Audit installed dependencies
         run: uv run --with pip-audit==2.10.1 pip-audit --local
       - name: Lint backend
-        run: uv run ruff check app tests migrations
+        run: uv run ruff check app tests migrations ../../scripts/create-release-manifest.py ../../scripts/smoke-release.py
       - name: Upgrade empty database to migration head
         run: uv run alembic upgrade head
       - name: Reject model and migration drift
@@ -116,3 +116,5 @@ jobs:
         working-directory: apps/web
       - name: Check browser artifacts
         run: python3 scripts/check-production-artifacts.py
+      - name: Verify release manifest generation
+        run: python3 scripts/create-release-manifest.py --output "${RUNNER_TEMP}/witscraft-release.json"

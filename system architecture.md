@@ -2,7 +2,7 @@
 
 **Document status:** Production baseline
 
-**Architecture version:** 3.0
+**Architecture version:** 3.1
 
 **Last updated:** 17 August 2026
 
@@ -340,6 +340,13 @@ The release order is:
 6. Require `/health/ready` to return HTTP `200`.
 7. Run authenticated smoke tests and observe logs before completing the release.
 
+`scripts/release-preflight.sh` implements the reproducible local quality and security gate. After
+the production frontend build, it creates a non-sensitive JSON manifest binding the full Git
+revision to the Alembic heads, dependency-lock SHA-256 hashes, and Next.js build ID. Deployment
+addresses and credentials are runtime inputs and are never written to the manifest. The
+non-mutating `scripts/smoke-release.py` gate requires liveness, readiness, and both deployed
+migration revision sets to match that manifest before a release can be accepted.
+
 Application startup does not call `create_all`, seed data, or `alembic upgrade`. Readiness rejects a deployment whose database revision does not match the migration head shipped with the application.
 
 On `SIGTERM`, the process server stops accepting new work, waits up to the configured graceful interval for in-flight requests, and then closes the SQLAlchemy connection pool. Long-running generation remains bounded by the configured overall model timeout.
@@ -350,7 +357,7 @@ For every pull request and push to `main`, GitHub Actions provisions an empty Po
 
 Database authorization and lifecycle behavior use real PostgreSQL integration tests. Provider adapters use deterministic fake-client contracts that exercise OpenAI Responses and DeepInfra Chat Completions parameter mapping, structured output options, token usage, stream filtering, split timeout configuration, disabled SDK retries, and exception propagation. Gateway tests separately prove transient and permanent HTTP status classification. Controlled live validation remains optional when API expenditure is explicitly permitted; CI never requires provider credentials.
 
-A successful workflow is required release evidence. Branch protection and the deployment procedure must require that result; CI does not replace staging validation, authenticated smoke tests, or post-deployment observation.
+A successful workflow is required release evidence. CI also proves that a clean checkout can create the release manifest after the production build. Branch protection and the deployment procedure must require that result; CI does not replace staging validation, authenticated smoke tests, or post-deployment observation.
 
 ## 14. Current Constraints and Approved Evolution
 
