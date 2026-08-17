@@ -8,6 +8,7 @@ from contextlib import suppress
 from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
+import anyio
 from fastapi import HTTPException
 from sqlalchemy import case, delete, desc, or_, select, update
 from sqlalchemy.exc import IntegrityError
@@ -401,18 +402,19 @@ class StoryEngine:
                 yield {"type": "delta", "content": delta}
         except asyncio.CancelledError:
             partial_text = visible_stream_story_text("".join(chunks)).strip()
-            with suppress(Exception):
-                await self.session.rollback()
-            if partial_text:
+            with anyio.CancelScope(shield=True):
                 with suppress(Exception):
-                    await self._persist_partial_stream(
-                        story,
-                        branch,
-                        llm_request,
-                        partial_text,
-                        int((time.perf_counter() - started) * 1000),
-                        stream_message,
-                    )
+                    await self.session.rollback()
+                if partial_text:
+                    with suppress(Exception):
+                        await self._persist_partial_stream(
+                            story,
+                            branch,
+                            llm_request,
+                            partial_text,
+                            int((time.perf_counter() - started) * 1000),
+                            stream_message,
+                        )
             raise
 
         raw_response_text = "".join(chunks)

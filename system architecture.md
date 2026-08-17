@@ -2,7 +2,7 @@
 
 **Document status:** Production baseline
 
-**Architecture version:** 3.1
+**Architecture version:** 3.2
 
 **Last updated:** 17 August 2026
 
@@ -257,7 +257,7 @@ sequenceDiagram
 
 The final transaction commits the assistant message, state snapshot, memories, canon facts, branch version, and completed generation response together. A branch-version conflict rolls back the complete final write.
 
-Streaming partial content is checkpointed immediately and then at bounded time or character intervals. Cancellation preserves the latest stable partial and records a complete cancellation reason.
+Streaming partial content is checkpointed immediately and then at bounded time or character intervals. Cancellation preserves the latest stable partial and records a complete cancellation reason. Cleanup runs inside a narrowly shielded AnyIO cancellation scope so repeated disconnect cancellation cannot interrupt the rollback, partial checkpoint, or generation-status transition; model execution itself is never shielded.
 
 ## 8. Idempotency and Concurrency
 
@@ -355,7 +355,7 @@ On `SIGTERM`, the process server stops accepting new work, waits up to the confi
 
 For every pull request and push to `main`, GitHub Actions provisions an empty PostgreSQL 17 database, upgrades it through the complete Alembic history, rejects ORM-to-migration drift, and runs the full backend test suite. The same workflow runs Ruff, TypeScript type checking, ESLint, reproducible production builds, dependency vulnerability audits, full-history offline secret scanning, and production browser-artifact inspection. External model traffic is disabled in CI.
 
-Database authorization and lifecycle behavior use real PostgreSQL integration tests. Provider adapters use deterministic fake-client contracts that exercise OpenAI Responses and DeepInfra Chat Completions parameter mapping, structured output options, token usage, stream filtering, split timeout configuration, disabled SDK retries, and exception propagation. Gateway tests separately prove transient and permanent HTTP status classification. Controlled live validation remains optional when API expenditure is explicitly permitted; CI never requires provider credentials.
+Database authorization and lifecycle behavior use real PostgreSQL integration tests. The main API journey logs in through a real session cookie, creates an interactive novel, performs regular and SSE dry-run generation, cancels a blocked stream and verifies its durable checkpoint, regenerates a reply, creates and activates a branch, and exports the narrative. Provider adapters use deterministic fake-client contracts that exercise OpenAI Responses and DeepInfra Chat Completions parameter mapping, structured output options, token usage, stream filtering, split timeout configuration, disabled SDK retries, and exception propagation. Gateway tests separately prove transient and permanent HTTP status classification. Controlled live validation remains optional when API expenditure is explicitly permitted; CI never requires provider credentials.
 
 A successful workflow is required release evidence. CI also proves that a clean checkout can create the release manifest after the production build. Branch protection and the deployment procedure must require that result; CI does not replace staging validation, authenticated smoke tests, or post-deployment observation.
 

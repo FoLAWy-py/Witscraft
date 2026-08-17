@@ -2,6 +2,7 @@ import asyncio
 import json
 from uuid import UUID
 
+import anyio
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -51,7 +52,8 @@ async def send_chat(
     try:
         return await engine.send(payload)
     except asyncio.CancelledError as error:
-        await engine.fail_active_generation(error, cancelled=True)
+        with anyio.CancelScope(shield=True):
+            await engine.fail_active_generation(error, cancelled=True)
         raise
     except PurposeInputBudgetExceededError as error:
         await engine.fail_active_generation(error)
@@ -83,7 +85,8 @@ async def stream_chat(
                 event_type = event.get("type", "message")
                 yield f"event: {event_type}\ndata: {json.dumps(event, ensure_ascii=False)}\n\n"
         except asyncio.CancelledError as error:
-            await engine.fail_active_generation(error, cancelled=True)
+            with anyio.CancelScope(shield=True):
+                await engine.fail_active_generation(error, cancelled=True)
             raise
         except QuotaExceededError as error:
             await engine.fail_active_generation(error)
