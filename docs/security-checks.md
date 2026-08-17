@@ -13,6 +13,7 @@ It is a release gate: do not deploy a revision while any job is failing.
 - The complete backend test suite runs against that migrated PostgreSQL database, including authorization, quota, lifecycle, reliability, and security integration coverage. An authenticated API journey exercises login, story creation, regular and streamed generation, client cancellation, regeneration, branch switching, and export with a deterministic dry-run model. Deterministic fake clients verify OpenAI Responses and DeepInfra Chat Completions request mapping, usage parsing, streaming deltas, timeout configuration, disabled SDK retries, exception propagation, and Gateway retry classification. External model traffic is disabled in CI.
 - ESLint and TypeScript validate the frontend before its production build.
 - The production frontend build is rejected if public static assets contain sourcemaps, source-map directives, private-key headers, or server-only secret variable names.
+- Playwright runs a real Chromium session through login, workspace loading, player input, SSE parsing, narrative rendering, and post-generation state synchronization. API responses are deterministic browser fixtures; PostgreSQL behavior is covered separately by the authenticated API journey.
 - A clean CI checkout must generate a non-sensitive release manifest bound to the commit, Alembic head, dependency lock hashes, and frontend build ID.
 
 All third-party GitHub Actions are pinned to immutable commit SHAs. Tool versions are explicit so a scanner update cannot silently change a previously reproducible result.
@@ -40,6 +41,8 @@ npm audit --audit-level=high
 npm run lint
 npm run typecheck
 npm run build:production
+npx playwright install chromium
+npm run test:e2e
 cd ../..
 python3 scripts/check-production-artifacts.py
 python3 scripts/create-release-manifest.py --output .runtime/releases/$(git rev-parse --short=12 HEAD).json

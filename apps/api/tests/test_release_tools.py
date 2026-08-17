@@ -33,6 +33,7 @@ def test_release_shell_script_is_valid_and_contains_complete_gate() -> None:
         "npm run lint",
         "npm run typecheck",
         "npm run build:production",
+        "npm run test:e2e",
         "check-production-artifacts.py",
         "create-release-manifest.py",
     ):

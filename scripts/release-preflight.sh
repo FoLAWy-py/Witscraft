@@ -22,6 +22,7 @@ npm audit --audit-level=high
 npm run lint
 npm run typecheck
 npm run build:production
+npm run test:e2e
 
 cd "$ROOT"
 python3 scripts/check-production-artifacts.py

@@ -116,5 +116,11 @@ jobs:
         working-directory: apps/web
       - name: Check browser artifacts
         run: python3 scripts/check-production-artifacts.py
+      - name: Install Chromium for browser E2E
+        run: npx playwright install --with-deps chromium
+        working-directory: apps/web
+      - name: Run browser E2E
+        run: npm run test:e2e
+        working-directory: apps/web
       - name: Verify release manifest generation
         run: python3 scripts/create-release-manifest.py --output "${RUNNER_TEMP}/witscraft-release.json"

@@ -2,7 +2,7 @@
 
 **Document status:** Production baseline
 
-**Architecture version:** 3.2
+**Architecture version:** 3.3
 
 **Last updated:** 17 August 2026
 
@@ -355,7 +355,7 @@ On `SIGTERM`, the process server stops accepting new work, waits up to the confi
 
 For every pull request and push to `main`, GitHub Actions provisions an empty PostgreSQL 17 database, upgrades it through the complete Alembic history, rejects ORM-to-migration drift, and runs the full backend test suite. The same workflow runs Ruff, TypeScript type checking, ESLint, reproducible production builds, dependency vulnerability audits, full-history offline secret scanning, and production browser-artifact inspection. External model traffic is disabled in CI.
 
-Database authorization and lifecycle behavior use real PostgreSQL integration tests. The main API journey logs in through a real session cookie, creates an interactive novel, performs regular and SSE dry-run generation, cancels a blocked stream and verifies its durable checkpoint, regenerates a reply, creates and activates a branch, and exports the narrative. Provider adapters use deterministic fake-client contracts that exercise OpenAI Responses and DeepInfra Chat Completions parameter mapping, structured output options, token usage, stream filtering, split timeout configuration, disabled SDK retries, and exception propagation. Gateway tests separately prove transient and permanent HTTP status classification. Controlled live validation remains optional when API expenditure is explicitly permitted; CI never requires provider credentials.
+Database authorization and lifecycle behavior use real PostgreSQL integration tests. The main API journey logs in through a real session cookie, creates an interactive novel, performs regular and SSE dry-run generation, cancels a blocked stream and verifies its durable checkpoint, regenerates a reply, creates and activates a branch, and exports the narrative. A separate Playwright gate runs the production client in Chromium with deterministic API fixtures and verifies login UI, workspace hydration, player direction submission, SSE consumption, narrative rendering, and the final synchronized story state. Provider adapters use deterministic fake-client contracts that exercise OpenAI Responses and DeepInfra Chat Completions parameter mapping, structured output options, token usage, stream filtering, split timeout configuration, disabled SDK retries, and exception propagation. Gateway tests separately prove transient and permanent HTTP status classification. Controlled live validation remains optional when API expenditure is explicitly permitted; CI never requires provider credentials.
 
 A successful workflow is required release evidence. CI also proves that a clean checkout can create the release manifest after the production build. Branch protection and the deployment procedure must require that result; CI does not replace staging validation, authenticated smoke tests, or post-deployment observation.
 
