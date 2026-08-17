@@ -27,10 +27,12 @@ async def seed() -> None:
             text(
                 """
                 INSERT INTO memory_items (
-                    id, memory_type, content, embedding, embedding_dimensions,
+                    id, memory_type, content, importance, recency_score,
+                    entity_tags, metadata, embedding, embedding_dimensions,
                     embedding_model, embedding_version, is_active
                 ) VALUES (
                     :id, 'migration_contract', 'pgvector migration contract',
+                    5, 1.0, '[]'::jsonb, '{}'::jsonb,
                     CAST(:embedding AS jsonb), :dimensions,
                     'openai:text-embedding-3-large', 'v2-pgvector-1024', TRUE
                 )
