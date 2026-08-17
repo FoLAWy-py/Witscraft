@@ -448,7 +448,7 @@ export default function Home() {
         setAuthStatus("anonymous");
         return;
       }
-      const issue = classifyFailure(caught, "工作区读取失败。请稍后重试。");
+      const issue = classifyFailure(caught, "小说数据读取失败。请稍后重试。");
       setError(issue.message);
       setRecoveryKind(issue.kind);
     } finally {
@@ -489,7 +489,7 @@ export default function Home() {
         try {
           await confirmEmailVerification(verificationToken);
           clearAuthQuery();
-          setAuthNotice("邮箱验证成功，你的工作区已解锁。");
+          setAuthNotice("邮箱验证成功，你的互动小说已解锁。");
         } catch (caught) {
           if (!active) return;
           clearAuthQuery();
@@ -551,7 +551,7 @@ export default function Home() {
         setSavedUserPreferences(data.preferences);
         setPreferenceError(null);
       })
-      .catch(() => setPreferenceError("读取创作偏好失败，请稍后重试。"));
+      .catch(() => setPreferenceError("读取故事偏好失败，请稍后重试。"));
     void refreshQuota();
     void loadWorkspace();
   }, [authStatus, authUser?.email_verified, loadWorkspace]);
@@ -877,9 +877,9 @@ export default function Home() {
       const response = await updateUserPreferences(userPreferences.filter((item) => item.content.trim()));
       setUserPreferences(response.preferences);
       setSavedUserPreferences(response.preferences);
-      setPreferenceNotice("创作偏好已保存，建稿采访和后续小说生成都会引用。");
+      setPreferenceNotice("故事偏好已保存，开篇设定和后续小说生成都会引用。");
     } catch (caught) {
-      setPreferenceError(caught instanceof ApiError ? caught.message : "保存创作偏好失败，请稍后重试。");
+      setPreferenceError(caught instanceof ApiError ? caught.message : "保存故事偏好失败，请稍后重试。");
     } finally {
       setSavingPreferences(false);
     }
@@ -948,7 +948,7 @@ export default function Home() {
       return;
     }
     if (!storyId || !branchId) {
-      setError("工作区尚未从数据库加载完成，暂时不能发送。");
+      setError("小说数据尚未加载完成，暂时不能发送。");
       return;
     }
 
@@ -1029,7 +1029,7 @@ export default function Home() {
       try {
         applyWorkspace(await getWorkspace(storyId));
       } catch {
-        setError("回复已保存，但 Inspector 暂时无法与数据库同步；重新读取工作区即可恢复。");
+        setError("回复已保存，但 Inspector 暂时无法与数据库同步；重新读取小说即可恢复。");
         setRecoveryKind("sync");
       }
     } catch (caught) {
@@ -1910,7 +1910,7 @@ function AuthLoading({ uiLanguage, label }: { uiLanguage: UiLanguage; label?: st
 
 function WorkspaceSkeleton({ uiLanguage }: { uiLanguage: UiLanguage }) {
   return (
-    <main className="makeShell workspaceSkeleton" aria-busy="true" aria-label={uiText(uiLanguage, "正在读取工作区", "Loading workspace")}>
+    <main className="makeShell workspaceSkeleton" aria-busy="true" aria-label={uiText(uiLanguage, "正在载入互动小说", "Loading interactive novel")}>
       <header className="makeTopbar">
         <div className="makeBrand"><span className="makeLogo"><Feather size={16} /></span><strong>Witscraft</strong></div>
         <div className="skeletonLine short" />
@@ -1940,7 +1940,7 @@ function WorkspaceSkeleton({ uiLanguage }: { uiLanguage: UiLanguage }) {
           {[0, 1, 2, 3].map((item) => <div className="skeletonBlock compact" key={item} />)}
         </aside>
       </section>
-      <span className="srOnly" aria-live="polite">{uiText(uiLanguage, "正在读取工作区", "Loading workspace")}</span>
+      <span className="srOnly" aria-live="polite">{uiText(uiLanguage, "正在载入互动小说", "Loading interactive novel")}</span>
     </main>
   );
 }
@@ -1978,7 +1978,7 @@ function AuthGate({
 
         <div className="authHeading">
           <h1 id="auth-title">{mode === "login" ? uiText(uiLanguage, "登录", "Sign in") : mode === "register" ? uiText(uiLanguage, "创建账号", "Create account") : uiText(uiLanguage, "找回密码", "Reset password")}</h1>
-          <p>{mode === "login" ? uiText(uiLanguage, "继续你的小说工作区", "Continue to your writing workspace") : mode === "register" ? uiText(uiLanguage, "建立你的私人小说工作区", "Create your private writing workspace") : uiText(uiLanguage, "我们会向注册邮箱发送一次性重置链接", "We will email a one-time reset link to your registered address")}</p>
+          <p>{mode === "login" ? uiText(uiLanguage, "继续你的互动小说", "Continue your interactive novel") : mode === "register" ? uiText(uiLanguage, "开启你的私人互动小说", "Start your private interactive novel") : uiText(uiLanguage, "我们会向注册邮箱发送一次性重置链接", "We will email a one-time reset link to your registered address")}</p>
         </div>
 
         {mode === "recovery" ? (
@@ -2074,7 +2074,7 @@ function AuthGate({
 
           <button className="authSubmit" type="submit" disabled={!canSubmit || pending}>
             {pending ? <RefreshCw size={15} className="spinIcon" /> : <ArrowRight size={15} />}
-            {pending ? uiText(uiLanguage, "请稍候", "Please wait") : mode === "login" ? uiText(uiLanguage, "登录工作区", "Open workspace") : mode === "register" ? uiText(uiLanguage, "创建账号", "Create account") : uiText(uiLanguage, "发送重置链接", "Send reset link")}
+            {pending ? uiText(uiLanguage, "请稍候", "Please wait") : mode === "login" ? uiText(uiLanguage, "进入小说", "Enter novel") : mode === "register" ? uiText(uiLanguage, "创建账号", "Create account") : uiText(uiLanguage, "发送重置链接", "Send reset link")}
           </button>
         </form>
       </section>
@@ -2111,7 +2111,7 @@ function EmailVerificationGate({
         <div className="authStatusIcon"><Mail size={22} /></div>
         <div className="authHeading">
           <h1 id="verification-title">{uiText(uiLanguage, "验证你的邮箱", "Verify your email")}</h1>
-          <p>{uiText(uiLanguage, "验证链接已发送到", "A verification link was sent to")} <b>{email}</b>{uiText(uiLanguage, "。完成验证后即可进入工作区。", ". Verify it to enter your workspace.")}</p>
+          <p>{uiText(uiLanguage, "验证链接已发送到", "A verification link was sent to")} <b>{email}</b>{uiText(uiLanguage, "。完成验证后即可进入互动小说。", ". Verify it to enter your interactive novel.")}</p>
         </div>
         {error && <div className="authError" role="alert">{error}</div>}
         {notice && <div className="authNotice" role="status">{notice}</div>}
@@ -2204,7 +2204,7 @@ function WorkspaceLoadFailure({
         </header>
         <div className="authStatusIcon"><AlertTriangle size={22} /></div>
         <div className="authHeading">
-          <h1 id="workspace-error-title">{uiText(uiLanguage, "工作区暂时不可用", "Workspace unavailable")}</h1>
+          <h1 id="workspace-error-title">{uiText(uiLanguage, "互动小说暂时不可用", "Interactive novel unavailable")}</h1>
           <p>{error}</p>
         </div>
         <div className="authActions">
@@ -2493,7 +2493,7 @@ function StoryWizard({
               </div>
               <div className="wizardMode" role="radiogroup" aria-label={uiText(uiLanguage, "开场方式", "Opening mode")}>
                 <button type="button" role="radio" aria-checked={draft.openingMode === "blank"} className={draft.openingMode === "blank" ? "active" : undefined} onClick={() => updateDraft({ openingMode: "blank" })}>
-                  <BookOpen size={16} /><span><b>{uiText(uiLanguage, "空白开场", "Blank opening")}</b><small>{uiText(uiLanguage, "进入工作区后开始", "Start after entering the workspace")}</small></span>
+                  <BookOpen size={16} /><span><b>{uiText(uiLanguage, "空白开场", "Blank opening")}</b><small>{uiText(uiLanguage, "进入小说后开始", "Start after entering the novel")}</small></span>
                 </button>
                 <button type="button" role="radio" aria-checked={draft.openingMode === "custom"} className={draft.openingMode === "custom" ? "active" : undefined} onClick={() => updateDraft({ openingMode: "custom" })}>
                   <PenLine size={16} /><span><b>{uiText(uiLanguage, "自定义开场", "Custom opening")}</b><small>{uiText(uiLanguage, "保存第一段正文", "Save your first prose passage")}</small></span>
@@ -3033,7 +3033,7 @@ function Transcript({
             <header>
               <div>
                 <h2 id="story-prompt-title">{uiText(uiLanguage, "当前小说 Prompt", "Story prompt")}</h2>
-                <p>{uiText(uiLanguage, "只影响这部小说，并会在每轮生成时与全局创作偏好一起使用。", "Applies only to this story and is used with your global writing preferences on every generation.")}</p>
+                <p>{uiText(uiLanguage, "只影响这部小说，并会在每轮生成时与全局故事偏好一起使用。", "Applies only to this story and is used with your global story preferences on every generation.")}</p>
               </div>
               <button className="plainIcon" type="button" aria-label={uiText(uiLanguage, "关闭", "Close")} onClick={() => setPromptOpen(false)}><X size={15} /></button>
             </header>
@@ -3859,7 +3859,7 @@ function SettingsView({
       <div className="settingsInner">
         <header>
           <h1>{uiText(uiLanguage, "设置", "Settings")}</h1>
-          <p>{uiText(uiLanguage, "管理界面语言、账号安全、创作偏好与模型路由。", "Manage interface language, account security, writing preferences, and model routing.")}</p>
+          <p>{uiText(uiLanguage, "管理界面语言、账号安全、故事偏好与模型路由。", "Manage interface language, account security, story preferences, and model routing.")}</p>
         </header>
 
         <Panel title={uiText(uiLanguage, "界面语言", "Interface language")} icon={Globe2}>
@@ -3971,7 +3971,7 @@ function SettingsView({
         </Panel>
 
         <Panel
-          title={uiText(uiLanguage, "创作偏好", "Writing preferences")}
+          title={uiText(uiLanguage, "故事偏好", "Story preferences")}
           icon={Settings2}
           action={<span className={preferenceDirty ? "statusWarn" : "statusOk"}>{preferenceDirty ? uiText(uiLanguage, "未保存", "Unsaved") : uiText(uiLanguage, "已保存", "Saved")}</span>}
         >

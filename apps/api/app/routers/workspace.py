@@ -548,7 +548,7 @@ async def _build_story_interview_request(
         ChatMessage(
             role="developer",
             content=(
-                f"用户长期创作偏好：{preference_context or ['尚未设置']}\n"
+                f"用户长期叙事偏好：{preference_context or ['尚未设置']}\n"
                 f"当前可编辑草稿：{request.draft.model_dump_json()}\n"
                 f"当前仍缺字段：{_story_interview_missing_fields(request.draft)}\n"
                 f"处理最新消息前的建议关注点：{_choose_interview_focus(request.draft, request.message)}。"

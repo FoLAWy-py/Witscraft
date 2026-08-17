@@ -11,7 +11,7 @@ Witscraft applies a weekly AI token allowance to standard users and provides a s
 
 | Capability | Standard user | Administrator |
 | --- | --- | --- |
-| Use the writing workspace | Yes | Yes |
+| Play and customize interactive novels | Yes | Yes |
 | View personal weekly usage, percentage, and reset time | Yes | Yes |
 | View account names, emails, roles, and weekly token totals | No | Yes |
 | Reset the global quota window | No | Yes |

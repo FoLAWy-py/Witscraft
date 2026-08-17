@@ -142,7 +142,7 @@ async def overview(
             AdminUserQuotaResponse(
                 id=str(user.id),
                 email=user.email,
-                display_name=user.display_name or "Author",
+                display_name=user.display_name or "Player",
                 is_admin=user.is_admin,
                 created_at=user.created_at,
                 **snapshot_payload(snapshot),

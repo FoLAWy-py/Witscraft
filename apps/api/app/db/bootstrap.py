@@ -40,7 +40,7 @@ async def seed_demo_data(session: AsyncSession) -> None:
     user = User(
         id=DEFAULT_USER_ID,
         email="local@witscraft.dev",
-        display_name="Local Author",
+        display_name="Local Player",
     )
     world = World(
         id=DEFAULT_WORLD_ID,

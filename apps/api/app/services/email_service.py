@@ -38,7 +38,7 @@ async def send_verification_email(
         action_label="验证邮箱",
         action_link=link,
         expiry="24 小时",
-        explanation="完成验证后即可进入你的小说工作区。",
+        explanation="完成验证后即可进入你的互动小说。",
     )
     await _send_message(settings, message)
 

@@ -2,7 +2,7 @@
 
 **Document status:** Production baseline
 
-**Architecture version:** 2.9
+**Architecture version:** 3.0
 
 **Last updated:** 17 August 2026
 
@@ -10,7 +10,7 @@
 
 ## 1. Purpose and Scope
 
-Witscraft is an AI-assisted interactive fiction workspace. It combines persistent narrative state, branching story management, selective long-term memory, configurable model routing, and account-level privacy controls in a single production-oriented application.
+Witscraft is a customizable AI-authored interactive fiction experience. The AI narrative engine acts as author and narrator; the user plays a selected character and directs the plot through actions and choices. It combines persistent narrative state, branching story management, selective long-term memory, configurable model routing, and account-level privacy controls in a single production-oriented application. It is not an authoring workbench or a tool aimed at professional writers.
 
 This document describes the architecture implemented in the repository and identifies deliberate constraints and approved evolution paths. It is not a speculative target-state catalogue.
 
@@ -28,7 +28,7 @@ The architecture is guided by the following principles:
 
 ```mermaid
 flowchart LR
-    User["Author"] --> Browser["Next.js Web Application"]
+    User["Player"] --> Browser["Next.js Interactive Novel"]
     Administrator["Administrator"] --> Browser
     Browser --> Proxy["HTTPS Reverse Proxy"]
     Proxy --> Web["Next.js Production Server"]
@@ -99,7 +99,7 @@ Machine-specific deployment files and live secrets are intentionally excluded fr
 
 ### 5.1 Web Application
 
-The Next.js application provides the writing workspace, authentication views, story and branch management, model routing settings, weekly quota visibility, account data export, and account deletion controls. A separate `/admin` route provides searchable, role-filtered, paginated account-level usage governance and bounded reset audit history without exposing narrative content.
+The Next.js application provides the interactive novel experience, authentication views, story and branch selection, character and world customization, model routing settings, weekly quota visibility, account data export, and account deletion controls. The AI remains responsible for prose generation and narrative continuation; the player supplies character actions, choices, and desired direction. A separate `/admin` route provides searchable, role-filtered, paginated account-level usage governance and bounded reset audit history without exposing narrative content.
 
 The current interface is implemented as a cohesive App Router workspace rather than a collection of independently deployed frontends. It communicates exclusively with the FastAPI API through the typed client in `apps/web/lib/api.ts`.
 

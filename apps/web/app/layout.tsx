@@ -4,7 +4,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Witscraft",
-  description: "AI interactive novel workspace"
+  description: "Customizable AI-authored interactive novel"
 };
 
 export default function RootLayout({

@@ -1,13 +1,13 @@
 # Witscraft
 
-Witscraft is an AI interactive novel workspace. The MVP follows the architecture in `system architecture.md`: a Next.js frontend, a FastAPI backend, PostgreSQL/pgvector-ready data boundaries, and an LLM Gateway that hides OpenAI and DeepInfra differences from story logic.
+Witscraft is a customizable AI-authored interactive novel. The AI acts as the author and narrator, while the user plays a character and decides the direction of the plot through actions and choices. The application follows the architecture in `system architecture.md`: a Next.js frontend, a FastAPI backend, PostgreSQL/pgvector-ready data boundaries, and an LLM Gateway that hides OpenAI and DeepInfra differences from story logic.
 
 ## Project Shape
 
 ```text
 apps/
   api/    FastAPI backend, story engine, prompt builder, LLM gateway
-  web/    Next.js frontend writing cockpit
+  web/    Next.js interactive novel experience
 ```
 
 ## Documentation

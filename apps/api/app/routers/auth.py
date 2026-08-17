@@ -149,7 +149,7 @@ async def register(
         await send_verification_email(
             settings,
             recipient=user.email,
-            display_name=user.display_name or "Author",
+            display_name=user.display_name or "Player",
             token=verification_token,
         )
         await session.commit()
@@ -248,7 +248,7 @@ async def request_email_verification(
         await send_verification_email(
             settings,
             recipient=user.email,
-            display_name=user.display_name or "Author",
+            display_name=user.display_name or "Player",
             token=token,
         )
         await session.commit()
@@ -300,7 +300,7 @@ async def request_password_reset(
             await send_password_reset_email(
                 settings,
                 recipient=user.email,
-                display_name=user.display_name or "Author",
+                display_name=user.display_name or "Player",
                 token=token,
             )
             await session.commit()
@@ -513,7 +513,7 @@ def _user_response(user: User) -> AuthUserResponse:
     return AuthUserResponse(
         id=str(user.id),
         email=user.email,
-        display_name=user.display_name or "Author",
+        display_name=user.display_name or "Player",
         email_verified=user.email_verified_at is not None,
         is_admin=user.is_admin,
     )

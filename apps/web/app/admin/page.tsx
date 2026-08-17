@@ -69,9 +69,9 @@ export default function AdminPage() {
       <main className="adminShell adminStateShell">
         <ShieldCheck size={24} />
         <h1>{status === "forbidden" ? "Administrator access required" : status === "anonymous" ? "Sign in required" : status === "error" ? "Administrator console unavailable" : "Loading administrator console"}</h1>
-        <p>{status === "forbidden" ? "This account does not have the administrator role." : status === "anonymous" ? "Sign in through the Witscraft workspace before opening this page." : status === "error" ? "The server could not load administrative usage data." : "Checking your role and current quota period."}</p>
+        <p>{status === "forbidden" ? "This account does not have the administrator role." : status === "anonymous" ? "Sign in to Witscraft before opening this page." : status === "error" ? "The server could not load administrative usage data." : "Checking your role and current quota period."}</p>
         <div className="adminStateActions">
-          <Link className="cmdButton" href="/"><ArrowLeft size={14} /> Workspace</Link>
+          <Link className="cmdButton" href="/"><ArrowLeft size={14} /> Interactive novel</Link>
           {status === "error" && <button className="cmdButton" type="button" onClick={() => void load()}><RefreshCw size={14} /> Retry</button>}
         </div>
       </main>
@@ -88,7 +88,7 @@ export default function AdminPage() {
         </div>
         <div className="adminHeaderActions">
           <button className="plainIcon" type="button" aria-label="Refresh usage" title="Refresh usage" disabled={refreshing} onClick={() => void load()}><RefreshCw className={refreshing ? "spinIcon" : undefined} size={16} /></button>
-          <Link className="cmdButton" href="/"><ArrowLeft size={14} /> Workspace</Link>
+          <Link className="cmdButton" href="/"><ArrowLeft size={14} /> Interactive novel</Link>
         </div>
       </header>
 
