@@ -280,15 +280,23 @@ class StorySummary(Base):
             "branch_id",
             text("created_at DESC"),
         ),
+        Index("ix_story_summaries_parent_summary", "parent_summary_id"),
     )
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     story_id: Mapped[UUID] = mapped_column(ForeignKey("stories.id", ondelete="CASCADE"), nullable=False)
     branch_id: Mapped[UUID] = mapped_column(ForeignKey("story_branches.id", ondelete="CASCADE"), nullable=False)
+    parent_summary_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("story_summaries.id", ondelete="SET NULL")
+    )
     from_message_id: Mapped[UUID | None] = mapped_column(ForeignKey("messages.id", ondelete="SET NULL"))
     to_message_id: Mapped[UUID | None] = mapped_column(ForeignKey("messages.id", ondelete="SET NULL"))
     summary_type: Mapped[str] = mapped_column(String(80), default="session")
+    prompt_version: Mapped[str] = mapped_column(String(80), default="session-summary-v2")
+    provider: Mapped[str | None] = mapped_column(String(40))
+    model: Mapped[str | None] = mapped_column(String(220))
+    trigger: Mapped[str] = mapped_column(String(40), default="user_requested")
     title: Mapped[str] = mapped_column(String(220), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     message_count: Mapped[int] = mapped_column(Integer, default=0)

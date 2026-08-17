@@ -149,15 +149,23 @@ async def clone_story_branch(
         .where(StorySummary.story_id == story.id, StorySummary.branch_id == source_branch.id)
         .order_by(StorySummary.created_at.asc(), StorySummary.id.asc())
     )
-    for summary in summary_result.scalars().all():
+    source_summaries = list(summary_result.scalars().all())
+    summary_ids = {summary.id: uuid4() for summary in source_summaries}
+    for summary in source_summaries:
         session.add(
             StorySummary(
+                id=summary_ids[summary.id],
                 user_id=user_id,
                 story_id=story.id,
                 branch_id=branch.id,
+                parent_summary_id=summary_ids.get(summary.parent_summary_id),
                 from_message_id=_mapped_message_id(summary.from_message_id, message_ids),
                 to_message_id=_mapped_message_id(summary.to_message_id, message_ids),
                 summary_type=summary.summary_type,
+                prompt_version=summary.prompt_version,
+                provider=summary.provider,
+                model=summary.model,
+                trigger=summary.trigger,
                 title=summary.title,
                 content=summary.content,
                 message_count=summary.message_count,

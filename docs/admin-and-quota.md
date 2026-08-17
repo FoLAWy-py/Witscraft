@@ -79,7 +79,7 @@ The overview also returns the latest 10 global reset events with their effective
 After changing the quota or an administrator role:
 
 1. Restart the API process if an environment value changed.
-2. Verify `/health/ready` returns HTTP `200` and migration revision `0014`.
+2. Verify `/health/ready` returns HTTP `200` and migration revision `0015`.
 3. Sign in with a standard account and verify the usage percentage and local reset time.
 4. Verify a standard account receives HTTP `403` from `/api/admin/overview`.
 5. Sign in with an authorized administrator and verify the console before using reset.

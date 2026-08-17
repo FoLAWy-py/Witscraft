@@ -2,7 +2,7 @@
 
 **Document status:** Production baseline
 
-**Architecture version:** 3.8
+**Architecture version:** 3.9
 
 **Last updated:** 17 August 2026
 
@@ -145,6 +145,8 @@ Context construction is separated into deterministic stages:
 5. Render a provider-neutral message sequence.
 
 The current user message appears exactly once as the final user message. Historical and memory sections are budgeted independently so one oversized section cannot consume the complete context window.
+
+Session summaries are branch-local cumulative checkpoints. Generation is currently an explicit player operation rather than a per-turn side effect. A new summary receives the previous cumulative summary and only messages beyond its deterministic `(created_at, id)` coverage boundary, then stores a complete replacement. `parent_summary_id`, the full from/to message range, prompt version, actual provider/model, trigger, cumulative message count, and source-token estimate make lineage and cost auditable. A branch clone remaps summary parents and message boundaries; a request with no new messages is rejected before model execution.
 
 ### 5.5 LLM Gateway
 

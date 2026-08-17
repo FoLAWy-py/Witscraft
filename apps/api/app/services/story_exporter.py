@@ -184,7 +184,12 @@ def _character_payload(character: Character) -> dict:
 def _summary_payload(summary: StorySummary) -> dict:
     return {
         "id": str(summary.id),
+        "parent_summary_id": str(summary.parent_summary_id) if summary.parent_summary_id else None,
         "type": summary.summary_type,
+        "prompt_version": summary.prompt_version,
+        "provider": summary.provider,
+        "model": summary.model,
+        "trigger": summary.trigger,
         "title": summary.title,
         "content": summary.content,
         "message_count": summary.message_count,

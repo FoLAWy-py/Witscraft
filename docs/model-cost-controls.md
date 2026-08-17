@@ -61,4 +61,10 @@ The same preflight applies `STORY_WEEKLY_TOKEN_QUOTA`, 250,000 tokens by default
 
 The auditor resets the counter when it begins a new turn. Exhaustion stops the chain before another provider request and returns an explicit HTTP or SSE `429` response. This ceiling bounds pathological retry or orchestration behavior independently of token estimates and the weekly allowance.
 
+## Summary generation
+
+Session summaries are user-triggered and are not generated on every narrative turn. The summarizer sends the previous cumulative branch summary together with only messages after its coverage boundary, then persists a complete replacement summary. A request with no newly uncovered message returns HTTP `409` before quota preflight or provider execution, preventing repeated charges for the same range.
+
+Each summary stores the prompt version, actual provider and model after fallback resolution, generation trigger, parent summary, covered message range, cumulative message count, and conservative source-token estimate. Branch duplication remaps both message boundaries and parent-summary lineage to the new branch.
+
 These controls are intentionally deterministic. Model or prompt changes should modify the central budget table only after regression evidence demonstrates a quality need.

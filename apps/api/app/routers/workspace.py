@@ -1610,9 +1610,16 @@ async def _load_summaries(session: AsyncSession, story_id: UUID, branch_id: UUID
     return [
         {
             "id": str(summary.id),
+            "parent_summary_id": (
+                str(summary.parent_summary_id) if summary.parent_summary_id else None
+            ),
             "title": summary.title,
             "content": summary.content,
             "type": summary.summary_type,
+            "prompt_version": summary.prompt_version,
+            "provider": summary.provider,
+            "model": summary.model,
+            "trigger": summary.trigger,
             "message_count": summary.message_count,
             "token_count": summary.token_count,
             "created_at": summary.created_at.isoformat() if summary.created_at else "",
