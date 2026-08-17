@@ -4188,7 +4188,7 @@ function SettingsView({
                 </header>
                 <div className="deploymentModel">
                   <span>{embeddingRole.deployment.model}</span>
-                  <small>{embeddingRole.deployment.provider} · {embeddingRole.deployment.version} · {uiText(uiLanguage, "更换模型需要受控重建索引", "model changes require controlled re-indexing")}</small>
+                  <small>{embeddingRole.deployment.provider} · {embeddingRole.deployment.dimensions}d · {embeddingRole.deployment.version} · {uiText(uiLanguage, "更换模型需要受控重建索引", "model changes require controlled re-indexing")}</small>
                 </div>
               </section>
             )}

@@ -1,6 +1,7 @@
 from datetime import datetime
 from uuid import UUID, uuid4
 
+from pgvector.sqlalchemy import VECTOR
 from sqlalchemy import (
     Boolean,
     BigInteger,
@@ -18,6 +19,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
+from app.embedding_config import EMBEDDING_VECTOR_DIMENSIONS
 
 
 class Base(DeclarativeBase):
@@ -360,6 +363,9 @@ class MemoryItem(Base, TimestampMixin):
     entity_tags: Mapped[list] = mapped_column(JSONB, default=list)
     meta: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
     embedding: Mapped[list | None] = mapped_column(JSONB)
+    embedding_vector: Mapped[list | None] = mapped_column(
+        VECTOR(EMBEDDING_VECTOR_DIMENSIONS)
+    )
     embedding_model: Mapped[str | None] = mapped_column(String(220))
     embedding_dimensions: Mapped[int | None] = mapped_column(Integer)
     embedding_version: Mapped[str | None] = mapped_column(String(80))

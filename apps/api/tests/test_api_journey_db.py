@@ -91,6 +91,7 @@ def test_authenticated_interactive_novel_api_journey(monkeypatch) -> None:
                 assert set(embedding_role["deployment"]) == {
                     "provider",
                     "model",
+                    "dimensions",
                     "version",
                 }
                 assert catalog_payload["effective_routes"]["normal_chat"] == {

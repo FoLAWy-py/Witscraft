@@ -28,7 +28,8 @@ from app.schemas.chat import (
     UpdateStoryRequest,
     UpdateWorldRequest,
 )
-from app.services.embeddings import embedding_content_hash
+from app.embedding_config import EMBEDDING_VECTOR_DIMENSIONS, LOCAL_EMBEDDING_MODEL
+from app.services.embeddings import embedding_content_hash, stored_embedding
 from app.services.story_engine import StoryEngine
 
 
@@ -329,9 +330,10 @@ def test_memory_edit_reuses_or_refreshes_embedding_and_rejects_duplicates() -> N
                 await session.refresh(editable)
                 assert editable.content == changed_content
                 assert editable.entity_tags == []
-                assert len(editable.embedding or []) == 128
-                assert editable.embedding_model == "local:deterministic-blake2b-128"
-                assert editable.embedding_dimensions == 128
+                assert editable.embedding is None
+                assert len(stored_embedding(editable) or []) == EMBEDDING_VECTOR_DIMENSIONS
+                assert editable.embedding_model == f"local:{LOCAL_EMBEDDING_MODEL}"
+                assert editable.embedding_dimensions == EMBEDDING_VECTOR_DIMENSIONS
                 assert editable.embedding_version == settings.embedding_version
                 assert editable.content_hash == embedding_content_hash(changed_content)
                 assert editable.embedded_at > original_embedded_at

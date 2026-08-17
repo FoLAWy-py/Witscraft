@@ -3,8 +3,17 @@ from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from uuid import uuid4
 
+import pytest
+
 from app.config import Settings
-from app.services.embeddings import EmbeddingService, cosine_similarity, embedding_content_hash
+from app.embedding_config import EMBEDDING_VECTOR_DIMENSIONS, LOCAL_EMBEDDING_MODEL
+from app.services.embeddings import (
+    EmbeddingService,
+    cosine_similarity,
+    embedding_content_hash,
+    embedding_storage_values,
+    stored_embedding,
+)
 from app.services.story_engine import MEMORY_VECTOR_SEARCH_MIN_ITEMS, StoryEngine
 from app.services.turn_context import TurnContext
 
@@ -57,8 +66,26 @@ class CountingEmbeddingService:
         return model == "local:test-embedding" and dimensions == len(vector) and version == "test-v1"
 
     @staticmethod
-    def is_model_version_compatible(*, model, version):
-        return model == "local:test-embedding" and version == "test-v1"
+    def is_model_version_compatible(*, model, dimensions, version):
+        return (
+            model == "local:test-embedding"
+            and dimensions == 2
+            and version == "test-v1"
+        )
+
+
+class FakeEmbeddingClient:
+    def __init__(self, dimensions: int):
+        self.embeddings = self
+        self.dimensions = dimensions
+        self.request = None
+
+    async def create(self, **kwargs):
+        self.request = kwargs
+        return SimpleNamespace(
+            data=[SimpleNamespace(index=0, embedding=[0.0] * self.dimensions)],
+            usage=SimpleNamespace(prompt_tokens=3),
+        )
 
 
 def _engine(memories, *, threshold=MEMORY_VECTOR_SEARCH_MIN_ITEMS) -> tuple[StoryEngine, CountingEmbeddingService]:
@@ -202,6 +229,20 @@ def test_all_legacy_vectors_use_hybrid_ranking_and_skip_query_embedding() -> Non
     assert embedding_service.calls == 0
 
 
+def test_wrong_dimension_metadata_skips_unusable_query_embedding() -> None:
+    memories = [
+        _memory(index, [1.0, 0.0])
+        for index in range(MEMORY_VECTOR_SEARCH_MIN_ITEMS + 1)
+    ]
+    for memory in memories:
+        memory.embedding_dimensions = 1
+    engine, embedding_service = _engine(memories)
+
+    asyncio.run(engine._load_memories(uuid4(), uuid4(), "寻找钥匙"))
+
+    assert embedding_service.calls == 0
+
+
 def test_configured_threshold_controls_semantic_embedding_activation() -> None:
     memories = [_memory(index, [1.0, 0.0]) for index in range(3)]
     memories[-1].embedding = [0.0, 1.0]
@@ -230,7 +271,7 @@ def test_embedding_batch_uses_one_deterministic_pass_in_dry_run() -> None:
     vectors = asyncio.run(service.embed_many(["第一条记忆", "第二条记忆"]))
 
     assert len(vectors) == 2
-    assert all(len(vector) == 128 for vector in vectors)
+    assert all(len(vector) == EMBEDDING_VECTOR_DIMENSIONS for vector in vectors)
 
 
 def test_embedding_metadata_binds_content_model_dimensions_and_version() -> None:
@@ -239,11 +280,49 @@ def test_embedding_metadata_binds_content_model_dimensions_and_version() -> None
 
     metadata = service.metadata("  林岚   找到钥匙  ", vector)
 
-    assert metadata.model == "local:deterministic-blake2b-128"
-    assert metadata.dimensions == 128
+    assert metadata.model == f"local:{LOCAL_EMBEDDING_MODEL}"
+    assert metadata.dimensions == EMBEDDING_VECTOR_DIMENSIONS
     assert metadata.version == "test-v2"
     assert metadata.content_hash == embedding_content_hash("林岚 找到钥匙")
     assert metadata.embedded_at.tzinfo is not None
+
+
+def test_live_embedding_request_pins_and_validates_dimensions() -> None:
+    service = EmbeddingService(Settings(openai_api_key="test-key"))
+    client = FakeEmbeddingClient(EMBEDDING_VECTOR_DIMENSIONS)
+    service.client = client
+
+    vector = asyncio.run(service.embed("维度契约"))
+
+    assert len(vector) == EMBEDDING_VECTOR_DIMENSIONS
+    assert client.request["dimensions"] == EMBEDDING_VECTOR_DIMENSIONS
+
+
+def test_live_embedding_rejects_unexpected_dimensions() -> None:
+    service = EmbeddingService(Settings(openai_api_key="test-key"))
+    service.client = FakeEmbeddingClient(EMBEDDING_VECTOR_DIMENSIONS - 1)
+
+    with pytest.raises(ValueError, match="unexpected vector dimension"):
+        asyncio.run(service.embed("错误维度"))
+
+
+def test_embedding_storage_prefers_fixed_vector_and_preserves_legacy_dimensions() -> None:
+    fixed = [0.0] * EMBEDDING_VECTOR_DIMENSIONS
+    assert embedding_storage_values(fixed) == (None, fixed)
+    assert embedding_storage_values([0.25, 0.75]) == ([0.25, 0.75], None)
+    assert stored_embedding(SimpleNamespace(embedding=[0.25], embedding_vector=None)) == [
+        0.25
+    ]
+
+
+def test_embedding_storage_rejects_non_finite_values() -> None:
+    with pytest.raises(ValueError, match="non-finite"):
+        embedding_storage_values([float("nan")])
+
+
+def test_embedding_dimension_change_requires_a_schema_migration() -> None:
+    with pytest.raises(ValueError, match="fixed pgvector schema dimension"):
+        Settings(embedding_dimensions=EMBEDDING_VECTOR_DIMENSIONS // 2)
 
 
 def test_cosine_similarity_rejects_mixed_dimensions() -> None:

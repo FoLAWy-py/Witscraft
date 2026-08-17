@@ -36,7 +36,13 @@ from app.schemas.chat import ChatRequest, ChatResponse, StoryState
 from app.schemas.llm import ChatMessage, LLMRequest, LLMResponse
 from app.services.consistency_checker import check_response_consistency
 from app.services.context_assembler import ContextAssembly, assemble_story_context
-from app.services.embeddings import EmbeddingService, cosine_similarity, embedding_content_hash
+from app.services.embeddings import (
+    EmbeddingService,
+    cosine_similarity,
+    embedding_content_hash,
+    embedding_storage_values,
+    stored_embedding,
+)
 from app.services.state_extractor import extract_story_updates_with_llm
 from app.services.turn_context import TurnContext
 
@@ -1403,6 +1409,7 @@ class StoryEngine:
             compatible_candidates = any(
                 self.embedding_service.is_model_version_compatible(
                     model=memory.embedding_model,
+                    dimensions=memory.embedding_dimensions,
                     version=memory.embedding_version,
                 )
                 for memory in memories
@@ -1416,7 +1423,7 @@ class StoryEngine:
             ranked = []
             for index, memory in enumerate(memories):
                 semantic_score = (
-                    cosine_similarity(query_embedding, memory.embedding)
+                    cosine_similarity(query_embedding, stored_embedding(memory))
                     if query_embedding
                     and self.embedding_service.is_compatible(
                         model=memory.embedding_model,
@@ -1742,6 +1749,7 @@ class StoryEngine:
         source: str,
     ) -> list[str]:
         for memory in memories:
+            legacy_embedding, vector_embedding = embedding_storage_values(memory.embedding)
             self.session.add(
                 MemoryItem(
                     user_id=story.user_id,
@@ -1753,7 +1761,8 @@ class StoryEngine:
                     importance=memory.importance,
                     entity_tags=list(memory.entity_tags),
                     meta={"source": f"{source}_state_extractor"},
-                    embedding=memory.embedding,
+                    embedding=legacy_embedding,
+                    embedding_vector=vector_embedding,
                     embedding_model=memory.embedding_model,
                     embedding_dimensions=memory.embedding_dimensions,
                     embedding_version=memory.embedding_version,

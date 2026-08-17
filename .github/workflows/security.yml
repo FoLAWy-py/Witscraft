@@ -36,7 +36,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:17.6-bookworm
+        image: pgvector/pgvector:0.8.6-pg17-bookworm
         env:
           POSTGRES_USER: witscraft-ci
           POSTGRES_PASSWORD: witscraft-ci-password
@@ -76,11 +76,19 @@ jobs:
       - name: Audit installed dependencies
         run: uv run --with pip-audit==2.10.1 pip-audit --local
       - name: Lint backend
-        run: uv run ruff check app tests migrations ../../scripts/create-release-manifest.py ../../scripts/evaluate-structured-extraction.py ../../scripts/smoke-release.py
+        run: uv run ruff check app tests migrations ../../scripts/check-pgvector-migration.py ../../scripts/create-release-manifest.py ../../scripts/evaluate-structured-extraction.py ../../scripts/smoke-release.py
       - name: Run structured extraction evaluation gate
         run: uv run python ../../scripts/evaluate-structured-extraction.py
-      - name: Upgrade empty database to migration head
-        run: uv run alembic upgrade head
+      - name: Verify pgvector migration upgrade and downgrade
+        run: |
+          uv run alembic upgrade 0016
+          uv run python ../../scripts/check-pgvector-migration.py seed
+          uv run alembic upgrade head
+          uv run python ../../scripts/check-pgvector-migration.py verify-upgrade
+          uv run alembic downgrade 0016
+          uv run python ../../scripts/check-pgvector-migration.py verify-downgrade
+          uv run python ../../scripts/check-pgvector-migration.py cleanup
+          uv run alembic upgrade head
       - name: Reject model and migration drift
         run: uv run alembic check
       - name: Run complete backend test suite

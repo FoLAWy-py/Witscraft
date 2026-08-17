@@ -48,6 +48,7 @@ def test_model_roles_partition_story_purposes_and_separate_embedding() -> None:
 def test_serialized_roles_explain_defaults_without_exposing_credentials() -> None:
     roles = serialized_model_roles(
         embedding_model="text-embedding-test",
+        embedding_dimensions=1024,
         embedding_version="test-v2",
     )
     narrative = next(role for role in roles if role["id"] == "narrative_author")
@@ -59,6 +60,7 @@ def test_serialized_roles_explain_defaults_without_exposing_credentials() -> Non
     assert embedding["deployment"] == {
         "provider": "openai",
         "model": "text-embedding-test",
+        "dimensions": 1024,
         "version": "test-v2",
     }
     assert "api_key" not in str(roles).lower()

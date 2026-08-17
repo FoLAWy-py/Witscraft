@@ -163,6 +163,7 @@ async def providers(
         "models": [model.model_dump() for model in list_models()],
         "model_roles": serialized_model_roles(
             embedding_model=settings.openai_embedding_model,
+            embedding_dimensions=settings.embedding_dimensions,
             embedding_version=settings.embedding_version,
         ),
         "purpose_defaults": PURPOSE_DEFAULTS,

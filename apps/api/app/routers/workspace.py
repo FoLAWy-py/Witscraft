@@ -51,7 +51,7 @@ from app.schemas.chat import (
     WorkspaceResponse,
 )
 from app.schemas.llm import ChatMessage, LLMRequest
-from app.services.embeddings import EmbeddingService, embedding_content_hash
+from app.services.embeddings import EmbeddingService, embedding_content_hash, stored_embedding
 from app.services.branch_manager import clone_story_branch
 from app.services.session_summarizer import generate_session_summary
 from app.services.quota_service import QuotaExceededError
@@ -1315,6 +1315,7 @@ async def update_memory(
     if content_changed:
         memory.entity_tags = []
         memory.embedding = None
+        memory.embedding_vector = None
         memory.embedding_model = None
         memory.embedding_dimensions = None
         memory.embedding_version = None
@@ -1327,11 +1328,12 @@ async def update_memory(
             request_id=getattr(http_request.state, "request_id", None),
         )
         embedding_service = EmbeddingService(settings, auditor=auditor)
-        memory.embedding = await embedding_service.embed(
+        embedding = await embedding_service.embed(
             content,
             purpose="embedding_memory_update",
         )
-        metadata = embedding_service.metadata(content, memory.embedding)
+        memory.embedding_vector = embedding
+        metadata = embedding_service.metadata(content, embedding)
         memory.embedding_model = metadata.model
         memory.embedding_dimensions = metadata.dimensions
         memory.embedding_version = metadata.version
@@ -1577,9 +1579,10 @@ async def _load_memory_items(session: AsyncSession, story_id: UUID, branch_id: U
             "content": memory.content,
             "importance": memory.importance,
             "type": memory.memory_type,
-            "has_embedding": bool(memory.embedding),
+            "has_embedding": stored_embedding(memory) is not None,
             "embedding_model": memory.embedding_model,
-            "embedding_dimensions": memory.embedding_dimensions or len(memory.embedding or []),
+            "embedding_dimensions": memory.embedding_dimensions
+            or len(stored_embedding(memory) or []),
             "embedding_version": memory.embedding_version,
         }
         for memory in result.scalars().all()

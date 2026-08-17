@@ -151,7 +151,7 @@ async function installApiFixture(page: Page) {
             user_configurable: false,
             configuration_source: "deployment",
             default_models: {},
-            deployment: { provider: "openai", model: "text-embedding-test", version: "test-v1" }
+            deployment: { provider: "openai", model: "text-embedding-test", dimensions: 1024, version: "test-v1" }
           }
         ],
         purpose_defaults: defaults,

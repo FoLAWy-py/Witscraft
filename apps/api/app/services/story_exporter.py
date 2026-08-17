@@ -16,6 +16,7 @@ from app.db.models import (
     StorySummary,
     World,
 )
+from app.services.embeddings import stored_embedding
 
 
 async def build_story_export_payload(
@@ -209,6 +210,7 @@ def _canon_payload(fact: CanonFact) -> dict:
 
 
 def _memory_payload(memory: MemoryItem) -> dict:
+    embedding = stored_embedding(memory)
     return {
         "id": str(memory.id),
         "type": memory.memory_type,
@@ -216,9 +218,9 @@ def _memory_payload(memory: MemoryItem) -> dict:
         "importance": memory.importance,
         "recency_score": float(memory.recency_score or 0),
         "entity_tags": memory.entity_tags,
-        "has_embedding": bool(memory.embedding),
+        "has_embedding": embedding is not None,
         "embedding_model": memory.embedding_model,
-        "embedding_dimensions": memory.embedding_dimensions or len(memory.embedding or []),
+        "embedding_dimensions": memory.embedding_dimensions or len(embedding or []),
         "embedding_version": memory.embedding_version,
         "content_hash": memory.content_hash,
         "embedded_at": memory.embedded_at.isoformat() if memory.embedded_at else None,

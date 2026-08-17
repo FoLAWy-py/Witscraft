@@ -89,7 +89,7 @@ async def build_account_export_payload(session: AsyncSession, user: User) -> dic
             for row in await _story_rows(session, CanonFact, CanonFact.story_id, story_ids)
         ],
         "memories": [
-            _serialize(row, exclude={"user_id", "embedding"})
+            _serialize(row, exclude={"user_id", "embedding", "embedding_vector"})
             for row in await _memory_rows(session, user.id, story_ids)
         ],
         "preferences": [

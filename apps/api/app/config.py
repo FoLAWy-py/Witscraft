@@ -10,6 +10,8 @@ from pydantic import Field
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.embedding_config import EMBEDDING_VECTOR_DIMENSIONS, EMBEDDING_VERSION
+
 
 ROOT_DIR = Path(__file__).resolve().parents[3]
 
@@ -75,7 +77,12 @@ class Settings(BaseSettings):
     default_openai_model: str = "gpt-5.5"
     default_deepinfra_model: str = "Qwen/Qwen3-Max"
     openai_embedding_model: str = "text-embedding-3-large"
-    embedding_version: str = "v1"
+    embedding_dimensions: int = Field(
+        default=EMBEDDING_VECTOR_DIMENSIONS,
+        ge=1,
+        le=2000,
+    )
+    embedding_version: str = EMBEDDING_VERSION
     memory_vector_search_min_items: int = Field(default=40, ge=1, le=10000)
     model_pricing: dict[str, dict[str, float]] = Field(default_factory=dict)
     model_pricing_version: str = "unconfigured"
@@ -160,6 +167,15 @@ class Settings(BaseSettings):
             return self.rate_limit_enabled
         return self.app_environment == "production"
 
+    @model_validator(mode="after")
+    def validate_embedding_storage(self) -> Self:
+        if self.embedding_dimensions != EMBEDDING_VECTOR_DIMENSIONS:
+            raise ValueError(
+                "EMBEDDING_DIMENSIONS must match the fixed pgvector schema dimension "
+                f"({EMBEDDING_VECTOR_DIMENSIONS}); change it only with a database migration"
+            )
+        return self
+
 
 def validate_runtime_security(settings: Settings) -> None:
     if settings.app_environment != "production":
@@ -224,6 +240,8 @@ def get_settings() -> Settings:
         overrides["deepinfra_api_key"] = deepinfra_key
     if "SMTP_PORT" in env_md:
         overrides["smtp_port"] = int(env_md["SMTP_PORT"])
+    if "EMBEDDING_DIMENSIONS" in env_md:
+        overrides["embedding_dimensions"] = int(env_md["EMBEDDING_DIMENSIONS"])
     if env_md.get("MODEL_PRICING"):
         overrides["model_pricing"] = json.loads(env_md["MODEL_PRICING"])
     if env_md.get("MODEL_PRICING_VERSION"):

@@ -10,11 +10,9 @@ from datetime import datetime, timezone
 from openai import AsyncOpenAI
 
 from app.config import Settings
+from app.embedding_config import EMBEDDING_VECTOR_DIMENSIONS, LOCAL_EMBEDDING_MODEL
 from app.llm.audit import CallAuditor
 from app.services.token_estimator import estimate_tokens
-
-
-EMBEDDING_DIMENSIONS = 128
 
 
 @dataclass(frozen=True)
@@ -48,10 +46,16 @@ class EmbeddingService:
         started = time.perf_counter()
         input_tokens = sum(estimate_tokens(content) for content in contents)
         if self.settings.dry_run_llm or self.client is None:
-            vectors = [deterministic_embed_text(content) for content in contents]
+            vectors = [
+                deterministic_embed_text(
+                    content,
+                    dimensions=self.settings.embedding_dimensions,
+                )
+                for content in contents
+            ]
             await self._record_call(
                 provider="local",
-                model="deterministic-blake2b-128",
+                model=LOCAL_EMBEDDING_MODEL,
                 purpose=purpose,
                 contents=contents,
                 input_tokens=input_tokens,
@@ -70,6 +74,7 @@ class EmbeddingService:
             response = await self.client.embeddings.create(
                 model=self.settings.openai_embedding_model,
                 input=contents,
+                dimensions=self.settings.embedding_dimensions,
             )
             usage = getattr(response, "usage", None)
             provider_input_tokens = getattr(usage, "prompt_tokens", None)
@@ -77,6 +82,7 @@ class EmbeddingService:
             input_tokens = provider_input_tokens or input_tokens
             ordered = sorted(response.data, key=lambda item: item.index)
             vectors = [[float(value) for value in item.embedding] for item in ordered]
+            self._validate_vectors(vectors, expected_count=len(contents))
         except Exception as error:
             await self._record_call(
                 provider="openai",
@@ -131,7 +137,7 @@ class EmbeddingService:
 
     def _provider_and_model(self) -> tuple[str, str]:
         if self.settings.dry_run_llm or self.client is None:
-            return "local", "deterministic-blake2b-128"
+            return "local", LOCAL_EMBEDDING_MODEL
         return "openai", self.settings.openai_embedding_model
 
     def metadata(self, text: str, vector: list[float]) -> EmbeddingMetadata:
@@ -156,6 +162,7 @@ class EmbeddingService:
         return (
             model == f"{provider}:{current_model}"
             and dimensions == len(vector)
+            and dimensions == self.settings.embedding_dimensions
             and version == self.settings.embedding_version
         )
 
@@ -163,10 +170,34 @@ class EmbeddingService:
         self,
         *,
         model: str | None,
+        dimensions: int | None,
         version: str | None,
     ) -> bool:
         provider, current_model = self._provider_and_model()
-        return model == f"{provider}:{current_model}" and version == self.settings.embedding_version
+        return (
+            model == f"{provider}:{current_model}"
+            and dimensions == self.settings.embedding_dimensions
+            and version == self.settings.embedding_version
+        )
+
+    def _validate_vectors(
+        self,
+        vectors: list[list[float]],
+        *,
+        expected_count: int,
+    ) -> None:
+        if len(vectors) != expected_count:
+            raise ValueError(
+                f"Embedding provider returned {len(vectors)} vectors for {expected_count} inputs"
+            )
+        for vector in vectors:
+            if len(vector) != self.settings.embedding_dimensions:
+                raise ValueError(
+                    "Embedding provider returned an unexpected vector dimension: "
+                    f"expected {self.settings.embedding_dimensions}, got {len(vector)}"
+                )
+            if not all(math.isfinite(value) for value in vector):
+                raise ValueError("Embedding provider returned a non-finite vector value")
 
     async def _record_call(
         self,
@@ -199,7 +230,7 @@ class EmbeddingService:
         )
 
 
-def deterministic_embed_text(text: str, dimensions: int = EMBEDDING_DIMENSIONS) -> list[float]:
+def deterministic_embed_text(text: str, dimensions: int) -> list[float]:
     vector = [0.0] * dimensions
     tokens = _tokens(text)
     if not tokens:
@@ -220,6 +251,27 @@ def deterministic_embed_text(text: str, dimensions: int = EMBEDDING_DIMENSIONS) 
 def embedding_content_hash(text: str) -> str:
     normalized = re.sub(r"\s+", " ", text).strip()
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+
+def stored_embedding(memory: object) -> list[float] | None:
+    vector = getattr(memory, "embedding_vector", None)
+    if vector is None:
+        vector = getattr(memory, "embedding", None)
+    if vector is None:
+        return None
+    if hasattr(vector, "tolist"):
+        vector = vector.tolist()
+    return [float(value) for value in vector]
+
+
+def embedding_storage_values(
+    vector: list[float],
+) -> tuple[list[float] | None, list[float] | None]:
+    if not all(math.isfinite(value) for value in vector):
+        raise ValueError("Embedding storage rejects non-finite vector values")
+    if len(vector) == EMBEDDING_VECTOR_DIMENSIONS:
+        return None, vector
+    return vector, None
 
 
 def cosine_similarity(left: list[float] | None, right: list[float] | None) -> float:

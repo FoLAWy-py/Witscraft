@@ -234,6 +234,7 @@ def serialized_purpose_budgets() -> dict[StoryPurpose, dict[str, int]]:
 def serialized_model_roles(
     *,
     embedding_model: str,
+    embedding_dimensions: int,
     embedding_version: str,
 ) -> list[dict]:
     roles: list[dict] = []
@@ -249,6 +250,7 @@ def serialized_model_roles(
             item["deployment"] = {
                 "provider": "openai",
                 "model": embedding_model,
+                "dimensions": embedding_dimensions,
                 "version": embedding_version,
             }
         roles.append(item)

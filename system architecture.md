@@ -2,7 +2,7 @@
 
 **Document status:** Production baseline
 
-**Architecture version:** 3.12
+**Architecture version:** 3.13
 
 **Last updated:** 17 August 2026
 
@@ -209,7 +209,7 @@ PostgreSQL is the authoritative store. The principal entity groups are:
 
 UUIDs are used for externally referenced entities. Foreign keys and database cascades enforce ownership lifecycles, while application-level checks enforce user authorization.
 
-Embedding values remain in JSONB behind a pgvector-ready boundary, while migration `0014` adds provider-qualified model, dimension, operator-controlled version, normalized content hash, and UTC generation metadata. Application similarity runs only when all compatibility fields match. Legacy or incompatible vectors remain eligible for structured importance and recency ranking but are never compared across vector spaces. A future migration will move a selected production dimension to fixed-dimension vector columns.
+Migration `0017` installs pgvector and adds fixed `vector(1024)` storage for current long-term-memory embeddings. Provider calls explicitly request 1,024 dimensions and reject count, dimension, or finite-value violations before persistence. Migration `0014` metadata continues to bind provider-qualified model, dimension, operator-controlled version, normalized content hash, and UTC generation time. Dimension-compatible JSONB values are moved to the vector column; incompatible legacy values remain in JSONB until controlled re-embedding. Application similarity runs only when model, dimension, and version all match, so legacy memories remain eligible for structured ranking but are never compared across vector spaces.
 
 ### 6.1 Query and Index Strategy
 
@@ -298,7 +298,7 @@ Retrieval is hybrid within the authorized story and branch candidate set. Keywor
 
 Every model purpose has a central route, maximum input budget, default output budget, and hard output limit. The gateway applies these policies before provider execution to primary, auxiliary, fallback, streaming, and non-streaming requests. Saved user routes take precedence over system defaults and are loaded for narrative generation, state and event extraction, choice generation, consistency checks, planning interviews, story drafts, and summaries. The effective output ceiling is the lower of the purpose limit and model capability. Oversized input is rejected before provider traffic. In addition, the shared turn auditor reserves one slot for each real provider request and stops retries, fallbacks, auxiliary calls, and external embeddings when the per-turn ceiling is reached. The current policy and values are maintained in `docs/model-cost-controls.md`.
 
-The production direction remains to migrate compatible embeddings to fixed-dimension pgvector columns after selecting the production dimension, and to re-embed legacy or superseded versions asynchronously during model migrations.
+The next retrieval step is to measure exact database cosine ranking against the fixed Recall@K corpus and production-shaped row counts. HNSW remains disabled until those measurements justify an activation threshold and parameters. Legacy or superseded vectors require an asynchronous, retryable re-embedding workflow before their JSONB compatibility lane can be removed.
 
 Multi-model routing is supported by purpose. A multi-agent architecture is not the default because narrative generation is primarily a coordinated state-transition workflow, not an open-ended autonomous task graph. Additional agents are justified only when an independently measurable task, such as evaluation or complex planning, produces sufficient quality improvement to offset latency, cost, and failure complexity.
 
@@ -344,7 +344,7 @@ The current implementation uses structured application logs and PostgreSQL audit
 
 ## 12. Migration and Release Contract
 
-Alembic is the only production schema migration mechanism. Revision `0013` adds administrator roles, append-only quota reset events, and a user/time model-call index for weekly accounting. Revision `0014` adds versioned embedding compatibility metadata and a content-hash lookup index for long-term memories.
+Alembic is the only production schema migration mechanism. Revision `0013` adds administrator roles, append-only quota reset events, and a user/time model-call index for weekly accounting. Revision `0014` adds versioned embedding compatibility metadata and a content-hash lookup index for long-term memories. Revision `0017` installs pgvector, adds fixed-dimension vector storage, and preserves a reversible legacy JSONB compatibility path.
 
 The release order is:
 
@@ -369,7 +369,7 @@ On `SIGTERM`, the process server stops accepting new work, waits up to the confi
 
 ## 13. Quality Gates
 
-For every pull request and push to `main`, GitHub Actions provisions an empty PostgreSQL 17 database, upgrades it through the complete Alembic history, rejects ORM-to-migration drift, and runs the full backend test suite. The same workflow runs Ruff, TypeScript type checking, ESLint, reproducible production builds, dependency vulnerability audits, full-history offline secret scanning, and production browser-artifact inspection. External model traffic is disabled in CI.
+For every pull request and push to `main`, GitHub Actions provisions PostgreSQL 17 with pinned pgvector 0.8.6 support. It proves the `0017` compatible-vector backfill and downgrade restoration on synthetic data, returns the database to migration head, rejects ORM-to-migration drift, and runs the full backend test suite. The same workflow runs Ruff, TypeScript type checking, ESLint, reproducible production builds, dependency vulnerability audits, full-history offline secret scanning, and production browser-artifact inspection. External model traffic is disabled in CI.
 
 Database authorization and lifecycle behavior use real PostgreSQL integration tests. The main API journey logs in through a real session cookie, creates an interactive novel, performs regular and SSE dry-run generation, cancels a blocked stream and verifies its durable checkpoint, regenerates a reply, creates and activates a branch, and exports the narrative. A separate Playwright gate runs the production client in Chromium with deterministic API fixtures and verifies login UI, workspace hydration, player direction submission, SSE consumption, narrative rendering, and the final synchronized story state. Provider adapters use deterministic fake-client contracts that exercise OpenAI Responses and DeepInfra Chat Completions parameter mapping, structured output options, token usage, stream filtering, split timeout configuration, disabled SDK retries, and exception propagation. Gateway tests separately prove transient and permanent HTTP status classification. Controlled live validation remains optional when API expenditure is explicitly permitted; CI never requires provider credentials.
 
@@ -383,7 +383,7 @@ The following constraints are known and accepted for the current deployment:
 
 - The API runs as one process; rate-limit and circuit-breaker state are process-local.
 - Long-running jobs execute within request orchestration rather than a durable worker queue.
-- Embedding storage has not yet migrated to fixed-dimension pgvector columns.
+- Legacy embeddings with non-current dimensions remain in JSONB pending a controlled background re-embedding workflow.
 - Daily encrypted local backup and application-level restoration drills are operational; approved off-site replication and independent recovery-key escrow remain P0 work.
 - A production-equivalent staging environment has not yet been established.
 - Metrics, tracing, and alerting are not yet connected to a dedicated observability platform.
@@ -394,7 +394,7 @@ Evolution should occur in this order:
 
 1. Complete backup, restoration, staging, and release automation.
 2. Add browser end-to-end coverage and production-equivalent staging validation to the existing CI baseline.
-3. Introduce pgvector schema and retrieval-version controls.
+3. Move exact compatible-vector similarity into PostgreSQL and establish Recall@K/latency evidence before enabling HNSW.
 4. Add durable background jobs where retries and operational visibility require them.
 5. Move coordination state to shared infrastructure before adding API replicas.
 6. Add specialist models or agents only after evaluation data demonstrates a net quality benefit.

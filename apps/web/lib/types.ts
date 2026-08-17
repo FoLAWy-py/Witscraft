@@ -25,6 +25,7 @@ export type ModelRole = {
   deployment?: {
     provider: string;
     model: string;
+    dimensions: number;
     version: string;
   };
 };
