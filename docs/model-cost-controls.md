@@ -27,6 +27,10 @@ Clients submit the purpose, not an independently assembled provider/model pair. 
 
 Route changes are serialized per account and store complete before/after snapshots atomically with the active route rows. Saving the current effective configuration is a no-op and does not create a misleading audit event. The authenticated history endpoint is bounded to 100 entries per request. Undo restores the latest event's prior snapshot and records a linked `revert` event, preserving both cost-policy provenance and the ability to reverse an accidental rollback.
 
+## Consistency revision gate
+
+Canon, scene-state, character, and world-rule checks execute locally and add no model call. Their result separates high-severity errors from warnings. A warning is retained as local evidence and cannot trigger the `consistency_check` route. In automatic mode, only at least one local error permits a single revision request. The revised narrative is checked again locally and replaces the original only when its error count is zero; an empty revision, provider failure, or surviving error keeps the original response. Manual mode never invokes the revision route automatically.
+
 ## Embedding reuse
 
 `TurnContext` owns query embedding reuse for one request/turn. The context is reset whenever a new audited turn begins, so cached narrative inputs cannot cross requests, stories, users, or turns.

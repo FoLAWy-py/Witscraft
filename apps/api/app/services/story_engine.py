@@ -762,7 +762,14 @@ class StoryEngine:
         mode: str,
     ) -> tuple[str, dict, dict]:
         if mode == "off":
-            check = {"status": "off", "issue_count": 0, "issues": []}
+            check = {
+                "status": "off",
+                "issue_count": 0,
+                "error_count": 0,
+                "warning_count": 0,
+                "highest_severity": None,
+                "issues": [],
+            }
             return response_text, check, {
                 "attempted": False,
                 "accepted": False,
@@ -770,11 +777,12 @@ class StoryEngine:
             }
 
         initial_check = self._check_consistency(response_text, state, context)
-        if mode != "auto" or initial_check["status"] != "fail":
+        initial_error_count = self._consistency_error_count(initial_check)
+        if mode != "auto" or initial_error_count == 0:
             return response_text, initial_check, {
                 "attempted": False,
                 "accepted": False,
-                "reason": "manual_review" if initial_check["status"] == "fail" else "check_passed",
+                "reason": "manual_review" if initial_error_count else "check_passed",
             }
 
         revision_request = self.llm_gateway.request_for_purpose(
@@ -800,11 +808,14 @@ class StoryEngine:
                 "reason": "revision_failed",
                 "provider": revision_request.provider,
                 "model": revision_request.model,
+                "trigger": "high_severity_local_rule",
+                "initial_error_count": initial_error_count,
                 "initial_check": initial_check,
             }
         revised_text = revised_response.text.strip()
         revised_check = self._check_consistency(revised_text, state, context)
-        accepted = bool(revised_text) and revised_check["issue_count"] <= initial_check["issue_count"]
+        final_error_count = self._consistency_error_count(revised_check)
+        accepted = bool(revised_text) and final_error_count == 0
         return (
             revised_text if accepted else response_text,
             revised_check if accepted else initial_check,
@@ -814,8 +825,24 @@ class StoryEngine:
                 "reason": "accepted_revision" if accepted else "kept_original",
                 "provider": revision_request.provider,
                 "model": revision_request.model,
+                "trigger": "high_severity_local_rule",
+                "initial_error_count": initial_error_count,
+                "final_error_count": final_error_count,
                 "initial_check": initial_check,
             },
+        )
+
+    @staticmethod
+    def _consistency_error_count(check: dict) -> int:
+        error_count = check.get("error_count")
+        if isinstance(error_count, int) and not isinstance(error_count, bool):
+            return max(error_count, 0)
+        issues = check.get("issues")
+        if not isinstance(issues, list):
+            return 0
+        return sum(
+            isinstance(issue, dict) and issue.get("severity") == "error"
+            for issue in issues
         )
 
     def _build_consistency_revision_messages(

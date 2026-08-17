@@ -34,9 +34,15 @@ def check_response_consistency(
     issues.extend(_check_character_constraints(response_text, character))
     issues.extend(_check_world_rules(response_text, world))
 
+    error_count = sum(issue.severity == "error" for issue in issues)
+    warning_count = sum(issue.severity == "warning" for issue in issues)
+
     return {
-        "status": "fail" if any(issue.severity == "error" for issue in issues) else "pass",
+        "status": "fail" if error_count else "pass",
         "issue_count": len(issues),
+        "error_count": error_count,
+        "warning_count": warning_count,
+        "highest_severity": "error" if error_count else "warning" if warning_count else None,
         "issues": [asdict(issue) for issue in issues],
     }
 

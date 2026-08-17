@@ -134,6 +134,8 @@ The Story Engine is the primary narrative orchestrator. It coordinates context a
 
 The engine does not grant model output authority over database identity, authorization, branch selection, or transaction control. Structured model output is validated before it can affect stored state.
 
+Consistency checks are deterministic local rules over canon, scene state, character constraints, and world rules. Their evidence includes error and warning counts plus the highest severity. Warnings never call a provider. In automatic mode, a revision call is permitted only when a local rule emits `severity=error`; the revised prose is accepted only if a second local pass reduces the error count to zero. Provider failure or a surviving error preserves the original AI-authored response and records the reason. Manual mode exposes the same evidence for a player decision without automatic revision spend.
+
 ### 5.4 Context and Prompt Services
 
 Context construction is separated into deterministic stages:
