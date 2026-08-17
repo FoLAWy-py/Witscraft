@@ -78,6 +78,21 @@ def test_authenticated_interactive_novel_api_journey(monkeypatch) -> None:
                 provider_catalog = await client.get("/api/providers")
                 assert provider_catalog.status_code == 200, provider_catalog.text
                 catalog_payload = provider_catalog.json()
+                assert [role["id"] for role in catalog_payload["model_roles"]] == [
+                    "narrative_author",
+                    "structured_extraction",
+                    "continuity_revision",
+                    "summary",
+                    "embedding",
+                ]
+                embedding_role = catalog_payload["model_roles"][-1]
+                assert embedding_role["configuration_source"] == "deployment"
+                assert embedding_role["user_configurable"] is False
+                assert set(embedding_role["deployment"]) == {
+                    "provider",
+                    "model",
+                    "version",
+                }
                 assert catalog_payload["effective_routes"]["normal_chat"] == {
                     "purpose": "normal_chat",
                     "provider": "deepinfra",

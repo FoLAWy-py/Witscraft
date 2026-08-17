@@ -7,6 +7,28 @@ export type StoryPurpose =
   | "summary_generation"
   | "consistency_check";
 
+export type ModelRoleId =
+  | "narrative_author"
+  | "structured_extraction"
+  | "continuity_revision"
+  | "summary"
+  | "embedding";
+
+export type ModelRole = {
+  id: ModelRoleId;
+  label: string;
+  description: string;
+  purposes: StoryPurpose[];
+  user_configurable: boolean;
+  configuration_source: "purpose_routes" | "deployment";
+  default_models: Partial<Record<StoryPurpose, string>>;
+  deployment?: {
+    provider: string;
+    model: string;
+    version: string;
+  };
+};
+
 export type ModelOption = {
   provider: ProviderName;
   model: string;
@@ -42,6 +64,7 @@ export type ModelRouteChange = {
 
 export type ProvidersResponse = {
   models: ModelOption[];
+  model_roles: ModelRole[];
   purpose_defaults: Record<StoryPurpose, string>;
   purpose_budgets: Record<StoryPurpose, {
     max_input_tokens: number;

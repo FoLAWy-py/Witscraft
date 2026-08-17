@@ -1,4 +1,10 @@
-from app.llm.model_registry import PURPOSE_BUDGETS, PURPOSE_DEFAULTS, list_models
+from app.llm.model_registry import (
+    MODEL_ROLES,
+    PURPOSE_BUDGETS,
+    PURPOSE_DEFAULTS,
+    list_models,
+    serialized_model_roles,
+)
 
 
 EXPECTED_MODELS = {
@@ -25,3 +31,34 @@ def test_every_purpose_has_a_bounded_budget() -> None:
     for budget in PURPOSE_BUDGETS.values():
         assert budget.max_input_tokens > budget.hard_output_tokens
         assert 128 <= budget.default_output_tokens <= budget.hard_output_tokens
+
+
+def test_model_roles_partition_story_purposes_and_separate_embedding() -> None:
+    routed_roles = [role for role in MODEL_ROLES if role.user_configurable]
+    routed_purposes = [purpose for role in routed_roles for purpose in role.purposes]
+    assert len(routed_purposes) == len(set(routed_purposes))
+    assert set(routed_purposes) == set(PURPOSE_DEFAULTS)
+
+    embedding_role = next(role for role in MODEL_ROLES if role.id == "embedding")
+    assert embedding_role.purposes == ()
+    assert embedding_role.user_configurable is False
+    assert embedding_role.configuration_source == "deployment"
+
+
+def test_serialized_roles_explain_defaults_without_exposing_credentials() -> None:
+    roles = serialized_model_roles(
+        embedding_model="text-embedding-test",
+        embedding_version="test-v2",
+    )
+    narrative = next(role for role in roles if role["id"] == "narrative_author")
+    assert set(narrative["default_models"]) == {
+        "normal_chat",
+        "critical_story_generation",
+    }
+    embedding = next(role for role in roles if role["id"] == "embedding")
+    assert embedding["deployment"] == {
+        "provider": "openai",
+        "model": "text-embedding-test",
+        "version": "test-v2",
+    }
+    assert "api_key" not in str(roles).lower()

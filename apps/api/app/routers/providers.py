@@ -15,6 +15,7 @@ from app.llm.model_registry import (
     PURPOSE_DEFAULTS,
     get_model,
     list_models,
+    serialized_model_roles,
     serialized_purpose_budgets,
 )
 from app.llm.router import LLMGateway
@@ -160,6 +161,10 @@ async def providers(
     history = await _load_route_history(session, user_id)
     return {
         "models": [model.model_dump() for model in list_models()],
+        "model_roles": serialized_model_roles(
+            embedding_model=settings.openai_embedding_model,
+            embedding_version=settings.embedding_version,
+        ),
         "purpose_defaults": PURPOSE_DEFAULTS,
         "purpose_budgets": serialized_purpose_budgets(),
         "purpose_routes": purpose_routes,

@@ -103,6 +103,57 @@ async function installApiFixture(page: Page) {
       const budgets = Object.fromEntries(purposes.map((purpose) => [purpose, { max_input_tokens: 16000, default_output_tokens: 2400, hard_output_tokens: 8192 }]));
       return json(route, {
         models: [model],
+        model_roles: [
+          {
+            id: "narrative_author",
+            label: "AI author",
+            description: "Authors prose and dialogue.",
+            purposes: ["normal_chat", "critical_story_generation"],
+            user_configurable: true,
+            configuration_source: "purpose_routes",
+            default_models: {
+              normal_chat: model.model,
+              critical_story_generation: model.model
+            }
+          },
+          {
+            id: "structured_extraction",
+            label: "Structured extraction",
+            description: "Extracts state and events.",
+            purposes: ["state_update", "event_extraction"],
+            user_configurable: true,
+            configuration_source: "purpose_routes",
+            default_models: { state_update: model.model, event_extraction: model.model }
+          },
+          {
+            id: "continuity_revision",
+            label: "Continuity revision",
+            description: "Revises high-severity conflicts.",
+            purposes: ["consistency_check"],
+            user_configurable: true,
+            configuration_source: "purpose_routes",
+            default_models: { consistency_check: model.model }
+          },
+          {
+            id: "summary",
+            label: "Context summary",
+            description: "Compresses completed narrative history.",
+            purposes: ["summary_generation"],
+            user_configurable: true,
+            configuration_source: "purpose_routes",
+            default_models: { summary_generation: model.model }
+          },
+          {
+            id: "embedding",
+            label: "Memory embedding",
+            description: "Indexes eligible memories.",
+            purposes: [],
+            user_configurable: false,
+            configuration_source: "deployment",
+            default_models: {},
+            deployment: { provider: "openai", model: "text-embedding-test", version: "test-v1" }
+          }
+        ],
         purpose_defaults: defaults,
         purpose_budgets: budgets,
         purpose_routes: {},
@@ -194,6 +245,12 @@ test("player signs in and directs the next scene", async ({ page }) => {
   await page.getByRole("button", { name: "设置", exact: true }).click();
   await expect(page.getByText("小说周额度", { exact: true })).toBeVisible();
   await expect(page.getByText("249,950", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("model-role-narrative_author")).toContainText("AI 作者");
+  await expect(page.getByTestId("model-role-structured_extraction")).toContainText("结构化提取");
+  await expect(page.getByTestId("model-role-continuity_revision")).toContainText("连续性修订");
+  await expect(page.getByTestId("model-role-summary")).toContainText("上下文摘要");
+  await expect(page.getByTestId("model-role-embedding")).toContainText("text-embedding-test");
+  await expect(page.getByTestId("model-role-embedding")).toContainText("更换模型需要受控重建索引");
   await page.getByRole("button", { name: "故事", exact: true }).click();
 
   const composer = page.getByPlaceholder("引导下一幕…");

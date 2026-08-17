@@ -19,6 +19,12 @@ The effective output maximum is the lower of the purpose limit and the selected 
 
 The provider catalogue exposes `purpose_budgets` so clients can explain the backend policy without recreating it. The backend remains the source of truth.
 
+## Model roles
+
+Purpose routes are grouped into independent operational roles: AI author, structured extraction, continuity revision, and context summary. Their registered defaults currently happen to use the same approved model, but each role has a separate configuration constant and can evolve only through its own quality and cost evidence. This prevents a narrative-model decision from silently changing durable state extraction or conditional revision behavior.
+
+Memory embedding is a fifth, deployment-controlled role. It is not stored in user purpose routes because its model and version define vector compatibility for persisted memories. `GET /api/providers` exposes only its provider, model, and version; credentials and provider infrastructure remain server-side. Changing either identity requires an explicit version increase and a controlled re-embedding workflow rather than an interactive route save.
+
 ## Purpose route resolution
 
 The API resolves a validated saved user route for each purpose and falls back to the model registry's system default when no valid user route exists. This same resolution path covers the AI-authored narrative response and auxiliary state extraction, event extraction, choice generation, consistency checks, planning interviews, story drafts, and summaries. Persisted routes with an unknown purpose, unknown model, or provider/model mismatch are excluded from effective routing.

@@ -2,7 +2,7 @@
 
 **Document status:** Production baseline
 
-**Architecture version:** 3.11
+**Architecture version:** 3.12
 
 **Last updated:** 17 August 2026
 
@@ -166,6 +166,8 @@ flowchart LR
 The gateway owns provider-specific parameter translation, purpose-level route resolution, input and output budgets, timeouts, bounded retries, error classification, purpose-specific fallback selection, process-local circuit breaking, streaming normalization, and model-call audit metadata. For every primary narrative or auxiliary model task, it resolves a validated user route first and otherwise selects the registered system default. Unknown purposes, unknown models, and persisted provider/model mismatches are ignored rather than forwarded to a provider.
 
 The browser submits a purpose and never independently selects the effective provider/model for story generation. The provider catalogue exposes the resolved route, source, and effective budgets for every purpose, while context preview includes the selected narrative route. Optional legacy route hints must match the backend result or the request is rejected before story mutation. Provider credentials and infrastructure base URLs are never part of this browser contract.
+
+The registry partitions model work into five explicit roles: AI author (`normal_chat` and `critical_story_generation`), structured extraction (`state_update` and `event_extraction`), continuity revision (`consistency_check`), context summary (`summary_generation`), and memory embedding. The first four remain independently configurable purpose-route groups even when their approved defaults currently resolve to the same model. Embedding is deployment-controlled and versioned outside the narrative gateway; a model or version change requires a controlled re-indexing workflow. The provider catalogue exposes role metadata and non-sensitive embedding identity so clients explain this boundary without inferring it.
 
 Purpose-route updates acquire an account row lock, replace the complete route set, and append an immutable before/after audit snapshot in one transaction. A no-op creates no history row. Undo restores the previous effective snapshot and appends a linked undo event instead of deleting history, so every active configuration remains explainable and a rollback can itself be reversed. History queries are tenant-scoped, bounded, exported with the account, and deleted by the account foreign-key cascade.
 

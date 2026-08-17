@@ -64,7 +64,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ApiError, StreamInterruptedError, confirmEmailVerification, confirmPasswordReset, createBranch, createCharacter, createStory, createWorld, deleteAccount, deleteBranch, deleteCharacter, deleteStory, deleteWorld, downloadAccountExport, downloadStoryExport, duplicateBranch, generateSessionSummary, getAuthSessions, getCurrentUser, getMyQuota, getProviders, getUserPreferences, getWorkspace, login, logout, register, requestEmailVerification, requestPasswordReset, revertModelRoutes, revokeAuthSession, selectStoryWorld, sendStoryMessage, streamStoryInterview, streamStoryMessage, switchBranch, testProviderModel, updateBranch, updateCanonFact, updateCharacter, updateMemoryItem, updateModelRoutes, updateStory, updateUserPreferences, updateWorld } from "@/lib/api";
-import type { AuthSessionSummary, AuthUser, CanonFactSummary, ChatResponse, ConsistencyCheck, CreateStoryInput, LoginInput, MemoryItemSummary, ModelOption, ModelRouteChange, ProvidersResponse, QuotaUsage, RegisterInput, SessionSummary, StoryInterviewMessage, StoryPurpose, StoryState, UserPreference, WorkspaceResponse } from "@/lib/types";
+import type { AuthSessionSummary, AuthUser, CanonFactSummary, ChatResponse, ConsistencyCheck, CreateStoryInput, LoginInput, MemoryItemSummary, ModelOption, ModelRoleId, ModelRouteChange, ProvidersResponse, QuotaUsage, RegisterInput, SessionSummary, StoryInterviewMessage, StoryPurpose, StoryState, UserPreference, WorkspaceResponse } from "@/lib/types";
 
 type View = "story" | "settings";
 type MobileTab = "library" | "story" | "inspector";
@@ -172,6 +172,43 @@ const purposeRoutesZh: Record<StoryPurpose, { label: string; description: string
   event_extraction: { label: "事件提取", description: "时间线与实体捕获" },
   summary_generation: { label: "记忆摘要", description: "长期记忆压缩" },
   consistency_check: { label: "连续性检查", description: "既定事实与角色声音审查" }
+};
+
+const purposeRoutesById = Object.fromEntries(
+  purposeRoutes.map((route) => [route.id, route])
+) as Record<StoryPurpose, (typeof purposeRoutes)[number]>;
+
+const modelRoleText: Record<ModelRoleId, { zh: string; en: string; zhDescription: string; enDescription: string }> = {
+  narrative_author: {
+    zh: "AI 作者",
+    en: "AI author",
+    zhDescription: "负责小说正文与角色对话；玩家始终决定角色行动和剧情走向。",
+    enDescription: "Authors prose and dialogue; the player remains in control of character actions and plot direction."
+  },
+  structured_extraction: {
+    zh: "结构化提取",
+    en: "Structured extraction",
+    zhDescription: "从 AI 正文中提取场景状态与事件，不负责创作剧情。",
+    enDescription: "Extracts scene state and events from AI-authored prose without directing the plot."
+  },
+  continuity_revision: {
+    zh: "连续性修订",
+    en: "Continuity revision",
+    zhDescription: "仅在本地规则发现高严重度冲突时修订 AI 正文。",
+    enDescription: "Revises AI-authored prose only after a high-severity local-rule conflict."
+  },
+  summary: {
+    zh: "上下文摘要",
+    en: "Context summary",
+    zhDescription: "压缩已完成剧情，供后续回合保持连续性。",
+    enDescription: "Compresses completed narrative history for continuity in later turns."
+  },
+  embedding: {
+    zh: "记忆向量",
+    en: "Memory embedding",
+    zhDescription: "为符合条件的长期记忆建立语义索引，由部署配置统一管理。",
+    enDescription: "Indexes eligible long-term memories and is managed by deployment configuration."
+  }
 };
 
 const preferenceFieldsEn: Record<(typeof preferenceFields)[number]["id"], { label: string; placeholder: string }> = {
@@ -3890,6 +3927,8 @@ function SettingsView({
   const [deletePassword, setDeletePassword] = useState("");
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const deleteReady = deletePassword.length > 0 && deleteConfirmation === "DELETE";
+  const configurableRoles = providers?.model_roles.filter((role) => role.user_configurable) ?? [];
+  const embeddingRole = providers?.model_roles.find((role) => role.id === "embedding");
 
   return (
     <section className="settingsPage">
@@ -4095,37 +4134,65 @@ function SettingsView({
           icon={Route}
           action={<span className={routeDirty || savingRoutes ? "statusWarn" : "statusOk"}>{savingRoutes ? uiText(uiLanguage, "保存中…", "Saving...") : routeDirty ? uiText(uiLanguage, "待保存", "Pending") : uiText(uiLanguage, "已保存", "Saved")}</span>}
         >
-          <ul className="routingList">
-            {purposeRoutes.map((route) => (
-              <li key={route.id} className={selectedPurpose === route.id ? "active" : undefined}>
-                <span>
-                  <button type="button" onClick={() => onSelectPurpose(route.id)}>
-                    <b>{uiLanguage === "zh-CN" ? purposeRoutesZh[route.id].label : route.label}</b>
-                    <small>{uiLanguage === "zh-CN" ? purposeRoutesZh[route.id].description : route.description}</small>
-                  </button>
-                </span>
-                <select
-                  value={routeModels[route.id] ?? providers?.purpose_defaults[route.id] ?? ""}
-                  disabled={!models.length}
-                  onChange={(event) => onSelectRouteModel(route.id, event.target.value)}
-                >
-                  {models.length ? (
-                    models.map((model) => (
-                      <option
-                        key={model.model}
-                        value={model.model}
-                        disabled={providers?.model_health[model.model]?.fresh && providers.model_health[model.model].status === "unavailable"}
-                      >
-                        {model.label} ({model.provider})
-                      </option>
-                    ))
-                  ) : (
-                    <option value="">{uiText(uiLanguage, "等待后端模型列表", "Waiting for server model list")}</option>
-                  )}
-                </select>
-              </li>
-            ))}
-          </ul>
+          <div className="routingRoleList">
+            {configurableRoles.map((role) => {
+              const roleText = modelRoleText[role.id];
+              return (
+                <section key={role.id} className="routingRole" data-testid={`model-role-${role.id}`}>
+                  <header>
+                    <b>{uiLanguage === "zh-CN" ? roleText.zh : roleText.en}</b>
+                    <small>{uiLanguage === "zh-CN" ? roleText.zhDescription : roleText.enDescription}</small>
+                  </header>
+                  <ul className="routingList">
+                    {role.purposes.map((purpose) => {
+                      const route = purposeRoutesById[purpose];
+                      return (
+                        <li key={route.id} className={selectedPurpose === route.id ? "active" : undefined}>
+                          <span>
+                            <button type="button" onClick={() => onSelectPurpose(route.id)}>
+                              <b>{uiLanguage === "zh-CN" ? purposeRoutesZh[route.id].label : route.label}</b>
+                              <small>{uiLanguage === "zh-CN" ? purposeRoutesZh[route.id].description : route.description}</small>
+                            </button>
+                          </span>
+                          <select
+                            value={routeModels[route.id] ?? providers?.purpose_defaults[route.id] ?? ""}
+                            disabled={!models.length}
+                            onChange={(event) => onSelectRouteModel(route.id, event.target.value)}
+                          >
+                            {models.length ? (
+                              models.map((model) => (
+                                <option
+                                  key={model.model}
+                                  value={model.model}
+                                  disabled={providers?.model_health[model.model]?.fresh && providers.model_health[model.model].status === "unavailable"}
+                                >
+                                  {model.label} ({model.provider})
+                                </option>
+                              ))
+                            ) : (
+                              <option value="">{uiText(uiLanguage, "等待后端模型列表", "Waiting for server model list")}</option>
+                            )}
+                          </select>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
+              );
+            })}
+            {embeddingRole?.deployment && (
+              <section className="routingRole deploymentRole" data-testid="model-role-embedding">
+                <header>
+                  <b>{uiLanguage === "zh-CN" ? modelRoleText.embedding.zh : modelRoleText.embedding.en}</b>
+                  <small>{uiLanguage === "zh-CN" ? modelRoleText.embedding.zhDescription : modelRoleText.embedding.enDescription}</small>
+                </header>
+                <div className="deploymentModel">
+                  <span>{embeddingRole.deployment.model}</span>
+                  <small>{embeddingRole.deployment.provider} · {embeddingRole.deployment.version} · {uiText(uiLanguage, "更换模型需要受控重建索引", "model changes require controlled re-indexing")}</small>
+                </div>
+              </section>
+            )}
+          </div>
           <div className="routingActions">
             <button className="cmdButton" type="button" onClick={onRestoreSavedRoutes} disabled={!routeDirty || savingRoutes}>
               <RefreshCw size={13} /> {uiText(uiLanguage, "恢复已保存", "Restore saved")}

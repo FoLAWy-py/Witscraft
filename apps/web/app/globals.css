@@ -3850,6 +3850,57 @@ html.theme-transition textarea {
   opacity: 0.58;
 }
 
+.routingRoleList {
+  display: grid;
+  gap: 14px;
+}
+
+.routingRole {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+}
+
+.routingRole > header {
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--surface-strong) 70%, transparent);
+}
+
+.routingRole > header b,
+.routingRole > header small {
+  display: block;
+}
+
+.routingRole > header b {
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.routingRole > header small,
+.deploymentModel small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.routingRole .routingList {
+  padding: 0 12px;
+}
+
+.deploymentModel {
+  display: grid;
+  gap: 3px;
+  padding: 11px 12px;
+  overflow-wrap: anywhere;
+}
+
+.deploymentModel span {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 650;
+}
+
 .routingList li {
   min-height: 62px;
   display: grid;

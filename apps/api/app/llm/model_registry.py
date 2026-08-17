@@ -10,6 +10,16 @@ class PurposeBudget:
     hard_output_tokens: int
 
 
+@dataclass(frozen=True)
+class ModelRole:
+    id: str
+    label: str
+    description: str
+    purposes: tuple[StoryPurpose, ...]
+    user_configurable: bool
+    configuration_source: str
+
+
 MODEL_REGISTRY: list[ModelOption] = [
     ModelOption(
         provider="deepinfra",
@@ -99,14 +109,82 @@ MODEL_REGISTRY: list[ModelOption] = [
 ]
 
 
+NARRATIVE_AUTHOR_MODEL = "Qwen/Qwen3-Max"
+STRUCTURED_EXTRACTION_MODEL = "Qwen/Qwen3-Max"
+CONTINUITY_REVISION_MODEL = "Qwen/Qwen3-Max"
+SUMMARY_MODEL = "Qwen/Qwen3-Max"
+
+
+MODEL_ROLES: tuple[ModelRole, ...] = (
+    ModelRole(
+        id="narrative_author",
+        label="AI author",
+        description=(
+            "Authors narrative prose and dialogue while preserving the player's authority "
+            "over character actions and plot direction."
+        ),
+        purposes=("normal_chat", "critical_story_generation"),
+        user_configurable=True,
+        configuration_source="purpose_routes",
+    ),
+    ModelRole(
+        id="structured_extraction",
+        label="Structured extraction",
+        description=(
+            "Extracts durable scene state and events from AI-authored narrative output."
+        ),
+        purposes=("state_update", "event_extraction"),
+        user_configurable=True,
+        configuration_source="purpose_routes",
+    ),
+    ModelRole(
+        id="continuity_revision",
+        label="Continuity revision",
+        description=(
+            "Revises narrative output only after deterministic rules detect a "
+            "high-severity continuity conflict."
+        ),
+        purposes=("consistency_check",),
+        user_configurable=True,
+        configuration_source="purpose_routes",
+    ),
+    ModelRole(
+        id="summary",
+        label="Context summary",
+        description="Compresses completed narrative history for later turns.",
+        purposes=("summary_generation",),
+        user_configurable=True,
+        configuration_source="purpose_routes",
+    ),
+    ModelRole(
+        id="embedding",
+        label="Memory embedding",
+        description=(
+            "Indexes eligible long-term memories for semantic retrieval; model and version "
+            "changes require a controlled re-embedding workflow."
+        ),
+        purposes=(),
+        user_configurable=False,
+        configuration_source="deployment",
+    ),
+)
+
+
 PURPOSE_DEFAULTS: dict[StoryPurpose, str] = {
-    "critical_story_generation": "Qwen/Qwen3-Max",
-    "normal_chat": "Qwen/Qwen3-Max",
-    "state_update": "Qwen/Qwen3-Max",
-    "event_extraction": "Qwen/Qwen3-Max",
-    "summary_generation": "Qwen/Qwen3-Max",
-    "consistency_check": "Qwen/Qwen3-Max",
+    "critical_story_generation": NARRATIVE_AUTHOR_MODEL,
+    "normal_chat": NARRATIVE_AUTHOR_MODEL,
+    "state_update": STRUCTURED_EXTRACTION_MODEL,
+    "event_extraction": STRUCTURED_EXTRACTION_MODEL,
+    "summary_generation": SUMMARY_MODEL,
+    "consistency_check": CONTINUITY_REVISION_MODEL,
 }
+
+
+_ROLE_PURPOSES = [purpose for role in MODEL_ROLES for purpose in role.purposes]
+if len(_ROLE_PURPOSES) != len(set(_ROLE_PURPOSES)) or set(_ROLE_PURPOSES) != set(
+    PURPOSE_DEFAULTS
+):
+    raise RuntimeError("Model roles must partition every story purpose exactly once")
 
 
 PURPOSE_BUDGETS: dict[StoryPurpose, PurposeBudget] = {
@@ -151,6 +229,30 @@ def purpose_budget(purpose: StoryPurpose) -> PurposeBudget:
 
 def serialized_purpose_budgets() -> dict[StoryPurpose, dict[str, int]]:
     return {purpose: asdict(budget) for purpose, budget in PURPOSE_BUDGETS.items()}
+
+
+def serialized_model_roles(
+    *,
+    embedding_model: str,
+    embedding_version: str,
+) -> list[dict]:
+    roles: list[dict] = []
+    for role in MODEL_ROLES:
+        item = {
+            **asdict(role),
+            "purposes": list(role.purposes),
+            "default_models": {
+                purpose: PURPOSE_DEFAULTS[purpose] for purpose in role.purposes
+            },
+        }
+        if role.id == "embedding":
+            item["deployment"] = {
+                "provider": "openai",
+                "model": embedding_model,
+                "version": embedding_version,
+            }
+        roles.append(item)
+    return roles
 
 
 def fallback_models(purpose: StoryPurpose, current_model: str) -> list[ModelOption]:
