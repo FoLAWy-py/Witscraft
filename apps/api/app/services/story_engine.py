@@ -1,6 +1,7 @@
 import asyncio
 import hashlib
 import json
+import math
 import re
 import time
 from collections.abc import AsyncIterator
@@ -1419,20 +1420,31 @@ class StoryEngine:
                 if len(memories) > threshold and compatible_candidates
                 else []
             )
+            database_semantic_scores = (
+                await self._load_database_semantic_scores(
+                    story_id,
+                    branch_id,
+                    memories,
+                    query_embedding,
+                )
+                if query_embedding
+                else {}
+            )
             recency_scores = self._memory_recency_scores(memories)
             ranked = []
             for index, memory in enumerate(memories):
-                semantic_score = (
-                    cosine_similarity(query_embedding, stored_embedding(memory))
-                    if query_embedding
-                    and self.embedding_service.is_compatible(
-                        model=memory.embedding_model,
-                        dimensions=memory.embedding_dimensions,
-                        version=memory.embedding_version,
-                        vector=query_embedding,
-                    )
-                    else 0.0
+                compatible = query_embedding and self.embedding_service.is_compatible(
+                    model=memory.embedding_model,
+                    dimensions=memory.embedding_dimensions,
+                    version=memory.embedding_version,
+                    vector=query_embedding,
                 )
+                if compatible and getattr(memory, "embedding_vector", None) is not None:
+                    semantic_score = database_semantic_scores.get(memory.id, 0.0)
+                elif compatible:
+                    semantic_score = cosine_similarity(query_embedding, stored_embedding(memory))
+                else:
+                    semantic_score = 0.0
                 keyword_score = self._memory_keyword_score(normalized_query, memory.content)
                 entity_score = self._memory_entity_score(
                     normalized_query,
@@ -1452,6 +1464,54 @@ class StoryEngine:
 
         self.turn_context.memory_results[cache_key] = tuple(selected)
         return selected
+
+    async def _load_database_semantic_scores(
+        self,
+        story_id: UUID,
+        branch_id: UUID,
+        memories: list[MemoryItem],
+        query_embedding: list[float],
+    ) -> dict[UUID, float]:
+        candidates = [
+            memory
+            for memory in memories
+            if getattr(memory, "id", None) is not None
+            and getattr(memory, "embedding_vector", None) is not None
+            and self.embedding_service.is_model_version_compatible(
+                model=memory.embedding_model,
+                dimensions=memory.embedding_dimensions,
+                version=memory.embedding_version,
+            )
+        ]
+        if not candidates:
+            return {}
+
+        contract = candidates[0]
+        similarity = (
+            1 - MemoryItem.embedding_vector.cosine_distance(query_embedding)
+        ).label("semantic_score")
+        rows = (
+            await self.session.execute(
+                select(MemoryItem.id, similarity).where(
+                    MemoryItem.id.in_([memory.id for memory in candidates]),
+                    MemoryItem.story_id == story_id,
+                    MemoryItem.branch_id == branch_id,
+                    MemoryItem.is_active.is_(True),
+                    MemoryItem.embedding_vector.is_not(None),
+                    MemoryItem.embedding_model == contract.embedding_model,
+                    MemoryItem.embedding_dimensions == contract.embedding_dimensions,
+                    MemoryItem.embedding_version == contract.embedding_version,
+                )
+            )
+        ).all()
+        scores: dict[UUID, float] = {}
+        for memory_id, raw_score in rows:
+            if raw_score is None:
+                continue
+            score = float(raw_score)
+            if math.isfinite(score):
+                scores[memory_id] = score
+        return scores
 
     @staticmethod
     def _memory_search_terms(value: str) -> set[str]:

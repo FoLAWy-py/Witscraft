@@ -2,7 +2,7 @@
 
 **Document status:** Production baseline
 
-**Architecture version:** 3.13
+**Architecture version:** 3.14
 
 **Last updated:** 17 August 2026
 
@@ -209,7 +209,7 @@ PostgreSQL is the authoritative store. The principal entity groups are:
 
 UUIDs are used for externally referenced entities. Foreign keys and database cascades enforce ownership lifecycles, while application-level checks enforce user authorization.
 
-Migration `0017` installs pgvector and adds fixed `vector(1024)` storage for current long-term-memory embeddings. Provider calls explicitly request 1,024 dimensions and reject count, dimension, or finite-value violations before persistence. Migration `0014` metadata continues to bind provider-qualified model, dimension, operator-controlled version, normalized content hash, and UTC generation time. Dimension-compatible JSONB values are moved to the vector column; incompatible legacy values remain in JSONB until controlled re-embedding. Application similarity runs only when model, dimension, and version all match, so legacy memories remain eligible for structured ranking but are never compared across vector spaces.
+Migration `0017` installs pgvector and adds fixed `vector(1024)` storage for current long-term-memory embeddings. Provider calls explicitly request 1,024 dimensions and reject count, dimension, or finite-value violations before persistence. Migration `0014` metadata continues to bind provider-qualified model, dimension, operator-controlled version, normalized content hash, and UTC generation time. Dimension-compatible JSONB values are moved to the vector column; incompatible legacy values remain in JSONB until controlled re-embedding. PostgreSQL computes exact cosine similarity only for authorized, active story/branch candidates with compatible metadata. Legacy memories remain eligible for structured ranking but are never compared across vector spaces.
 
 ### 6.1 Query and Index Strategy
 
@@ -292,13 +292,13 @@ New long-term-memory candidates pass a deterministic admission boundary before e
 
 A repeated extracted event refreshes the existing row's importance, entity tags, and recency without changing its content or embedding. Manual importance-only edits also preserve the vector. Manual content edits reject exact active duplicates before provider work, clear content-derived entity tags, and replace the vector and compatibility metadata atomically with the new content. A failed embedding cannot persist a content/vector mismatch.
 
-Retrieval is hybrid within the authorized story and branch candidate set. Keyword n-grams, entity-tag overlap, importance, and relative update time are always available. Compatible vector similarity becomes an additional signal only above the deployment-configurable `MEMORY_VECTOR_SEARCH_MIN_ITEMS` threshold. Before creating a query embedding, the engine verifies that at least one candidate has the current provider-qualified model and version; legacy-only sets therefore remain useful without incurring an unusable embedding call.
+Retrieval is hybrid within the authorized story and branch candidate set. Keyword n-grams, entity-tag overlap, importance, and relative update time are always available. Compatible vector similarity becomes an additional signal only above the deployment-configurable `MEMORY_VECTOR_SEARCH_MIN_ITEMS` threshold. Before creating a query embedding, the engine verifies that at least one candidate has the current provider-qualified model, dimension, and version; legacy-only sets therefore remain useful without incurring an unusable embedding call. Exact cosine values for fixed pgvector rows are calculated by PostgreSQL under the same story, branch, active-row, model, dimension, and version predicates, then combined with deterministic structured signals in the application. Compatible JSONB transition/test vectors keep an isolated calculation; non-current legacy vectors receive structured signals only.
 
 `TurnContext` owns state-snapshot, memory-retrieval, and query-embedding reuse within one audited request. It is reset at the start of every turn and is never shared across users or concurrent requests. State and relationship assembly derive from one cached snapshot read, while repeated retrieval with the same story, branch, and normalized query reuses an immutable result. The first unique embedding query records provider usage; a direct embedding-cache hit records zero billable tokens, zero cost, dimensions, and estimated avoided input tokens. This makes the optimization measurable without inflating quota consumption or billing reconciliation.
 
 Every model purpose has a central route, maximum input budget, default output budget, and hard output limit. The gateway applies these policies before provider execution to primary, auxiliary, fallback, streaming, and non-streaming requests. Saved user routes take precedence over system defaults and are loaded for narrative generation, state and event extraction, choice generation, consistency checks, planning interviews, story drafts, and summaries. The effective output ceiling is the lower of the purpose limit and model capability. Oversized input is rejected before provider traffic. In addition, the shared turn auditor reserves one slot for each real provider request and stops retries, fallbacks, auxiliary calls, and external embeddings when the per-turn ceiling is reached. The current policy and values are maintained in `docs/model-cost-controls.md`.
 
-The next retrieval step is to measure exact database cosine ranking against the fixed Recall@K corpus and production-shaped row counts. HNSW remains disabled until those measurements justify an activation threshold and parameters. Legacy or superseded vectors require an asynchronous, retryable re-embedding workflow before their JSONB compatibility lane can be removed.
+The exact-database contract currently proves Recall@1 on a small adversarial corpus. The next retrieval step is to expand this to the fixed Recall@8/error-recall corpus and production-shaped p95 latency measurements. HNSW remains disabled until those measurements justify an activation threshold and parameters. Legacy or superseded vectors require an asynchronous, retryable re-embedding workflow before their JSONB compatibility lane can be removed.
 
 Multi-model routing is supported by purpose. A multi-agent architecture is not the default because narrative generation is primarily a coordinated state-transition workflow, not an open-ended autonomous task graph. Additional agents are justified only when an independently measurable task, such as evaluation or complex planning, produces sufficient quality improvement to offset latency, cost, and failure complexity.
 
@@ -394,7 +394,7 @@ Evolution should occur in this order:
 
 1. Complete backup, restoration, staging, and release automation.
 2. Add browser end-to-end coverage and production-equivalent staging validation to the existing CI baseline.
-3. Move exact compatible-vector similarity into PostgreSQL and establish Recall@K/latency evidence before enabling HNSW.
+3. Expand exact PostgreSQL similarity evidence to Recall@8, error-recall, and production-shaped latency before enabling HNSW.
 4. Add durable background jobs where retries and operational visibility require them.
 5. Move coordination state to shared infrastructure before adding API replicas.
 6. Add specialist models or agents only after evaluation data demonstrates a net quality benefit.
