@@ -1,7 +1,9 @@
 import asyncio
+from uuid import uuid4
 
 import pytest
 
+import app.llm.audit as audit_module
 from app.config import Settings
 from app.llm.audit import CallAuditor
 from app.llm.router import LLMGateway
@@ -34,6 +36,14 @@ class SuccessfulAdapter:
 class FailingAdapter:
     async def generate(self, _request: LLMRequest) -> LLMResponse:
         raise RuntimeError("provider unavailable")
+
+
+class FakeSessionContext:
+    async def __aenter__(self):
+        return object()
+
+    async def __aexit__(self, *_args):
+        return None
 
 
 def _request(secret: str = "不要记录这段完整 Prompt") -> LLMRequest:
@@ -133,3 +143,30 @@ def test_embedding_cache_hit_records_avoided_usage_at_zero_cost() -> None:
     assert row.request["avoided_input_tokens"] > 0
     assert row.response["dimensions"] == 2
     assert float(row.cost_estimate) == 0.0
+
+
+def test_quota_preflight_carries_the_active_story_scope(monkeypatch) -> None:
+    user_id = uuid4()
+    story_id = uuid4()
+    captured = {}
+
+    async def capture_quota(session, checked_user_id, requested_tokens, settings, *, story_id):
+        captured.update(
+            session=session,
+            user_id=checked_user_id,
+            requested_tokens=requested_tokens,
+            settings=settings,
+            story_id=story_id,
+        )
+
+    monkeypatch.setattr(audit_module, "AsyncSessionLocal", lambda: FakeSessionContext())
+    monkeypatch.setattr(audit_module, "ensure_quota", capture_quota)
+    settings = Settings()
+    auditor = CallAuditor(settings, user_id=user_id, story_id=story_id)
+
+    asyncio.run(auditor.ensure_quota(321))
+
+    assert captured["user_id"] == user_id
+    assert captured["story_id"] == story_id
+    assert captured["requested_tokens"] == 321
+    assert captured["settings"] is settings

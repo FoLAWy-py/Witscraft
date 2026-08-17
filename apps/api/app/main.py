@@ -136,7 +136,8 @@ def create_app(
         return JSONResponse(
             status_code=429,
             content={
-                "detail": "Weekly AI token quota exceeded",
+                "detail": str(error),
+                "scope": error.scope,
                 "requested_tokens": error.requested_tokens,
                 "quota": jsonable_encoder(snapshot_payload(error.snapshot)),
             },

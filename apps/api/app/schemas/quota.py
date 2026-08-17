@@ -13,6 +13,11 @@ class QuotaResponse(BaseModel):
     period_started_at: datetime
     resets_at: datetime
     unlimited: bool
+    story_id: str | None = None
+    story_limit_tokens: int | None = None
+    story_used_tokens: int | None = None
+    story_remaining_tokens: int | None = None
+    story_percentage_used: float | None = None
 
 
 class AdminUserQuotaResponse(QuotaResponse):

@@ -60,7 +60,13 @@ class CallAuditor:
         if self.user_id is None or self.settings.dry_run_llm:
             return
         async with AsyncSessionLocal() as session:
-            await ensure_quota(session, self.user_id, requested_tokens, self.settings)
+            await ensure_quota(
+                session,
+                self.user_id,
+                requested_tokens,
+                self.settings,
+                story_id=self.story_id,
+            )
 
     async def record_llm(
         self,

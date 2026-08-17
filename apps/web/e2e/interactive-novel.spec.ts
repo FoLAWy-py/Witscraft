@@ -115,6 +115,7 @@ async function installApiFixture(page: Page) {
       return json(route, { preferences: [] });
     }
     if (path.endsWith("/api/quota/me")) {
+      const storyId = url.searchParams.get("story_id");
       return json(route, {
         limit_tokens: 500000,
         used_tokens: 100,
@@ -124,7 +125,12 @@ async function installApiFixture(page: Page) {
         soft_limit_reached: false,
         period_started_at: "2026-08-17T00:00:00Z",
         resets_at: "2026-08-24T00:00:00Z",
-        unlimited: false
+        unlimited: false,
+        story_id: storyId,
+        story_limit_tokens: storyId ? 250000 : null,
+        story_used_tokens: storyId ? 50 : null,
+        story_remaining_tokens: storyId ? 249950 : null,
+        story_percentage_used: storyId ? 0.02 : null
       });
     }
     if (path.endsWith("/api/workspace")) {
@@ -172,6 +178,11 @@ test("player signs in and directs the next scene", async ({ page }) => {
 
   await expect(page.getByText("The Clockwork Key", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("The clockwork archive waits for your decision.")).toBeVisible();
+
+  await page.getByRole("button", { name: "设置", exact: true }).click();
+  await expect(page.getByText("小说周额度", { exact: true })).toBeVisible();
+  await expect(page.getByText("249,950", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "故事", exact: true }).click();
 
   const composer = page.getByPlaceholder("引导下一幕…");
   await composer.fill("I turn the key and enter the sealed room.");

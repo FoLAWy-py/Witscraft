@@ -7,9 +7,10 @@ from sqlalchemy import delete
 
 from app.auth import get_admin_user
 from app.config import Settings
-from app.db.models import ModelCall, QuotaResetEvent, User
+from app.db.models import ModelCall, QuotaResetEvent, Story, User
 from app.db.session import AsyncSessionLocal, engine
 from app.routers.admin import overview, reset_all_quotas
+from app.routers.quota import my_quota
 from app.schemas.quota import QuotaResetRequest
 from app.services.quota_service import QuotaExceededError, ensure_quota, quota_snapshot
 
@@ -165,6 +166,122 @@ def test_weekly_quota_reset_and_admin_bypass() -> None:
             async with AsyncSessionLocal() as cleanup:
                 await cleanup.execute(delete(QuotaResetEvent).where(QuotaResetEvent.id == reset_id))
                 await cleanup.execute(delete(User).where(User.id.in_([regular_id, admin_id])))
+                await cleanup.commit()
+            await engine.dispose()
+
+    asyncio.run(scenario())
+
+
+def test_story_weekly_quota_is_isolated_and_enforced_before_provider_traffic() -> None:
+    async def scenario() -> None:
+        user_id = uuid4()
+        first_story_id = uuid4()
+        second_story_id = uuid4()
+        settings = Settings(
+            user_weekly_token_quota=5000,
+            story_weekly_token_quota=1000,
+        )
+        try:
+            async with AsyncSessionLocal() as session:
+                user = User(
+                    id=user_id,
+                    email=f"story-quota-{user_id}@example.invalid",
+                    display_name="Story Quota User",
+                )
+                session.add(user)
+                await session.flush()
+                session.add_all(
+                    [
+                        Story(id=first_story_id, user_id=user_id, title="First Story"),
+                        Story(id=second_story_id, user_id=user_id, title="Second Story"),
+                    ]
+                )
+                await session.flush()
+                session.add_all(
+                    [
+                        ModelCall(
+                            user_id=user_id,
+                            story_id=first_story_id,
+                            call_type="llm",
+                            provider="test",
+                            model="test",
+                            purpose="normal_chat",
+                            status="succeeded",
+                            input_tokens=700,
+                            output_tokens=200,
+                            request={},
+                            response={},
+                        ),
+                        ModelCall(
+                            user_id=user_id,
+                            story_id=second_story_id,
+                            call_type="llm",
+                            provider="test",
+                            model="test",
+                            purpose="normal_chat",
+                            status="succeeded",
+                            input_tokens=50,
+                            output_tokens=50,
+                            request={},
+                            response={},
+                        ),
+                    ]
+                )
+                await session.commit()
+
+                await ensure_quota(
+                    session,
+                    user_id,
+                    100,
+                    settings,
+                    story_id=first_story_id,
+                )
+                with pytest.raises(QuotaExceededError) as exceeded:
+                    await ensure_quota(
+                        session,
+                        user_id,
+                        101,
+                        settings,
+                        story_id=first_story_id,
+                    )
+                assert exceeded.value.scope == "story"
+                assert exceeded.value.snapshot.used_tokens == 900
+                assert exceeded.value.snapshot.remaining_tokens == 100
+                assert str(exceeded.value) == "Story weekly AI token quota exceeded"
+
+                response = await my_quota(
+                    story_id=first_story_id,
+                    user_id=user_id,
+                    session=session,
+                    settings=settings,
+                )
+                assert response.used_tokens == 1000
+                assert response.story_id == str(first_story_id)
+                assert response.story_used_tokens == 900
+                assert response.story_limit_tokens == 1000
+                assert response.story_remaining_tokens == 100
+                assert response.story_percentage_used == 90
+                with pytest.raises(HTTPException) as hidden:
+                    await my_quota(
+                        story_id=uuid4(),
+                        user_id=user_id,
+                        session=session,
+                        settings=settings,
+                    )
+                assert hidden.value.status_code == 404
+
+                second_snapshot = await ensure_quota(
+                    session,
+                    user_id,
+                    900,
+                    settings,
+                    story_id=second_story_id,
+                )
+                assert second_snapshot.used_tokens == 1000
+                assert second_snapshot.remaining_tokens == 4000
+        finally:
+            async with AsyncSessionLocal() as cleanup:
+                await cleanup.execute(delete(User).where(User.id == user_id))
                 await cleanup.commit()
             await engine.dispose()
 

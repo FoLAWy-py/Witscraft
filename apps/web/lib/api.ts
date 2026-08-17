@@ -148,8 +148,9 @@ export async function getCurrentUser(): Promise<AuthResponse> {
   return requestJson<AuthResponse>(`${API_BASE_URL}/api/auth/me`, { cache: "no-store" });
 }
 
-export async function getMyQuota(): Promise<QuotaUsage> {
-  return requestJson<QuotaUsage>(`${API_BASE_URL}/api/quota/me`, { cache: "no-store" });
+export async function getMyQuota(storyId?: string): Promise<QuotaUsage> {
+  const query = storyId ? `?story_id=${encodeURIComponent(storyId)}` : "";
+  return requestJson<QuotaUsage>(`${API_BASE_URL}/api/quota/me${query}`, { cache: "no-store" });
 }
 
 export async function getAdminOverview(options: {

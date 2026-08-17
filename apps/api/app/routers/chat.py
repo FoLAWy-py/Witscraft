@@ -93,7 +93,8 @@ async def stream_chat(
             event = {
                 "type": "error",
                 "status": 429,
-                "detail": "Weekly AI token quota exceeded",
+                "detail": str(error),
+                "scope": error.scope,
             }
             yield f"event: error\ndata: {json.dumps(event)}\n\n"
         except PurposeInputBudgetExceededError as error:

@@ -662,6 +662,7 @@ async def stream_story_interview(
             payload = {
                 "detail": str(error),
                 "status": 429,
+                "scope": error.scope,
                 "resets_at": error.snapshot.resets_at.isoformat(),
             }
             yield f"event: error\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"

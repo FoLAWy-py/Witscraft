@@ -76,6 +76,11 @@ export type QuotaUsage = {
   period_started_at: string;
   resets_at: string;
   unlimited: boolean;
+  story_id?: string | null;
+  story_limit_tokens?: number | null;
+  story_used_tokens?: number | null;
+  story_remaining_tokens?: number | null;
+  story_percentage_used?: number | null;
 };
 
 export type AdminUserQuota = QuotaUsage & {

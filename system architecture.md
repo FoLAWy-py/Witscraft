@@ -2,7 +2,7 @@
 
 **Document status:** Production baseline
 
-**Architecture version:** 3.4
+**Architecture version:** 3.5
 
 **Last updated:** 17 August 2026
 
@@ -290,9 +290,9 @@ Multi-model routing is supported by purpose. A multi-agent architecture is not t
 
 ### 9.1 Weekly Usage Governance
 
-Standard users receive a configurable weekly allowance through `USER_WEEKLY_TOKEN_QUOTA`, with a default of 500,000 tokens. The natural period is Monday `00:00 UTC` through the following Monday. Successful external LLM and embedding audit rows contribute their recorded input and output tokens; deterministic local and dry-run operations do not consume the allowance.
+Standard users receive a configurable weekly account allowance through `USER_WEEKLY_TOKEN_QUOTA`, with a default of 500,000 tokens, plus an independent per-novel ceiling through `STORY_WEEKLY_TOKEN_QUOTA`, with a default of 250,000 tokens. The natural period is Monday `00:00 UTC` through the following Monday. Successful external LLM and embedding audit rows contribute their recorded input and output tokens; deterministic local and dry-run operations do not consume either allowance.
 
-The provider-neutral gateway performs a preflight check using estimated input plus maximum output before contacting a provider. Rejection returns HTTP `429` and the next reset boundary. Administrators are exempt from the allowance.
+The provider-neutral gateway performs account and, for an active novel, story preflight checks using estimated input plus maximum output before contacting a provider. Rejection returns HTTP `429`, an explicit `account` or `story` scope, and the next reset boundary. Administrators are exempt from both allowances.
 
 At the configurable soft threshold, 80% by default, the API marks the quota snapshot for a visible workspace warning while preserving the user's selected route. At the hard threshold, preflight blocks additional spend. The independent per-turn external-call ceiling defaults to 8 and bounds retry or orchestration amplification even when token estimates remain below the weekly allowance.
 

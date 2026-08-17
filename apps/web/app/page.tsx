@@ -134,6 +134,9 @@ function classifyFailure(caught: unknown, fallback: string): { message: string; 
   }
   if (caught instanceof ApiError) {
     if (caught.status === 429 && caught.message.toLowerCase().includes("quota")) {
+      if (caught.message.toLowerCase().includes("story")) {
+        return { message: "本小说已达到本周 AI 额度。可在设置中查看小说用量与重置时间。", kind: "api" };
+      }
       return { message: "本周 AI 额度不足。可在设置中查看用量与重置时间。", kind: "api" };
     }
     if (caught.status === 429 && caught.message.toLowerCase().includes("per-turn")) {
@@ -347,6 +350,14 @@ export default function Home() {
   const streamAbortRef = useRef<AbortController | null>(null);
   const streamAssistantActiveRef = useRef(false);
 
+  const refreshQuota = useCallback(async (activeStoryId?: string) => {
+    try {
+      setQuota(await getMyQuota(activeStoryId));
+    } catch {
+      setQuota(null);
+    }
+  }, []);
+
   const applyWorkspace = useCallback((data: WorkspaceResponse, historyMode: WorkspaceHistoryMode = "replace") => {
     setStoryId(data.story_id);
     setBranchId(data.branch_id);
@@ -554,7 +565,12 @@ export default function Home() {
       .catch(() => setPreferenceError("读取故事偏好失败，请稍后重试。"));
     void refreshQuota();
     void loadWorkspace();
-  }, [authStatus, authUser?.email_verified, loadWorkspace]);
+  }, [authStatus, authUser?.email_verified, loadWorkspace, refreshQuota]);
+
+  useEffect(() => {
+    if (authStatus !== "authenticated" || !authUser?.email_verified || !storyId) return;
+    void refreshQuota(storyId);
+  }, [authStatus, authUser?.email_verified, refreshQuota, storyId]);
 
   useEffect(() => {
     if (authStatus !== "authenticated" || !authUser?.email_verified) return;
@@ -590,14 +606,6 @@ export default function Home() {
     if (authStatus !== "authenticated" || view !== "settings") return;
     void loadAuthSessions();
   }, [authStatus, loadAuthSessions, view]);
-
-  async function refreshQuota() {
-    try {
-      setQuota(await getMyQuota());
-    } catch {
-      setQuota(null);
-    }
-  }
 
   async function handleAuthenticate(mode: "login" | "register", input: LoginInput | RegisterInput) {
     if (authSubmitting) return;
@@ -1045,7 +1053,7 @@ export default function Home() {
       streamAbortRef.current = null;
       streamAssistantActiveRef.current = false;
       setPending(false);
-      void refreshQuota();
+      void refreshQuota(storyId || undefined);
     }
   }
 
@@ -1084,7 +1092,7 @@ export default function Home() {
       setError(caught instanceof ApiError ? caught.message : `${command === "rewrite" ? "重写" : "重新生成"}失败，请稍后重试。`);
     } finally {
       setPending(false);
-      void refreshQuota();
+      void refreshQuota(storyId || undefined);
     }
   }
 
@@ -3747,6 +3755,7 @@ function QuotaMeter({ quota, uiLanguage, compact = false }: { quota: QuotaUsage 
   }).format(new Date(quota.resets_at));
   const percent = quota.unlimited ? 0 : Math.min(100, quota.percentage_used);
   const number = new Intl.NumberFormat(uiLanguage === "zh-CN" ? "zh-CN" : "en-AU", { notation: compact ? "compact" : "standard", maximumFractionDigits: 1 });
+  const hasStoryQuota = Boolean(quota.story_id) && quota.story_used_tokens !== null && quota.story_used_tokens !== undefined;
   return (
     <div className={`quotaMeter ${compact ? "compact" : ""} ${quota.soft_limit_reached ? "warning" : ""}`} title={`${uiText(uiLanguage, "重置时间", "Resets")} ${resetLabel}`}>
       <div className="quotaMeterLabel">
@@ -3762,6 +3771,9 @@ function QuotaMeter({ quota, uiLanguage, compact = false }: { quota: QuotaUsage 
           <span><b>{number.format(quota.used_tokens)}</b><small>{uiText(uiLanguage, "已用 tokens", "tokens used")}</small></span>
           <span><b>{quota.limit_tokens === null ? "∞" : number.format(quota.limit_tokens)}</b><small>{uiText(uiLanguage, "周额度", "weekly limit")}</small></span>
           <span><b>{quota.remaining_tokens === null ? "∞" : number.format(quota.remaining_tokens)}</b><small>{uiText(uiLanguage, "剩余", "remaining")}</small></span>
+          {hasStoryQuota && <span><b>{number.format(quota.story_used_tokens ?? 0)}</b><small>{uiText(uiLanguage, `本小说已用 · ${(quota.story_percentage_used ?? 0).toFixed(1)}%`, `current novel · ${(quota.story_percentage_used ?? 0).toFixed(1)}%`)}</small></span>}
+          {hasStoryQuota && <span><b>{quota.story_limit_tokens === null ? "∞" : number.format(quota.story_limit_tokens ?? 0)}</b><small>{uiText(uiLanguage, "小说周额度", "novel weekly limit")}</small></span>}
+          {hasStoryQuota && <span><b>{quota.story_remaining_tokens === null ? "∞" : number.format(quota.story_remaining_tokens ?? 0)}</b><small>{uiText(uiLanguage, "小说剩余", "novel remaining")}</small></span>}
         </div>
       )}
     </div>

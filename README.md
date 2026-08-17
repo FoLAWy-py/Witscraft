@@ -120,6 +120,7 @@ GENERATION_STALE_SECONDS=900
 AUTH_LOGIN_THROTTLE_RETENTION_HOURS=24
 MODEL_CALL_RETENTION_DAYS=30
 USER_WEEKLY_TOKEN_QUOTA=500000
+STORY_WEEKLY_TOKEN_QUOTA=250000
 USER_WEEKLY_TOKEN_SOFT_LIMIT_PERCENTAGE=80
 RATE_LIMIT_ADMIN_RESET_REQUESTS=5
 ```
@@ -128,7 +129,7 @@ The circuit breaker is process-local. This is sufficient for the current single 
 
 ## Administrator and Weekly Quota
 
-Standard users receive a weekly AI token allowance that resets every Monday at `00:00 UTC`. The workspace and settings views show usage percentage, consumed and remaining tokens, and the reset time in the user's local time zone. Administrators have a separate `/admin` console, are exempt from the allowance, can review account-level usage, and can begin a new global quota window without deleting audit history.
+Standard users receive a 500,000-token weekly account allowance and an independent 250,000-token weekly ceiling for each interactive novel; both reset every Monday at `00:00 UTC` and are deployment-configurable. The workspace shows account usage, while settings also shows consumed, limit, and remaining tokens for the active novel. A story-limit rejection identifies its scope explicitly and does not contact the provider. Administrators have a separate `/admin` console, are exempt from both allowances, can review account-level usage, and can begin a new global quota window without deleting audit history.
 
 Administrator roles are assigned only through the controlled backend CLI; there is no browser role-escalation endpoint:
 

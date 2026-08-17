@@ -33,13 +33,13 @@ Role changes should be executed through controlled host access and recorded in t
 
 ## Weekly Allowance
 
-`USER_WEEKLY_TOKEN_QUOTA` defines the standard-user allowance and defaults to `500000` tokens. Administrators are exempt so that operational diagnosis and recovery are not blocked by the user budget.
+`USER_WEEKLY_TOKEN_QUOTA` defines the standard-user account allowance and defaults to `500000` tokens. `STORY_WEEKLY_TOKEN_QUOTA` independently limits each interactive novel to `250000` tokens in the same window, preventing one narrative from consuming the complete account allowance. Story creation and provider health checks have no story scope and therefore use only the account boundary. Administrators are exempt from both limits so that operational diagnosis and recovery are not blocked by user budgets.
 
 `USER_WEEKLY_TOKEN_SOFT_LIMIT_PERCENTAGE` defines a visible warning threshold and defaults to `80`. Reaching it changes the user's quota meter to a warning state without blocking requests or silently changing the selected model. The hard allowance continues to reject provider preflight with HTTP `429` and the reset boundary.
 
 The natural quota window starts each Monday at `00:00 UTC` and ends the following Monday at `00:00 UTC`. The user interface displays the boundary in the viewer's local time zone. Successful external LLM and embedding calls contribute their input and output token usage from the `model_calls` audit table. Local deterministic embeddings and dry-run model responses do not consume the allowance.
 
-Before an external request begins, the LLM Gateway checks the estimated input plus the configured maximum output against the remaining allowance. A rejected request returns HTTP `429`, includes `Retry-After`, and does not contact the model provider.
+Before an external request begins, the LLM Gateway checks the estimated input plus the configured maximum output against the remaining account allowance and, when a story is active, that story's allowance. A rejected request returns HTTP `429`, includes `Retry-After`, identifies `account` or `story` scope, and does not contact the model provider. Account usage remains visible in the workspace; the settings view securely loads the active novel's usage after ownership validation. Story-limit failures are explicit request errors rather than a silent route or quality change.
 
 The current deployment uses one API process. The preflight check prevents ordinary overspend, but two requests admitted concurrently can complete slightly above the allowance because tokens are reconciled after provider completion. A durable reservation ledger is required before strict accounting across multiple workers or highly concurrent clients.
 
