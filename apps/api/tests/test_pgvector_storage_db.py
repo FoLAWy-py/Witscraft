@@ -4,7 +4,7 @@ from uuid import uuid4
 from sqlalchemy import delete, text
 
 from app.db.models import MemoryItem
-from app.db.session import AsyncSessionLocal
+from app.db.session import AsyncSessionLocal, engine as db_engine
 from app.embedding_config import EMBEDDING_VECTOR_DIMENSIONS
 from app.services.embeddings import stored_embedding
 
@@ -60,5 +60,6 @@ def test_pgvector_extension_column_and_round_trip() -> None:
             async with AsyncSessionLocal() as session:
                 await session.execute(delete(MemoryItem).where(MemoryItem.id == memory_id))
                 await session.commit()
+            await db_engine.dispose()
 
     asyncio.run(scenario())
