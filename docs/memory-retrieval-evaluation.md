@@ -40,4 +40,10 @@ The command prints a machine-readable JSON result and exits non-zero on any thre
 
 ## Current Accepted Baseline
 
-The first accepted measurement will be recorded here after the new gate completes on `main`. Until that run is green, the retrieval evaluation batch is not complete and HNSW remains disabled.
+Commit `9f1b062` established the first accepted baseline in [Security run 32024934897](https://github.com/FoLAWy-py/Witscraft/actions/runs/32024934897):
+
+| Candidate rows | Iterations | Recall@8 | Error recall | p95 latency |
+| ---: | ---: | ---: | ---: | ---: |
+| 10,000 | 24 | 1.00 | 0.00 | 65.575 ms |
+
+All thresholds passed and the complete backend suite reported 193 passing tests. These values are CI-runner synthetic-contract evidence only. HNSW remains disabled pending approved live-provider captures and production tenant/concurrency measurements.
