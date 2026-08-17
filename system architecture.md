@@ -2,7 +2,7 @@
 
 **Document status:** Production baseline
 
-**Architecture version:** 3.19
+**Architecture version:** 3.20
 
 **Last updated:** 17 August 2026
 
@@ -107,7 +107,9 @@ Machine-specific deployment files and live secrets are intentionally excluded fr
 
 The Next.js application provides the interactive novel experience, authentication views, story and branch selection, character and world customization, model routing settings, weekly quota visibility, account data export, and account deletion controls. The AI remains responsible for prose generation and narrative continuation; the player supplies character actions, choices, and desired direction. A separate `/admin` route provides searchable, role-filtered, paginated account-level usage governance and bounded reset audit history without exposing narrative content.
 
-The current interface is implemented as a cohesive App Router workspace rather than a collection of independently deployed frontends. The root route remains a thin Server Component that mounts a route-private client coordinator. Authentication gates, story setup, transcript rendering, quota presentation, and shared workspace controls are isolated under `apps/web/app/_components/workspace`; the coordinator owns cross-module state and effects. This boundary keeps route discovery simple while allowing the interactive novel experience to evolve without returning to a single page component. The client communicates exclusively with the FastAPI API through the typed client in `apps/web/lib/api.ts`.
+The current interface is implemented as a cohesive App Router workspace rather than a collection of independently deployed frontends. The root route remains a thin Server Component that mounts a route-private client coordinator. Authentication gates, story setup, transcript rendering, quota presentation, and shared workspace controls are isolated under `apps/web/app/_components/workspace`; the coordinator owns cross-module state and effects. This boundary keeps route discovery simple while allowing the interactive novel experience to evolve without returning to a single page component.
+
+The browser communicates exclusively with FastAPI through domain clients under `apps/web/lib/api/`: authentication and account lifecycle, administration and quota, chat streaming, provider routing, and workspace resources. `core.ts` is the single transport and error boundary, while `apps/web/lib/api.ts` is a compatibility-only export facade. Domain clients may share wire types, but they do not duplicate base-URL resolution, credential handling, status-to-error conversion, or stream interruption errors.
 
 Client responsibilities include:
 

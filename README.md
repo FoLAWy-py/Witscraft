@@ -7,7 +7,7 @@ Witscraft is a customizable AI-authored interactive novel. The AI acts as the au
 ```text
 apps/
   api/    FastAPI backend, story engine, prompt builder, LLM gateway
-  web/    Next.js interactive novel experience with route-private workspace modules
+  web/    Next.js interactive novel experience with route-private UI and domain API modules
 ```
 
 ## Documentation
