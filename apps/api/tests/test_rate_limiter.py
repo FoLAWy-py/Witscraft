@@ -97,6 +97,10 @@ def test_high_cost_routes_are_classified_independently() -> None:
         == "admin_quota_reset"
     )
     assert (
+        classify_rate_limit(_request("/api/admin/quota/policy", method="PUT"), settings).name
+        == "admin_quota_policy"
+    )
+    assert (
         classify_rate_limit(
             _request("/api/workspace/stories/x/branches/y/export", method="GET"),
             settings,

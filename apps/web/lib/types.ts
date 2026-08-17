@@ -120,11 +120,6 @@ export type QuotaUsage = {
   period_started_at: string;
   resets_at: string;
   unlimited: boolean;
-  story_id?: string | null;
-  story_limit_tokens?: number | null;
-  story_used_tokens?: number | null;
-  story_remaining_tokens?: number | null;
-  story_percentage_used?: number | null;
 };
 
 export type AdminUserQuota = QuotaUsage & {
@@ -143,10 +138,22 @@ export type AdminQuotaResetEvent = {
   effective_at: string;
 };
 
+export type AdminQuotaPolicyChange = {
+  id: string;
+  administrator_email: string | null;
+  administrator_name: string | null;
+  previous_limit_tokens: number;
+  limit_tokens: number;
+  estimated_words: number;
+  reason: string;
+  effective_at: string;
+};
+
 export type AdminOverview = {
   total_users: number;
   administrator_count: number;
   weekly_token_quota: number;
+  estimated_weekly_words: number;
   period_started_at: string;
   resets_at: string;
   total_used_tokens: number;
@@ -156,12 +163,17 @@ export type AdminOverview = {
   total_pages: number;
   users: AdminUserQuota[];
   reset_events: AdminQuotaResetEvent[];
+  policy_changes: AdminQuotaPolicyChange[];
 };
 
 export type QuotaResetResponse = {
   reset_event_id: string;
   effective_at: string;
   resets_at: string;
+};
+
+export type QuotaPolicyUpdateResponse = {
+  change: AdminQuotaPolicyChange;
 };
 
 export type AuthResponse = {

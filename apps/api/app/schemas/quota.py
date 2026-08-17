@@ -13,11 +13,6 @@ class QuotaResponse(BaseModel):
     period_started_at: datetime
     resets_at: datetime
     unlimited: bool
-    story_id: str | None = None
-    story_limit_tokens: int | None = None
-    story_used_tokens: int | None = None
-    story_remaining_tokens: int | None = None
-    story_percentage_used: float | None = None
 
 
 class AdminUserQuotaResponse(QuotaResponse):
@@ -36,10 +31,22 @@ class AdminQuotaResetEventResponse(BaseModel):
     effective_at: datetime
 
 
+class AdminQuotaPolicyChangeResponse(BaseModel):
+    id: str
+    administrator_email: str | None
+    administrator_name: str | None
+    previous_limit_tokens: int
+    limit_tokens: int
+    estimated_words: int
+    reason: str
+    effective_at: datetime
+
+
 class AdminOverviewResponse(BaseModel):
     total_users: int
     administrator_count: int
     weekly_token_quota: int
+    estimated_weekly_words: int
     period_started_at: datetime
     resets_at: datetime
     total_used_tokens: int
@@ -49,6 +56,7 @@ class AdminOverviewResponse(BaseModel):
     total_pages: int
     users: list[AdminUserQuotaResponse]
     reset_events: list[AdminQuotaResetEventResponse]
+    policy_changes: list[AdminQuotaPolicyChangeResponse]
 
 
 class QuotaResetRequest(BaseModel):
@@ -59,3 +67,12 @@ class QuotaResetResponse(BaseModel):
     reset_event_id: str
     effective_at: datetime
     resets_at: datetime
+
+
+class QuotaPolicyUpdateRequest(BaseModel):
+    weekly_token_quota: int = Field(ge=1000, le=100_000_000)
+    reason: str = Field(default="Administrator quota policy update", max_length=220)
+
+
+class QuotaPolicyUpdateResponse(BaseModel):
+    change: AdminQuotaPolicyChangeResponse

@@ -547,3 +547,23 @@ class QuotaResetEvent(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class QuotaPolicyChange(Base):
+    __tablename__ = "quota_policy_changes"
+    __table_args__ = (
+        CheckConstraint("previous_limit_tokens >= 1000", name="ck_quota_policy_previous_limit"),
+        CheckConstraint("limit_tokens >= 1000", name="ck_quota_policy_limit"),
+        Index("ix_quota_policy_changes_latest", text("id DESC")),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    changed_by_user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    previous_limit_tokens: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    limit_tokens: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    reason: Mapped[str] = mapped_column(String(220), default="Administrator quota policy update")
+    effective_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

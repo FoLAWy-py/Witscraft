@@ -115,7 +115,6 @@ class Settings(BaseSettings):
     auth_login_throttle_retention_hours: int = Field(default=24, ge=1)
     model_call_retention_days: int = Field(default=30, ge=1)
     user_weekly_token_quota: int = Field(default=500000, ge=1000)
-    story_weekly_token_quota: int = Field(default=250000, ge=1000)
     user_weekly_token_soft_limit_percentage: int = Field(default=80, ge=1, le=99)
 
     smtp_host: str | None = None
@@ -291,7 +290,6 @@ def get_settings() -> Settings:
             int,
         ),
         "USER_WEEKLY_TOKEN_QUOTA": ("user_weekly_token_quota", int),
-        "STORY_WEEKLY_TOKEN_QUOTA": ("story_weekly_token_quota", int),
         "USER_WEEKLY_TOKEN_SOFT_LIMIT_PERCENTAGE": (
             "user_weekly_token_soft_limit_percentage",
             int,

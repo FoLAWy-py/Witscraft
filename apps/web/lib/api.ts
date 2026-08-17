@@ -15,6 +15,7 @@ import type {
   ProvidersResponse,
   QuotaResetResponse,
   QuotaUsage,
+  QuotaPolicyUpdateResponse,
   RegisterInput,
   StoryPurpose,
   UpdateCanonFactInput,
@@ -148,9 +149,8 @@ export async function getCurrentUser(): Promise<AuthResponse> {
   return requestJson<AuthResponse>(`${API_BASE_URL}/api/auth/me`, { cache: "no-store" });
 }
 
-export async function getMyQuota(storyId?: string): Promise<QuotaUsage> {
-  const query = storyId ? `?story_id=${encodeURIComponent(storyId)}` : "";
-  return requestJson<QuotaUsage>(`${API_BASE_URL}/api/quota/me${query}`, { cache: "no-store" });
+export async function getMyQuota(): Promise<QuotaUsage> {
+  return requestJson<QuotaUsage>(`${API_BASE_URL}/api/quota/me`, { cache: "no-store" });
 }
 
 export async function getAdminOverview(options: {
@@ -175,6 +175,14 @@ export async function resetAllQuotas(reason: string): Promise<QuotaResetResponse
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ reason })
+  });
+}
+
+export async function updateQuotaPolicy(weeklyTokenQuota: number, reason: string): Promise<QuotaPolicyUpdateResponse> {
+  return requestJson<QuotaPolicyUpdateResponse>(`${API_BASE_URL}/api/admin/quota/policy`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ weekly_token_quota: weeklyTokenQuota, reason })
   });
 }
 

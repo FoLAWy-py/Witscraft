@@ -1,10 +1,10 @@
 "use client";
 
-import { AlertTriangle, ArrowLeft, ChevronLeft, ChevronRight, Gauge, History, RefreshCw, RotateCcw, Search, ShieldCheck, Users, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ChevronLeft, ChevronRight, Gauge, History, RefreshCw, RotateCcw, Save, Search, ShieldCheck, Users, X } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
-import { ApiError, getAdminOverview, resetAllQuotas } from "@/lib/api";
+import { ApiError, getAdminOverview, resetAllQuotas, updateQuotaPolicy } from "@/lib/api";
 import type { AdminOverview } from "@/lib/types";
 
 
@@ -30,6 +30,9 @@ export default function AdminPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<"all" | "admin" | "standard">("all");
   const [page, setPage] = useState(1);
+  const [quotaInput, setQuotaInput] = useState("");
+  const [quotaReason, setQuotaReason] = useState("");
+  const [updatingQuota, setUpdatingQuota] = useState(false);
 
   const load = useCallback(async () => {
     setRefreshing(true);
@@ -49,6 +52,10 @@ export default function AdminPage() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    if (overview) setQuotaInput(String(overview.weekly_token_quota));
+  }, [overview]);
+
   async function resetQuotas() {
     setResetting(true);
     setNotice(null);
@@ -61,6 +68,26 @@ export default function AdminPage() {
       setNotice(error instanceof ApiError ? error.message : "Quota reset failed.");
     } finally {
       setResetting(false);
+    }
+  }
+
+  async function saveQuotaPolicy() {
+    const nextLimit = Number(quotaInput);
+    if (!Number.isInteger(nextLimit) || nextLimit < 1000 || nextLimit > 100_000_000) {
+      setNotice("Weekly quota must be an integer between 1,000 and 100,000,000 tokens.");
+      return;
+    }
+    setUpdatingQuota(true);
+    setNotice(null);
+    try {
+      const result = await updateQuotaPolicy(nextLimit, quotaReason.trim() || "Administrator console update");
+      setNotice(`Weekly account quota updated to ${result.change.limit_tokens.toLocaleString("en-AU")} tokens (approximately ${result.change.estimated_words.toLocaleString("en-AU")} words).`);
+      setQuotaReason("");
+      await load();
+    } catch (error) {
+      setNotice(error instanceof ApiError ? error.message : "Quota policy update failed.");
+    } finally {
+      setUpdatingQuota(false);
     }
   }
 
@@ -102,7 +129,13 @@ export default function AdminPage() {
       <section className="adminQuotaPolicy">
         <div>
           <h2>Weekly standard-user quota</h2>
-          <p>{overview.weekly_token_quota.toLocaleString("en-AU")} tokens per user. Administrators are exempt. Current window began {formatDate(overview.period_started_at)}.</p>
+          <p>{overview.weekly_token_quota.toLocaleString("en-AU")} tokens per account, approximately {overview.estimated_weekly_words.toLocaleString("en-AU")} words. All interactive novels share this allowance; administrators are exempt. Current window began {formatDate(overview.period_started_at)}.</p>
+          <div className="adminQuotaEditor">
+            <label>Token allowance<input type="number" min={1000} max={100000000} step={1000} value={quotaInput} onChange={(event) => setQuotaInput(event.target.value)} /></label>
+            <label>Audit reason<input type="text" maxLength={220} value={quotaReason} onChange={(event) => setQuotaReason(event.target.value)} placeholder="Reason for this policy change" /></label>
+            <span>≈ {Math.floor(Math.max(0, Number(quotaInput) || 0) * 3 / 4).toLocaleString("en-AU")} words <small>Estimate: 4 tokens ≈ 3 words; actual output varies by language and model.</small></span>
+            <button className="cmdButton" type="button" disabled={updatingQuota || Number(quotaInput) === overview.weekly_token_quota} onClick={() => void saveQuotaPolicy()}>{updatingQuota ? <RefreshCw className="spinIcon" size={14} /> : <Save size={14} />} Save quota</button>
+          </div>
         </div>
         {!confirmingReset ? (
           <button className="cmdButton dangerAction" type="button" onClick={() => setConfirmingReset(true)}><RotateCcw size={14} /> Reset all quotas</button>
@@ -117,6 +150,20 @@ export default function AdminPage() {
       </section>
 
       {notice && <div className="adminNotice" role="status">{notice}</div>}
+
+      <section className="adminAuditSection">
+        <header><span><Gauge size={15} /><h2>Quota policy history</h2></span><small>Latest 10 changes</small></header>
+        {overview.policy_changes.length ? (
+          <ol className="adminAuditList">
+            {overview.policy_changes.map((change) => (
+              <li key={change.id}>
+                <time dateTime={change.effective_at}>{formatDate(change.effective_at)}</time>
+                <span><b>{change.previous_limit_tokens.toLocaleString("en-AU")} → {change.limit_tokens.toLocaleString("en-AU")} tokens</b><small>{change.administrator_name || change.administrator_email || "Deleted administrator"} · ≈ {change.estimated_words.toLocaleString("en-AU")} words · {change.reason}</small></span>
+              </li>
+            ))}
+          </ol>
+        ) : <p className="adminEmptyState">No persisted quota policy changes. The deployment default is active.</p>}
+      </section>
 
       <section className="adminAuditSection">
         <header><span><History size={15} /><h2>Quota reset history</h2></span><small>Latest 10 events</small></header>

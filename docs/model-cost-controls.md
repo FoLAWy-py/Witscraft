@@ -71,7 +71,7 @@ Quota preflight uses estimated input plus the normalized maximum output. Purpose
 
 Standard accounts receive an explicit soft warning at `USER_WEEKLY_TOKEN_SOFT_LIMIT_PERCENTAGE`, which defaults to 80%. The quota API returns both the threshold and whether it has been reached; the workspace changes the usage meter state and asks the user to monitor the remaining allowance. The soft threshold does not silently change model routing. At the hard weekly limit, provider preflight returns HTTP `429` with the current usage and reset boundary.
 
-The same preflight applies `STORY_WEEKLY_TOKEN_QUOTA`, 250,000 tokens by default, whenever the audited turn belongs to an existing interactive novel. Account and story usage use the same successful, non-local, non-dry-run audit rows and reset window. The account limit is checked first; a story rejection then reports `scope=story`. The quota endpoint accepts an owned story identifier and returns its consumed, limit, remaining, and percentage values for the settings view; unknown or cross-tenant identifiers return `404`. New-story planning and provider health checks have no story identifier and remain governed by the account limit only. Administrators are exempt from both boundaries.
+Every story and story-independent auxiliary call consumes the same account-wide weekly allowance. No per-story ceiling or story-scoped quota query exists. The preflight sums successful, non-local, non-dry-run audit rows for the account and returns `scope=account` on rejection. Administrators are exempt. Ordinary players see only the percentage used; administrators retain token totals for governance.
 
 ## Per-turn call ceiling
 

@@ -175,22 +175,17 @@ async function installApiFixture(page: Page) {
       return json(route, { preferences: [] });
     }
     if (path.endsWith("/api/quota/me")) {
-      const storyId = url.searchParams.get("story_id");
+      expect(url.searchParams.has("story_id")).toBe(false);
       return json(route, {
         limit_tokens: 500000,
         used_tokens: 100,
         remaining_tokens: 499900,
-        percentage_used: 0.02,
+        percentage_used: 12.5,
         soft_limit_percentage: 80,
         soft_limit_reached: false,
         period_started_at: "2026-08-17T00:00:00Z",
         resets_at: "2026-08-24T00:00:00Z",
-        unlimited: false,
-        story_id: storyId,
-        story_limit_tokens: storyId ? 250000 : null,
-        story_used_tokens: storyId ? 50 : null,
-        story_remaining_tokens: storyId ? 249950 : null,
-        story_percentage_used: storyId ? 0.02 : null
+        unlimited: false
       });
     }
     if (path.endsWith("/api/workspace")) {
@@ -243,8 +238,9 @@ test("player signs in and directs the next scene", async ({ page }) => {
   await expect(page.getByText("The clockwork archive waits for your decision.")).toBeVisible();
 
   await page.getByRole("button", { name: "设置", exact: true }).click();
-  await expect(page.getByText("小说周额度", { exact: true })).toBeVisible();
-  await expect(page.getByText("249,950", { exact: true })).toBeVisible();
+  await expect(page.getByText("12.5%", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("500,000", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("499,900", { exact: true })).toHaveCount(0);
   await expect(page.getByTestId("model-role-narrative_author")).toContainText("AI 作者");
   await expect(page.getByTestId("model-role-structured_extraction")).toContainText("结构化提取");
   await expect(page.getByTestId("model-role-continuity_revision")).toContainText("连续性修订");

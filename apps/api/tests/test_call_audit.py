@@ -145,18 +145,17 @@ def test_embedding_cache_hit_records_avoided_usage_at_zero_cost() -> None:
     assert float(row.cost_estimate) == 0.0
 
 
-def test_quota_preflight_carries_the_active_story_scope(monkeypatch) -> None:
+def test_quota_preflight_uses_only_the_account_scope(monkeypatch) -> None:
     user_id = uuid4()
     story_id = uuid4()
     captured = {}
 
-    async def capture_quota(session, checked_user_id, requested_tokens, settings, *, story_id):
+    async def capture_quota(session, checked_user_id, requested_tokens, settings):
         captured.update(
             session=session,
             user_id=checked_user_id,
             requested_tokens=requested_tokens,
             settings=settings,
-            story_id=story_id,
         )
 
     monkeypatch.setattr(audit_module, "AsyncSessionLocal", lambda: FakeSessionContext())
@@ -167,6 +166,5 @@ def test_quota_preflight_carries_the_active_story_scope(monkeypatch) -> None:
     asyncio.run(auditor.ensure_quota(321))
 
     assert captured["user_id"] == user_id
-    assert captured["story_id"] == story_id
     assert captured["requested_tokens"] == 321
     assert captured["settings"] is settings

@@ -9,25 +9,31 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_admin_user
 from app.config import Settings, get_settings
-from app.db.models import ModelCall, QuotaResetEvent, User
+from app.db.models import ModelCall, QuotaPolicyChange, QuotaResetEvent, User
 from app.db.session import get_session
 from app.schemas.quota import (
     AdminOverviewResponse,
+    AdminQuotaPolicyChangeResponse,
     AdminQuotaResetEventResponse,
     AdminUserQuotaResponse,
     QuotaResetRequest,
     QuotaResetResponse,
+    QuotaPolicyUpdateRequest,
+    QuotaPolicyUpdateResponse,
 )
 from app.services.quota_service import (
     calendar_week,
+    estimated_words_for_tokens,
     quota_period,
     quota_snapshot_for_usage,
     quota_usage_predicates,
     snapshot_payload,
+    weekly_token_limit,
 )
 
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+QUOTA_POLICY_LOCK_ID = 8_319_227_041
 
 
 @router.get("/overview", response_model=AdminOverviewResponse)
@@ -41,6 +47,7 @@ async def overview(
     settings: Settings = Depends(get_settings),
 ) -> AdminOverviewResponse:
     period_start, period_end = await quota_period(session)
+    effective_limit = await weekly_token_limit(session, settings)
     total_users, administrator_count = (
         await session.execute(
             select(
@@ -133,10 +140,23 @@ async def overview(
             .limit(10)
         )
     ).all()
+    policy_rows = (
+        await session.execute(
+            select(QuotaPolicyChange, User.email, User.display_name)
+            .outerjoin(User, User.id == QuotaPolicyChange.changed_by_user_id)
+            .order_by(QuotaPolicyChange.id.desc())
+            .limit(10)
+        )
+    ).all()
     rows = []
     for user in users:
         snapshot = quota_snapshot_for_usage(
-            user, settings, period_start, period_end, usage.get(user.id, 0)
+            user,
+            settings,
+            period_start,
+            period_end,
+            usage.get(user.id, 0),
+            limit_tokens=effective_limit,
         )
         rows.append(
             AdminUserQuotaResponse(
@@ -151,7 +171,8 @@ async def overview(
     return AdminOverviewResponse(
         total_users=int(total_users),
         administrator_count=int(administrator_count),
-        weekly_token_quota=settings.user_weekly_token_quota,
+        weekly_token_quota=effective_limit,
+        estimated_weekly_words=estimated_words_for_tokens(effective_limit),
         period_started_at=period_start,
         resets_at=period_end,
         total_used_tokens=total_used,
@@ -170,7 +191,55 @@ async def overview(
             )
             for event, email, display_name in reset_rows
         ],
+        policy_changes=[
+            AdminQuotaPolicyChangeResponse(
+                id=str(change.id),
+                administrator_email=email,
+                administrator_name=display_name,
+                previous_limit_tokens=change.previous_limit_tokens,
+                limit_tokens=change.limit_tokens,
+                estimated_words=estimated_words_for_tokens(change.limit_tokens),
+                reason=change.reason,
+                effective_at=change.effective_at,
+            )
+            for change, email, display_name in policy_rows
+        ],
     )
+
+
+@router.put("/quota/policy", response_model=QuotaPolicyUpdateResponse)
+async def update_quota_policy(
+    payload: QuotaPolicyUpdateRequest,
+    admin: User = Depends(get_admin_user),
+    session: AsyncSession = Depends(get_session),
+    settings: Settings = Depends(get_settings),
+) -> QuotaPolicyUpdateResponse:
+    await session.execute(select(func.pg_advisory_xact_lock(QUOTA_POLICY_LOCK_ID)))
+    previous_limit = await weekly_token_limit(session, settings)
+    now = datetime.now(timezone.utc)
+    change = QuotaPolicyChange(
+        changed_by_user_id=admin.id,
+        previous_limit_tokens=previous_limit,
+        limit_tokens=payload.weekly_token_quota,
+        reason=payload.reason.strip()[:220] or "Administrator quota policy update",
+        effective_at=now,
+    )
+    session.add(change)
+    await session.flush()
+    response = QuotaPolicyUpdateResponse(
+        change=AdminQuotaPolicyChangeResponse(
+            id=str(change.id),
+            administrator_email=admin.email,
+            administrator_name=admin.display_name,
+            previous_limit_tokens=previous_limit,
+            limit_tokens=change.limit_tokens,
+            estimated_words=estimated_words_for_tokens(change.limit_tokens),
+            reason=change.reason,
+            effective_at=now,
+        )
+    )
+    await session.commit()
+    return response
 
 
 @router.post("/quota/reset-all", response_model=QuotaResetResponse)

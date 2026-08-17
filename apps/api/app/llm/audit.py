@@ -65,7 +65,6 @@ class CallAuditor:
                 self.user_id,
                 requested_tokens,
                 self.settings,
-                story_id=self.story_id,
             )
 
     async def record_llm(

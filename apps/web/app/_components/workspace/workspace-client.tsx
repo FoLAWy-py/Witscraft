@@ -122,10 +122,7 @@ function classifyFailure(caught: unknown, fallback: string): { message: string; 
   }
   if (caught instanceof ApiError) {
     if (caught.status === 429 && caught.message.toLowerCase().includes("quota")) {
-      if (caught.message.toLowerCase().includes("story")) {
-        return { message: "本小说已达到本周 AI 额度。可在设置中查看小说用量与重置时间。", kind: "api" };
-      }
-      return { message: "本周 AI 额度不足。可在设置中查看用量与重置时间。", kind: "api" };
+      return { message: "账号本周 AI 额度不足。所有小说共享该额度，可在设置中查看使用百分比。", kind: "api" };
     }
     if (caught.status === 429 && caught.message.toLowerCase().includes("per-turn")) {
       return { message: "本轮已达到外部模型调用上限，已停止继续调用。请重新同步后再试。", kind: "api" };
@@ -376,9 +373,9 @@ export default function WorkspaceClient() {
   const streamAbortRef = useRef<AbortController | null>(null);
   const streamAssistantActiveRef = useRef(false);
 
-  const refreshQuota = useCallback(async (activeStoryId?: string) => {
+  const refreshQuota = useCallback(async () => {
     try {
-      setQuota(await getMyQuota(activeStoryId));
+      setQuota(await getMyQuota());
     } catch {
       setQuota(null);
     }
@@ -593,11 +590,6 @@ export default function WorkspaceClient() {
     void refreshQuota();
     void loadWorkspace();
   }, [authStatus, authUser?.email_verified, loadWorkspace, refreshQuota]);
-
-  useEffect(() => {
-    if (authStatus !== "authenticated" || !authUser?.email_verified || !storyId) return;
-    void refreshQuota(storyId);
-  }, [authStatus, authUser?.email_verified, refreshQuota, storyId]);
 
   useEffect(() => {
     if (authStatus !== "authenticated" || !authUser?.email_verified) return;
@@ -1099,7 +1091,7 @@ export default function WorkspaceClient() {
       streamAbortRef.current = null;
       streamAssistantActiveRef.current = false;
       setPending(false);
-      void refreshQuota(storyId || undefined);
+      void refreshQuota();
     }
   }
 
@@ -1136,7 +1128,7 @@ export default function WorkspaceClient() {
       setError(caught instanceof ApiError ? caught.message : `${command === "rewrite" ? "重写" : "重新生成"}失败，请稍后重试。`);
     } finally {
       setPending(false);
-      void refreshQuota(storyId || undefined);
+      void refreshQuota();
     }
   }
 

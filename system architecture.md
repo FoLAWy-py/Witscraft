@@ -2,7 +2,7 @@
 
 **Document status:** Production baseline
 
-**Architecture version:** 3.17
+**Architecture version:** 3.18
 
 **Last updated:** 17 August 2026
 
@@ -310,13 +310,15 @@ Multi-model routing is supported by purpose. A multi-agent architecture is not t
 
 ### 9.1 Weekly Usage Governance
 
-Standard users receive a configurable weekly account allowance through `USER_WEEKLY_TOKEN_QUOTA`, with a default of 500,000 tokens, plus an independent per-novel ceiling through `STORY_WEEKLY_TOKEN_QUOTA`, with a default of 250,000 tokens. The natural period is Monday `00:00 UTC` through the following Monday. Successful external LLM and embedding audit rows contribute their recorded input and output tokens; deterministic local and dry-run operations do not consume either allowance.
+Standard users receive one weekly account allowance shared by all interactive novels, story-planning flows, health probes, and external embedding work attributed to that account. `USER_WEEKLY_TOKEN_QUOTA` supplies the 500,000-token deployment fallback until an administrator persists a policy. The natural period is Monday `00:00 UTC` through the following Monday. Successful external LLM and embedding audit rows contribute their recorded input and output tokens; deterministic local and dry-run operations do not consume the allowance.
 
-The provider-neutral gateway performs account and, for an active novel, story preflight checks using estimated input plus maximum output before contacting a provider. Rejection returns HTTP `429`, an explicit `account` or `story` scope, and the next reset boundary. Administrators are exempt from both allowances.
+The provider-neutral gateway performs one account preflight using estimated input plus maximum output before contacting a provider. Rejection returns HTTP `429`, account scope, and the next reset boundary. Administrators are exempt. The ordinary-player interface renders percentage only; token totals, limits, remaining capacity, and the reset boundary are not displayed there.
 
 At the configurable soft threshold, 80% by default, the API marks the quota snapshot for a visible workspace warning while preserving the user's selected route. At the hard threshold, preflight blocks additional spend. The independent per-turn external-call ceiling defaults to 8 and bounds retry or orchestration amplification even when token estimates remain below the weekly allowance.
 
-A manual global reset creates an append-only `QuotaResetEvent`; historical `ModelCall` records remain intact. The latest reset within the current calendar week becomes the effective period start. The administrator overview separates global metrics from the bounded account list: global counts and token usage retain tenant-wide meaning, while search, role filters, and pagination affect only the returned user page. Per-page usage is read through a grouped aggregate query, and the latest 10 reset events provide operator, reason, and effective-time auditability. None of these queries join narrative content.
+A quota update acquires a PostgreSQL transaction-level advisory lock and appends a `QuotaPolicyChange` containing the previous limit, new limit, administrator, reason, and effective time. The latest sequence is authoritative; the environment value remains a bootstrap fallback. The administrator console presents a deterministic planning estimate of three words per four tokens. This estimate is not billing data and can differ materially by language, tokenizer, model, and prose style.
+
+A manual global reset creates an append-only `QuotaResetEvent`; historical `ModelCall` records remain intact. The latest reset within the current calendar week becomes the effective period start. The administrator overview separates global metrics from the bounded account list: global counts and token usage retain tenant-wide meaning, while search, role filters, and pagination affect only the returned user page. Per-page usage is read through a grouped aggregate query, and the latest 10 policy changes and reset events provide operator, reason, and effective-time auditability. None of these queries join narrative content.
 
 This is a preflight and reconciliation design rather than a reservation ledger. The single-process deployment can admit simultaneous requests that together exceed the remaining allowance by a bounded amount. Strict multi-worker enforcement requires durable token reservations before horizontal scaling.
 
@@ -350,7 +352,7 @@ The current implementation uses structured application logs and PostgreSQL audit
 
 ## 12. Migration and Release Contract
 
-Alembic is the only production schema migration mechanism. Revision `0013` adds administrator roles, append-only quota reset events, and a user/time model-call index for weekly accounting. Revision `0014` adds versioned embedding compatibility metadata and a content-hash lookup index for long-term memories. Revision `0017` installs pgvector, adds fixed-dimension vector storage, and preserves a reversible legacy JSONB compatibility path. Revision `0018` adds durable memory embedding tasks, claim and stale-lease indexes, bounded attempt state, and cascading ownership references.
+Alembic is the only production schema migration mechanism. Revision `0013` adds administrator roles, append-only quota reset events, and a user/time model-call index for weekly accounting. Revision `0014` adds versioned embedding compatibility metadata and a content-hash lookup index for long-term memories. Revision `0017` installs pgvector, adds fixed-dimension vector storage, and preserves a reversible legacy JSONB compatibility path. Revision `0018` adds durable memory embedding tasks, claim and stale-lease indexes, bounded attempt state, and cascading ownership references. Revision `0019` adds the append-only account quota policy ledger, deterministic sequence ordering, and retained administrator attribution.
 
 The release order is:
 
