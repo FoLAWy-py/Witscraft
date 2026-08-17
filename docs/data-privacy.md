@@ -35,7 +35,7 @@ For generation requests, the selected OpenAI or DeepInfra-compatible provider re
 
 When semantic memory retrieval requires a remote embedding, OpenAI receives only the text being embedded. Small or empty memory sets bypass query embedding, and embeddings are not generated on every conversation turn.
 
-Witscraft does not send account email addresses, password hashes, session tokens, authentication action tokens, SMTP credentials, or provider API keys as model input. Provider credentials remain server-side.
+Witscraft does not send account email addresses, password hashes, session tokens, authentication action tokens, SMTP credentials, or provider API keys as model input. Provider credentials and provider infrastructure base URLs remain server-side. The browser receives only registered model metadata and the backend-resolved purpose route needed to explain which model will author or support the interaction.
 
 Upstream retention, abuse monitoring, regional processing, and training controls are governed by the operator's provider account and contract. Before enabling a provider in production, the operator must verify its current retention and training settings, document the approved region and purpose, and disclose material changes to users.
 

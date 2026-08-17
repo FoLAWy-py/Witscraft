@@ -35,6 +35,8 @@ class ChatRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_command(self) -> Self:
+        if bool(self.provider) != bool(self.model):
+            raise ValueError("provider and model must be supplied together")
         if self.command and not self.target_message_id:
             raise ValueError("target_message_id is required for message commands")
         if self.command and self.stream:

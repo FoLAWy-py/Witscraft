@@ -727,8 +727,6 @@ export async function updateCanonFact(factId: string, input: UpdateCanonFactInpu
 
 export async function sendStoryMessage(input: {
   message: string;
-  provider?: string;
-  model?: string;
   purpose?: StoryPurpose;
   storyId?: string;
   branchId?: string;
@@ -747,8 +745,6 @@ export async function sendStoryMessage(input: {
       message: input.message,
       story_id: input.storyId,
       branch_id: input.branchId,
-      provider: input.provider,
-      model: input.model,
       purpose: input.purpose ?? "normal_chat",
       command: input.command,
       target_message_id: input.targetMessageId,
@@ -761,8 +757,6 @@ export async function sendStoryMessage(input: {
 export async function streamStoryMessage(
   input: {
     message: string;
-    provider?: string;
-    model?: string;
     purpose?: StoryPurpose;
     storyId?: string;
     branchId?: string;
@@ -796,8 +790,6 @@ export async function streamStoryMessage(
       message: input.message,
       story_id: input.storyId,
       branch_id: input.branchId,
-      provider: input.provider,
-      model: input.model,
       purpose: input.purpose ?? "normal_chat",
       idempotency_key: input.idempotencyKey,
       branch_version: input.branchVersion

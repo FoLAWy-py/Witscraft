@@ -15,6 +15,7 @@ from app.llm.router import LLMGateway, PurposeInputBudgetExceededError
 from app.schemas.chat import ChatRequest, ChatResponse
 from app.services.story_engine import StoryEngine
 from app.services.quota_service import QuotaExceededError
+from app.services.model_route_service import load_user_purpose_routes
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -39,7 +40,12 @@ async def get_story_engine(
         user_id=user_id,
         request_id=getattr(request.state, "request_id", None),
     )
-    return StoryEngine(LLMGateway(settings, auditor=auditor), session, user_id)
+    purpose_routes = await load_user_purpose_routes(session, user_id)
+    return StoryEngine(
+        LLMGateway(settings, auditor=auditor, purpose_routes=purpose_routes),
+        session,
+        user_id,
+    )
 
 
 @router.post("/send", response_model=ChatResponse)

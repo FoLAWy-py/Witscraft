@@ -19,6 +19,12 @@ The effective output maximum is the lower of the purpose limit and the selected 
 
 The provider catalogue exposes `purpose_budgets` so clients can explain the backend policy without recreating it. The backend remains the source of truth.
 
+## Purpose route resolution
+
+The API resolves a validated saved user route for each purpose and falls back to the model registry's system default when no valid user route exists. This same resolution path covers the AI-authored narrative response and auxiliary state extraction, event extraction, choice generation, consistency checks, planning interviews, story drafts, and summaries. Persisted routes with an unknown purpose, unknown model, or provider/model mismatch are excluded from effective routing.
+
+Clients submit the purpose, not an independently assembled provider/model pair. The provider catalogue returns `effective_routes` with the provider, model, source, and effective budgets for every purpose, and context preview reports the route that would author the next narrative turn. Optional legacy hints are accepted only when both fields are present and match that route; otherwise the API returns HTTP `409` before story mutation or provider execution. Provider health tests remain an explicit operator-selected model probe and do not change saved routes.
+
 ## Embedding reuse
 
 `TurnContext` owns query embedding reuse for one request/turn. The context is reset whenever a new audited turn begins, so cached narrative inputs cannot cross requests, stories, users, or turns.

@@ -31,7 +31,6 @@ from app.db.models import (
     UserPreference,
     World,
 )
-from app.llm.model_registry import get_model
 from app.llm.router import LLMGateway
 from app.schemas.chat import ChatRequest, ChatResponse, StoryState
 from app.schemas.llm import ChatMessage, LLMRequest, LLMResponse
@@ -194,6 +193,7 @@ class StoryEngine:
         self._active_generation_id: UUID | None = None
 
     async def send(self, request: ChatRequest) -> ChatResponse:
+        self._validate_request_route(request)
         story_id = self._parse_uuid(request.story_id, DEFAULT_STORY_ID)
         story = await self._get_story(story_id)
         branch_id = self._parse_uuid(request.branch_id, story.current_branch_id or DEFAULT_BRANCH_ID)
@@ -233,27 +233,11 @@ class StoryEngine:
         prompt_messages = context.prompt_messages
         await self.session.commit()
 
-        if generation_request.provider and generation_request.model:
-            option = get_model(generation_request.model)
-            llm_request = LLMRequest(
-                provider=generation_request.provider,
-                model=generation_request.model,
-                messages=prompt_messages,
-                purpose=generation_request.purpose,
-                max_output_tokens=generation_request.max_output_tokens
-                or (option.default_max_output_tokens if option else 2400),
-                temperature=option.temperature if option else 0.82,
-                top_p=option.top_p if option else 0.92,
-                reasoning_effort=option.reasoning_effort if option else None,
-                stream=generation_request.stream,
-            )
-        else:
-            llm_request = self.llm_gateway.request_for_purpose(
-                generation_request.purpose,
-                prompt_messages,
-            )
-
-        llm_request = self.llm_gateway.normalize_request(llm_request)
+        llm_request = self._routed_generation_request(
+            generation_request,
+            prompt_messages,
+            stream=generation_request.stream,
+        )
         llm_response = await self.llm_gateway.generate(llm_request)
         response_content, response_choices = split_story_response(
             llm_response.text,
@@ -388,6 +372,11 @@ class StoryEngine:
         return response
 
     async def stream(self, request: ChatRequest) -> AsyncIterator[dict]:
+        try:
+            self._validate_request_route(request)
+        except HTTPException as error:
+            yield {"type": "error", "status": error.status_code, "detail": error.detail}
+            return
         story_id = self._parse_uuid(request.story_id, DEFAULT_STORY_ID)
         story = await self._get_story(story_id)
         branch_id = self._parse_uuid(request.branch_id, story.current_branch_id or DEFAULT_BRANCH_ID)
@@ -425,25 +414,11 @@ class StoryEngine:
         prompt_messages = context.prompt_messages
         await self.session.commit()
 
-        if request.provider and request.model:
-            option = get_model(request.model)
-            llm_request = LLMRequest(
-                provider=request.provider,
-                model=request.model,
-                messages=prompt_messages,
-                purpose=request.purpose,
-                max_output_tokens=request.max_output_tokens
-                or (option.default_max_output_tokens if option else 2400),
-                temperature=option.temperature if option else 0.82,
-                top_p=option.top_p if option else 0.92,
-                reasoning_effort=option.reasoning_effort if option else None,
-                stream=True,
-            )
-        else:
-            llm_request = self.llm_gateway.request_for_purpose(request.purpose, prompt_messages)
-            llm_request = llm_request.model_copy(update={"stream": True})
-
-        llm_request = self.llm_gateway.normalize_request(llm_request)
+        llm_request = self._routed_generation_request(
+            request,
+            prompt_messages,
+            stream=True,
+        )
         started = time.perf_counter()
         chunks: list[str] = []
         delivered_text = ""
@@ -564,6 +539,7 @@ class StoryEngine:
         yield {"type": "done", "response": response.model_dump()}
 
     async def preview_context(self, request: ChatRequest) -> dict:
+        self._validate_request_route(request)
         story_id = self._parse_uuid(request.story_id, DEFAULT_STORY_ID)
         story = await self._get_story(story_id)
         self._begin_audit_turn(story.id)
@@ -574,8 +550,36 @@ class StoryEngine:
             "story_id": str(story.id),
             "branch_id": str(branch.id),
             "purpose": request.purpose,
+            "effective_route": self.llm_gateway.route_for_purpose(request.purpose),
             **context.preview,
         }
+
+    def _routed_generation_request(
+        self,
+        request: ChatRequest,
+        messages: list[ChatMessage],
+        *,
+        stream: bool,
+    ) -> LLMRequest:
+        self._validate_request_route(request)
+        routed = self.llm_gateway.request_for_purpose(request.purpose, messages)
+        updates: dict = {"stream": stream}
+        if request.max_output_tokens is not None:
+            updates["max_output_tokens"] = request.max_output_tokens
+        return self.llm_gateway.normalize_request(routed.model_copy(update=updates))
+
+    def _validate_request_route(self, request: ChatRequest) -> None:
+        if not (request.provider or request.model):
+            return
+        routed = self.llm_gateway.route_for_purpose(request.purpose)
+        if request.provider != routed["provider"] or request.model != routed["model"]:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "Requested provider/model does not match the current backend purpose "
+                    "route; refresh provider settings and retry"
+                ),
+            )
 
     async def _prepare_generation_command(
         self,

@@ -55,6 +55,7 @@ from app.services.embeddings import EmbeddingService, embedding_content_hash
 from app.services.branch_manager import clone_story_branch
 from app.services.session_summarizer import generate_session_summary
 from app.services.quota_service import QuotaExceededError
+from app.services.model_route_service import load_user_purpose_routes
 from app.services.story_exporter import (
     build_story_export_payload,
     export_filename,
@@ -448,6 +449,7 @@ async def generate_story_draft(
     request: GenerateStoryDraftRequest,
     http_request: Request,
     settings: Settings = Depends(get_settings),
+    session: AsyncSession = Depends(get_session),
     user_id: UUID = Depends(get_verified_user_id),
 ) -> StoryDraftResponse:
     auditor = CallAuditor(
@@ -455,7 +457,8 @@ async def generate_story_draft(
         user_id=user_id,
         request_id=getattr(http_request.state, "request_id", None),
     )
-    gateway = LLMGateway(settings, auditor=auditor)
+    purpose_routes = await load_user_purpose_routes(session, user_id)
+    gateway = LLMGateway(settings, auditor=auditor, purpose_routes=purpose_routes)
     current = request.model_dump()
     messages = [
         ChatMessage(
@@ -516,7 +519,8 @@ async def _build_story_interview_request(
         f"{item.preference_type}: {item.content}" for item in preference_rows if item.content.strip()
     ]
     auditor = CallAuditor(settings, user_id=user_id, request_id=request_id)
-    gateway = LLMGateway(settings, auditor=auditor)
+    purpose_routes = await load_user_purpose_routes(session, user_id)
+    gateway = LLMGateway(settings, auditor=auditor, purpose_routes=purpose_routes)
     messages = [
         ChatMessage(
             role="system",
@@ -984,7 +988,11 @@ async def create_summary(
         )
         await generate_session_summary(
             session,
-            LLMGateway(settings, auditor=auditor),
+            LLMGateway(
+                settings,
+                auditor=auditor,
+                purpose_routes=await load_user_purpose_routes(session, user_id),
+            ),
             story,
             branch,
         )

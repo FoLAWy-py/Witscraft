@@ -108,7 +108,15 @@ async function installApiFixture(page: Page) {
         purpose_routes: {},
         availability: { openai: false, deepinfra: true, database: true },
         model_health: {},
-        deepinfra_base_url: "https://provider.example.invalid"
+        effective_routes: Object.fromEntries(purposes.map((purpose) => [purpose, {
+          purpose,
+          provider: "deepinfra",
+          model: "Qwen/Qwen3-Max",
+          source: "system_default",
+          max_input_tokens: budgets[purpose].max_input_tokens,
+          default_output_tokens: budgets[purpose].default_output_tokens,
+          hard_output_tokens: budgets[purpose].hard_output_tokens
+        }]))
       });
     }
     if (path.endsWith("/api/workspace/preferences")) {
@@ -138,6 +146,9 @@ async function installApiFixture(page: Page) {
     }
     if (path.endsWith("/api/chat/stream")) {
       const payload = request.postDataJSON();
+      expect(payload).not.toHaveProperty("provider");
+      expect(payload).not.toHaveProperty("model");
+      expect(payload.purpose).toBe("normal_chat");
       const reply = "Mira turns the key, and the sealed archive answers.";
       branchVersion += 1;
       storyState = { location: "Sealed archive", time: "Midnight", mood: "tense", objective: "Read the answer", inventory: ["key"], open_threads: [] };

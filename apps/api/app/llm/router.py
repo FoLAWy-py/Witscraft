@@ -2,6 +2,7 @@ import asyncio
 import random
 import time
 from collections.abc import AsyncIterator
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from openai import APIConnectionError, APIStatusError, APITimeoutError, RateLimitError
@@ -9,9 +10,15 @@ from openai import APIConnectionError, APIStatusError, APITimeoutError, RateLimi
 from app.config import Settings
 from app.llm.audit import CallAuditor
 from app.llm.deepinfra_adapter import DeepInfraAdapter
-from app.llm.model_registry import choose_model, fallback_models, get_model, purpose_budget
+from app.llm.model_registry import (
+    PURPOSE_DEFAULTS,
+    choose_model,
+    fallback_models,
+    get_model,
+    purpose_budget,
+)
 from app.llm.openai_adapter import OpenAIAdapter
-from app.schemas.llm import LLMRequest, LLMResponse, StoryPurpose
+from app.schemas.llm import LLMRequest, LLMResponse, ModelOption, StoryPurpose
 
 
 @dataclass
@@ -33,9 +40,15 @@ _CIRCUITS: dict[tuple[str, str], _CircuitState] = {}
 
 
 class LLMGateway:
-    def __init__(self, settings: Settings, auditor: CallAuditor | None = None):
+    def __init__(
+        self,
+        settings: Settings,
+        auditor: CallAuditor | None = None,
+        purpose_routes: Mapping[StoryPurpose, str] | None = None,
+    ):
         self.settings = settings
         self.auditor = auditor
+        self.purpose_routes = dict(purpose_routes or {})
         self.last_stream_call_id: str | None = None
         self.last_stream_cost_estimate: float | None = None
         self.last_stream_provider: str | None = None
@@ -298,7 +311,7 @@ class LLMGateway:
         return False
 
     def request_for_purpose(self, purpose: StoryPurpose, messages: list) -> LLMRequest:
-        option = choose_model(purpose)
+        option = self._route_option(purpose)
         budget = purpose_budget(purpose)
         return LLMRequest(
             provider=option.provider, model=option.model, messages=messages, purpose=purpose,
@@ -306,6 +319,37 @@ class LLMGateway:
             temperature=option.temperature, top_p=option.top_p,
             reasoning_effort=option.reasoning_effort,
         )
+
+    def route_for_purpose(self, purpose: StoryPurpose) -> dict:
+        option = self._route_option(purpose)
+        budget = purpose_budget(purpose)
+        configured = get_model(self.purpose_routes.get(purpose, ""))
+        return {
+            "purpose": purpose,
+            "provider": option.provider,
+            "model": option.model,
+            "source": "user_route" if configured is not None else "system_default",
+            "max_input_tokens": budget.max_input_tokens,
+            "default_output_tokens": budget.default_output_tokens,
+            "hard_output_tokens": min(
+                budget.hard_output_tokens,
+                option.hard_max_output_tokens,
+            ),
+        }
+
+    def route_manifest(self) -> dict[StoryPurpose, dict]:
+        return {
+            purpose: self.route_for_purpose(purpose)
+            for purpose in PURPOSE_DEFAULTS
+        }
+
+    def _route_option(self, purpose: StoryPurpose) -> ModelOption:
+        configured_model = self.purpose_routes.get(purpose)
+        if configured_model is not None:
+            option = get_model(configured_model)
+            if option is not None:
+                return option
+        return choose_model(purpose)
 
     def normalize_request(self, request: LLMRequest) -> LLMRequest:
         option = get_model(request.model)

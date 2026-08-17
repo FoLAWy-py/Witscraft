@@ -951,10 +951,6 @@ export default function Home() {
   async function handleSend(override?: string) {
     const text = (override ?? draft).trim();
     if (!text || pending) return;
-    if (!activeModel) {
-      setError("模型列表尚未从后端加载，暂时不能发送。");
-      return;
-    }
     if (!storyId || !branchId) {
       setError("小说数据尚未加载完成，暂时不能发送。");
       return;
@@ -975,8 +971,6 @@ export default function Home() {
       await streamStoryMessage(
         {
           message: text,
-          provider: activeModel.provider,
-          model: activeModel.model,
           purpose: selectedPurpose,
           storyId,
           branchId,
@@ -1067,7 +1061,7 @@ export default function Home() {
   }
 
   async function handleMessageCommand(messageId: string, command: "regenerate" | "rewrite", overrideInstruction?: string) {
-    if (!storyId || !branchId || !activeModel || pending) return;
+    if (!storyId || !branchId || pending) return;
     const instruction = command === "rewrite" ? overrideInstruction ?? draft.trim() : "";
     const idempotencyKey = window.crypto.randomUUID();
     const branchVersion = branchList.find((branch) => branch.id === branchId)?.version ?? 0;
@@ -1077,8 +1071,6 @@ export default function Home() {
     try {
       await sendStoryMessage({
         message: instruction,
-        provider: activeModel.provider,
-        model: activeModel.model,
         purpose: selectedPurpose,
         storyId,
         branchId,

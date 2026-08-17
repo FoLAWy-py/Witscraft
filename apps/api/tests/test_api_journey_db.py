@@ -10,7 +10,7 @@ import pytest
 from sqlalchemy import delete, select
 
 from app.config import Settings, get_settings
-from app.db.models import AuthCredential, GenerationRequest, Message, User
+from app.db.models import AuthCredential, GenerationRequest, Message, User, UserModelRoute
 from app.db.session import AsyncSessionLocal, engine
 from app.llm.router import LLMGateway
 from app.main import create_app
@@ -51,6 +51,14 @@ def test_authenticated_interactive_novel_api_journey(monkeypatch) -> None:
                 session.add(
                     AuthCredential(user_id=user.id, password_hash=hash_password(password))
                 )
+                session.add(
+                    UserModelRoute(
+                        user_id=user.id,
+                        purpose="normal_chat",
+                        provider="deepinfra",
+                        model="zai-org/GLM-5.2",
+                    )
+                )
                 await session.commit()
 
             transport = httpx.ASGITransport(app=application)
@@ -66,6 +74,20 @@ def test_authenticated_interactive_novel_api_journey(monkeypatch) -> None:
                 assert login.status_code == 200, login.text
                 assert login.json()["user"]["email_verified"] is True
                 assert "witscraft_session" in client.cookies
+
+                provider_catalog = await client.get("/api/providers")
+                assert provider_catalog.status_code == 200, provider_catalog.text
+                catalog_payload = provider_catalog.json()
+                assert catalog_payload["effective_routes"]["normal_chat"] == {
+                    "purpose": "normal_chat",
+                    "provider": "deepinfra",
+                    "model": "zai-org/GLM-5.2",
+                    "source": "user_route",
+                    "max_input_tokens": 10000,
+                    "default_output_tokens": 2400,
+                    "hard_output_tokens": 4096,
+                }
+                assert "deepinfra_base_url" not in catalog_payload
 
                 created = await client.post(
                     "/api/workspace/stories",
@@ -88,6 +110,40 @@ def test_authenticated_interactive_novel_api_journey(monkeypatch) -> None:
                 main_branch_id = workspace["branch_id"]
                 assert workspace["messages"][-1]["content"].startswith("The archive clock")
 
+                stale_route = await client.post(
+                    "/api/chat/send",
+                    headers={"Idempotency-Key": f"journey-{marker}-stale-route"},
+                    json={
+                        "message": "This stale client must not write a turn.",
+                        "story_id": story_id,
+                        "branch_id": main_branch_id,
+                        "branch_version": 0,
+                        "provider": "deepinfra",
+                        "model": "Qwen/Qwen3-Max",
+                        "idempotency_key": f"journey-{marker}-stale-route",
+                    },
+                )
+                assert stale_route.status_code == 409
+                unchanged_workspace = await client.get(
+                    "/api/workspace",
+                    params={"story_id": story_id, "branch_id": main_branch_id},
+                )
+                assert unchanged_workspace.status_code == 200
+                assert len(unchanged_workspace.json()["messages"]) == len(workspace["messages"])
+
+                preview = await client.post(
+                    "/api/chat/context-preview",
+                    json={
+                        "message": "I inspect the key.",
+                        "story_id": story_id,
+                        "branch_id": main_branch_id,
+                        "purpose": "normal_chat",
+                    },
+                )
+                assert preview.status_code == 200, preview.text
+                assert preview.json()["effective_route"]["model"] == "zai-org/GLM-5.2"
+                assert preview.json()["effective_route"]["source"] == "user_route"
+
                 generated = await client.post(
                     "/api/chat/send",
                     headers={"Idempotency-Key": f"journey-{marker}-send"},
@@ -103,6 +159,7 @@ def test_authenticated_interactive_novel_api_journey(monkeypatch) -> None:
                 first_reply = generated.json()
                 assert first_reply["branch_version"] == 1
                 assert first_reply["model_call"]["dry_run"] is True
+                assert first_reply["model_call"]["model"] == "zai-org/GLM-5.2"
 
                 regenerated = await client.post(
                     "/api/chat/send",

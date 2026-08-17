@@ -1,10 +1,16 @@
 from datetime import datetime, timedelta, timezone
 
 import pytest
+from fastapi import HTTPException
 from pydantic import ValidationError
 
+from app.config import Settings
+from app.llm.router import LLMGateway
 from app.llm.model_registry import PURPOSE_DEFAULTS
 from app.routers.providers import ModelRoutesRequest, _health_is_fresh
+from app.schemas.chat import ChatRequest
+from app.schemas.llm import ChatMessage
+from app.services.story_engine import StoryEngine
 
 
 def test_model_routes_require_every_purpose() -> None:
@@ -40,3 +46,46 @@ def test_model_health_freshness_normalizes_legacy_naive_timestamps() -> None:
     now = datetime(2026, 7, 13, 12, tzinfo=timezone.utc)
 
     assert _health_is_fresh(datetime(2026, 7, 13, 11), now)
+
+
+def test_client_model_hint_must_match_backend_route() -> None:
+    engine = StoryEngine.__new__(StoryEngine)
+    engine.llm_gateway = LLMGateway(
+        Settings(dry_run_llm=True),
+        purpose_routes={"normal_chat": "zai-org/GLM-5.2"},
+    )
+    messages = [ChatMessage(role="user", content="continue")]
+
+    matching = engine._routed_generation_request(
+        ChatRequest(
+            message="continue",
+            story_id="story",
+            provider="deepinfra",
+            model="zai-org/GLM-5.2",
+        ),
+        messages,
+        stream=False,
+    )
+    assert matching.model == "zai-org/GLM-5.2"
+
+    with pytest.raises(HTTPException) as caught:
+        engine._routed_generation_request(
+            ChatRequest(
+                message="continue",
+                story_id="story",
+                provider="deepinfra",
+                model="Qwen/Qwen3-Max",
+            ),
+            messages,
+            stream=False,
+        )
+    assert caught.value.status_code == 409
+
+
+def test_chat_request_rejects_partial_client_route_hint() -> None:
+    with pytest.raises(ValidationError, match="provider and model must be supplied together"):
+        ChatRequest(
+            message="continue",
+            story_id="story",
+            provider="deepinfra",
+        )

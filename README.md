@@ -78,7 +78,9 @@ Production disables FastAPI's interactive documentation and OpenAPI schema endpo
 
 ## Model Routing
 
-The current backend default for every story purpose is `Qwen/Qwen3-Max`. The registry also exposes alternative DeepInfra and OpenAI models, and the frontend can save purpose-specific routes.
+The current backend default for every story purpose is `Qwen/Qwen3-Max`. The registry also exposes alternative DeepInfra and OpenAI models, and an authenticated user can save purpose-specific routes. The backend is the only routing authority: every AI-authored narrative call and auxiliary state, event, consistency, interview, draft, or summary call resolves the user's saved route first and otherwise uses the registered system default.
+
+The browser submits the story purpose rather than assembling a provider/model pair. `GET /api/providers` exposes an `effective_routes` manifest, and context preview reports the effective route for the selected narrative purpose. During client migration, an optional legacy provider/model pair is accepted only when it matches the current backend route; a stale pair is rejected with HTTP `409` before narrative state is written. Provider credentials and infrastructure base URLs remain server-side.
 
 ## Model Call Auditing
 
@@ -173,5 +175,5 @@ curl -s -X POST http://<your-computer-lan-ip>:8000/api/providers/test \
 curl -s -X POST http://<your-computer-lan-ip>:8000/api/chat/send \
   -b cookies.txt \
   -H 'Content-Type: application/json' \
-  -d '{"message":"我压低声音问林岚：这把钥匙到底能打开什么？","provider":"deepinfra","model":"Qwen/Qwen3-Max","purpose":"normal_chat","max_output_tokens":512}'
+  -d '{"message":"我压低声音问林岚：这把钥匙到底能打开什么？","purpose":"normal_chat","max_output_tokens":512}'
 ```

@@ -40,13 +40,21 @@ export type ProvidersResponse = {
     hard_output_tokens: number;
   }>;
   purpose_routes: Partial<Record<StoryPurpose, string>>;
+  effective_routes: Record<StoryPurpose, {
+    purpose: StoryPurpose;
+    provider: ProviderName;
+    model: string;
+    source: "user_route" | "system_default";
+    max_input_tokens: number;
+    default_output_tokens: number;
+    hard_output_tokens: number;
+  }>;
   availability: {
     openai: boolean;
     deepinfra: boolean;
     database: boolean;
   };
   model_health: Record<string, ModelHealth>;
-  deepinfra_base_url: string;
 };
 
 export type ModelHealthResponse = {
@@ -56,6 +64,7 @@ export type ModelHealthResponse = {
 
 export type ModelRoutesResponse = {
   purpose_routes: Record<StoryPurpose, string>;
+  effective_routes: ProvidersResponse["effective_routes"];
 };
 
 export type AuthUser = {

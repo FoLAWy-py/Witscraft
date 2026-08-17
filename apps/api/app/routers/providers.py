@@ -20,6 +20,7 @@ from app.llm.model_registry import (
 from app.llm.router import LLMGateway
 from app.schemas.llm import ChatMessage, LLMRequest, ProviderName, StoryPurpose
 from app.services.quota_service import QuotaExceededError
+from app.services.model_route_service import load_user_purpose_routes
 
 router = APIRouter(prefix="/providers", tags=["providers"])
 HEALTH_FRESHNESS = timedelta(hours=6)
@@ -43,17 +44,6 @@ class ModelRoutesRequest(BaseModel):
         if unknown_models:
             raise ValueError(f"Unknown model: {unknown_models[0]}")
         return self
-
-
-async def _load_routes(session: AsyncSession, user_id: UUID) -> dict[str, str]:
-    result = await session.execute(
-        select(UserModelRoute).where(UserModelRoute.user_id == user_id)
-    )
-    return {
-        route.purpose: route.model
-        for route in result.scalars().all()
-        if get_model(route.model) is not None
-    }
 
 
 def _health_is_fresh(checked_at: datetime, now: datetime | None = None) -> bool:
@@ -110,24 +100,27 @@ async def providers(
     session: AsyncSession = Depends(get_session),
     user_id: UUID = Depends(get_verified_user_id),
 ) -> dict:
+    purpose_routes = await load_user_purpose_routes(session, user_id)
+    gateway = LLMGateway(settings, purpose_routes=purpose_routes)
     return {
         "models": [model.model_dump() for model in list_models()],
         "purpose_defaults": PURPOSE_DEFAULTS,
         "purpose_budgets": serialized_purpose_budgets(),
-        "purpose_routes": await _load_routes(session, user_id),
+        "purpose_routes": purpose_routes,
+        "effective_routes": gateway.route_manifest(),
         "availability": {
             "openai": bool(settings.openai_api_key),
             "deepinfra": bool(settings.deepinfra_api_key),
             "database": bool(settings.database_url),
         },
         "model_health": await _load_health(session),
-        "deepinfra_base_url": settings.deepinfra_base_url,
     }
 
 
 @router.put("/routes")
 async def update_routes(
     request: ModelRoutesRequest,
+    settings: Settings = Depends(get_settings),
     session: AsyncSession = Depends(get_session),
     user_id: UUID = Depends(get_verified_user_id),
 ) -> dict:
@@ -159,7 +152,14 @@ async def update_routes(
             )
         )
     await session.commit()
-    return {"purpose_routes": await _load_routes(session, user_id)}
+    purpose_routes = await load_user_purpose_routes(session, user_id)
+    return {
+        "purpose_routes": purpose_routes,
+        "effective_routes": LLMGateway(
+            settings,
+            purpose_routes=purpose_routes,
+        ).route_manifest(),
+    }
 
 
 @router.post("/test")
