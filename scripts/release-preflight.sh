@@ -13,7 +13,7 @@ fi
 cd "$ROOT/apps/api"
 uv sync --frozen --all-extras
 uv run --with pip-audit==2.10.1 pip-audit --local
-uv run ruff check app tests migrations ../../scripts/check-pgvector-migration.py ../../scripts/create-release-manifest.py ../../scripts/evaluate-structured-extraction.py ../../scripts/smoke-release.py
+uv run ruff check app tests migrations ../../scripts/check-pgvector-migration.py ../../scripts/create-release-manifest.py ../../scripts/evaluate-memory-retrieval.py ../../scripts/evaluate-structured-extraction.py ../../scripts/smoke-release.py
 uv run python ../../scripts/evaluate-structured-extraction.py
 uv run pytest -q
 

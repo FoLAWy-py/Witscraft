@@ -2,7 +2,7 @@
 
 **Document status:** Production baseline
 
-**Architecture version:** 3.14
+**Architecture version:** 3.15
 
 **Last updated:** 17 August 2026
 
@@ -298,7 +298,7 @@ Retrieval is hybrid within the authorized story and branch candidate set. Keywor
 
 Every model purpose has a central route, maximum input budget, default output budget, and hard output limit. The gateway applies these policies before provider execution to primary, auxiliary, fallback, streaming, and non-streaming requests. Saved user routes take precedence over system defaults and are loaded for narrative generation, state and event extraction, choice generation, consistency checks, planning interviews, story drafts, and summaries. The effective output ceiling is the lower of the purpose limit and model capability. Oversized input is rejected before provider traffic. In addition, the shared turn auditor reserves one slot for each real provider request and stops retries, fallbacks, auxiliary calls, and external embeddings when the per-turn ceiling is reached. The current policy and values are maintained in `docs/model-cost-controls.md`.
 
-The exact-database contract currently proves Recall@1 on a small adversarial corpus. The next retrieval step is to expand this to the fixed Recall@8/error-recall corpus and production-shaped p95 latency measurements. HNSW remains disabled until those measurements justify an activation threshold and parameters. Legacy or superseded vectors require an asynchronous, retryable re-embedding workflow before their JSONB compatibility lane can be removed.
+The exact-database contract includes a fixed eight-case Recall@8 and designated error-recall corpus, plus 24 uncached retrievals against 10,000 active rows. CI records end-to-end p95 latency as a regression guard. This remains synthetic contract evidence; HNSW stays disabled until production tenant shape, concurrency, cold-cache behavior, and live-provider embedding captures justify an activation threshold and parameters. Legacy or superseded vectors require an asynchronous, retryable re-embedding workflow before their JSONB compatibility lane can be removed.
 
 Multi-model routing is supported by purpose. A multi-agent architecture is not the default because narrative generation is primarily a coordinated state-transition workflow, not an open-ended autonomous task graph. Additional agents are justified only when an independently measurable task, such as evaluation or complex planning, produces sufficient quality improvement to offset latency, cost, and failure complexity.
 
@@ -394,7 +394,7 @@ Evolution should occur in this order:
 
 1. Complete backup, restoration, staging, and release automation.
 2. Add browser end-to-end coverage and production-equivalent staging validation to the existing CI baseline.
-3. Expand exact PostgreSQL similarity evidence to Recall@8, error-recall, and production-shaped latency before enabling HNSW.
+3. Add approved live-provider captures and production tenant/concurrency latency evidence before enabling HNSW.
 4. Add durable background jobs where retries and operational visibility require them.
 5. Move coordination state to shared infrastructure before adding API replicas.
 6. Add specialist models or agents only after evaluation data demonstrates a net quality benefit.

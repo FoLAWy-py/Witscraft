@@ -16,6 +16,7 @@ apps/
 - [`docs/data-privacy.md`](./docs/data-privacy.md): account export, deletion, retention, and model-provider data boundaries
 - [`docs/database-performance.md`](./docs/database-performance.md): repeatable PostgreSQL query-plan benchmark and index policy
 - [`docs/backup-recovery.md`](./docs/backup-recovery.md): encrypted backup operation, restore procedure, RPO/RTO, and drill evidence
+- [`docs/memory-retrieval-evaluation.md`](./docs/memory-retrieval-evaluation.md): fixed Recall@8, error-recall, and PostgreSQL latency gate
 - [`docs/admin-and-quota.md`](./docs/admin-and-quota.md): administrator permission boundary, weekly AI allowance, and reset operation
 - [`docs/model-cost-controls.md`](./docs/model-cost-controls.md): purpose-level model budgets, embedding cache metrics, and quota interaction
 - [`docs/structured-extraction-evaluation.md`](./docs/structured-extraction-evaluation.md): versioned state-extraction corpus, metrics, evidence classes, and model-approval gate

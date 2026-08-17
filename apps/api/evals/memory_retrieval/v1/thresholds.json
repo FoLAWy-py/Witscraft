@@ -1,0 +1,7 @@
+{
+  "candidate_rows": 10000,
+  "iterations": 24,
+  "max_error_recall_rate": 0.05,
+  "max_p95_latency_ms": 500.0,
+  "min_recall_at_8": 0.85
+}
