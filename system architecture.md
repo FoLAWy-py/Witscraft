@@ -2,7 +2,7 @@
 
 **Document status:** Production baseline
 
-**Architecture version:** 2.8
+**Architecture version:** 2.9
 
 **Last updated:** 17 August 2026
 
@@ -278,7 +278,7 @@ Embedding is selective. The system does not embed every conversational turn by d
 
 Embeddings are appropriate when content is accepted into long-term memory or when semantic retrieval is required. They are skipped when there are no eligible memories, when deterministic recent-context selection is sufficient, or when an identical content hash can reuse prior work.
 
-`TurnContext` owns query embedding reuse within one audited request. It is reset at the start of every turn. The first unique query records provider usage; a cache hit records zero billable tokens, zero cost, dimensions, and estimated avoided input tokens. This makes the optimization measurable without inflating quota consumption or billing reconciliation.
+`TurnContext` owns state-snapshot, memory-retrieval, and query-embedding reuse within one audited request. It is reset at the start of every turn and is never shared across users or concurrent requests. State and relationship assembly derive from one cached snapshot read, while repeated retrieval with the same story, branch, and normalized query reuses an immutable result. The first unique embedding query records provider usage; a direct embedding-cache hit records zero billable tokens, zero cost, dimensions, and estimated avoided input tokens. This makes the optimization measurable without inflating quota consumption or billing reconciliation.
 
 Every model purpose has a central maximum input budget, default output budget, and hard output limit. The gateway applies these policies before provider execution to primary, auxiliary, fallback, streaming, and non-streaming requests. The effective output ceiling is the lower of the purpose limit and model capability. Oversized input is rejected before provider traffic. In addition, the shared turn auditor reserves one slot for each real provider request and stops retries, fallbacks, auxiliary calls, and external embeddings when the per-turn ceiling is reached. The current policy and values are maintained in `docs/model-cost-controls.md`.
 
@@ -384,7 +384,7 @@ Evolution should occur in this order:
 | Explicit generation ledger | Prevents duplicate narrative writes and duplicate model spend |
 | Selective embeddings | Controls cost and avoids low-value vector work on every turn |
 | Purpose-level gateway budgets | Bounds input, output, quota preflight, and fallback spend for every model task |
-| Audited request-scoped embedding cache | Measures avoided embedding work without crossing tenant or turn boundaries |
+| Request-scoped context cache | Reuses snapshot, retrieval, and audited embedding work without crossing tenant or turn boundaries |
 | Soft weekly warning and hard turn ceiling | Warns before weekly exhaustion and stops abnormal provider-call amplification |
 | Fake-client provider contracts | Detects SDK and provider protocol regressions without credentials, network variance, or model spend |
 | Backend-owned roles and weekly quotas | Enforces least privilege and gives users a predictable spend boundary |

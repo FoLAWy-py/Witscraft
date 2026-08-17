@@ -23,12 +23,17 @@ class FakeResult:
     def scalars(self):
         return FakeScalarResult(self.values)
 
+    def scalar_one_or_none(self):
+        return self.values[0] if self.values else None
+
 
 class FakeSession:
     def __init__(self, memories):
         self.memories = memories
+        self.execute_calls = 0
 
     async def execute(self, _query):
+        self.execute_calls += 1
         return FakeResult(self.memories)
 
 
@@ -82,6 +87,27 @@ def test_small_memory_set_uses_structured_order_without_embedding() -> None:
     assert embedding_service.calls == 0
 
 
+def test_state_and_relationships_share_one_snapshot_read() -> None:
+    snapshot = SimpleNamespace(
+        state={
+            "location": "钟楼",
+            "time": "午夜",
+            "relationships": [{"name": "林岚", "status": "ally"}],
+        }
+    )
+    engine, _embedding_service = _engine([snapshot])
+    story_id = uuid4()
+    branch_id = uuid4()
+
+    state = asyncio.run(engine._load_state(story_id, branch_id))
+    relationships = asyncio.run(engine._load_relationships(story_id, branch_id))
+
+    assert state.location == "钟楼"
+    assert state.time == "午夜"
+    assert relationships == [{"name": "林岚", "status": "ally"}]
+    assert engine.session.execute_calls == 1
+
+
 def test_large_memory_set_reuses_query_embedding_and_ranks_semantically() -> None:
     memories = [
         _memory(index, [1.0, 0.0])
@@ -96,6 +122,18 @@ def test_large_memory_set_reuses_query_embedding_and_ranks_semantically() -> Non
     second = asyncio.run(engine._load_memories(story_id, branch_id, "寻找钥匙"))
 
     assert first[0] == f"memory-{MEMORY_VECTOR_SEARCH_MIN_ITEMS}"
+    assert second == first
+    assert embedding_service.calls == 1
+    assert embedding_service.cache_hits == 0
+    assert engine.session.execute_calls == 1
+
+
+def test_query_embedding_cache_records_direct_reuse() -> None:
+    engine, embedding_service = _engine([])
+
+    first = asyncio.run(engine._embed_query_once("寻找钥匙"))
+    second = asyncio.run(engine._embed_query_once("寻找钥匙"))
+
     assert second == first
     assert embedding_service.calls == 1
     assert embedding_service.cache_hits == 1

@@ -60,7 +60,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ApiError, StreamInterruptedError, confirmEmailVerification, confirmPasswordReset, createBranch, createCharacter, createStory, createWorld, deleteAccount, deleteBranch, deleteCharacter, deleteStory, deleteWorld, downloadAccountExport, downloadStoryExport, duplicateBranch, generateSessionSummary, getAuthSessions, getCurrentUser, getMyQuota, getProviders, getUserPreferences, getWorkspace, login, logout, register, requestEmailVerification, requestPasswordReset, revokeAuthSession, selectStoryWorld, sendStoryMessage, streamStoryInterview, streamStoryMessage, switchBranch, testProviderModel, updateBranch, updateCanonFact, updateCharacter, updateMemoryItem, updateModelRoutes, updateStory, updateUserPreferences, updateWorld } from "@/lib/api";
@@ -347,7 +347,7 @@ export default function Home() {
   const streamAbortRef = useRef<AbortController | null>(null);
   const streamAssistantActiveRef = useRef(false);
 
-  function applyWorkspace(data: WorkspaceResponse, historyMode: WorkspaceHistoryMode = "replace") {
+  const applyWorkspace = useCallback((data: WorkspaceResponse, historyMode: WorkspaceHistoryMode = "replace") => {
     setStoryId(data.story_id);
     setBranchId(data.branch_id);
     setBranchList(data.branches ?? []);
@@ -380,14 +380,14 @@ export default function Home() {
     );
     setSummaries(data.summaries ?? []);
     setLastRun(data.model_call ?? emptyModelCall);
-      setStoryPrompt(data.story_prompt ?? "");
+    setStoryPrompt(data.story_prompt ?? "");
     setSavedStoryPrompt(data.story_prompt ?? "");
     setInteractionMode(data.interaction_mode ?? "choices");
     setConsistencyMode(data.consistency_mode ?? "auto");
     syncWorkspaceLocation(data.story_id, data.branch_id, historyMode);
-  }
+  }, []);
 
-  function clearWorkspace() {
+  const clearWorkspace = useCallback(() => {
     setStoryId("");
     setBranchId("");
     setBranchList([]);
@@ -414,13 +414,13 @@ export default function Home() {
     setWorkspaceInitialized(false);
     setShowStoryWizard(false);
     syncWorkspaceLocation("", "", "replace");
-  }
+  }, []);
 
-  async function loadWorkspace(
+  const loadWorkspace = useCallback(async (
     nextStoryId?: string,
     nextBranchId?: string,
     historyMode: WorkspaceHistoryMode = "replace"
-  ) {
+  ) => {
     setWorkspaceLoading(true);
     setError(null);
     setRecoveryKind(null);
@@ -454,7 +454,7 @@ export default function Home() {
     } finally {
       setWorkspaceLoading(false);
     }
-  }
+  }, [applyWorkspace, clearWorkspace]);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
@@ -554,7 +554,7 @@ export default function Home() {
       .catch(() => setPreferenceError("读取创作偏好失败，请稍后重试。"));
     void refreshQuota();
     void loadWorkspace();
-  }, [authStatus, authUser?.email_verified]);
+  }, [authStatus, authUser?.email_verified, loadWorkspace]);
 
   useEffect(() => {
     if (authStatus !== "authenticated" || !authUser?.email_verified) return;
@@ -565,14 +565,9 @@ export default function Home() {
     };
     window.addEventListener("popstate", restoreWorkspaceFromHistory);
     return () => window.removeEventListener("popstate", restoreWorkspaceFromHistory);
-  }, [authStatus, authUser?.email_verified]);
+  }, [authStatus, authUser?.email_verified, loadWorkspace]);
 
-  useEffect(() => {
-    if (authStatus !== "authenticated" || view !== "settings") return;
-    void loadAuthSessions();
-  }, [authStatus, view]);
-
-  async function loadAuthSessions() {
+  const loadAuthSessions = useCallback(async () => {
     setLoadingAuthSessions(true);
     setSessionError(null);
     try {
@@ -589,7 +584,12 @@ export default function Home() {
     } finally {
       setLoadingAuthSessions(false);
     }
-  }
+  }, [clearWorkspace]);
+
+  useEffect(() => {
+    if (authStatus !== "authenticated" || view !== "settings") return;
+    void loadAuthSessions();
+  }, [authStatus, loadAuthSessions, view]);
 
   async function refreshQuota() {
     try {
@@ -768,7 +768,7 @@ export default function Home() {
     }
   }
 
-  const models = providers?.models ?? [];
+  const models = useMemo(() => providers?.models ?? [], [providers]);
   const activeModelId = routeModels[selectedPurpose] ?? providers?.purpose_defaults[selectedPurpose] ?? selectedModel;
   const activeModel = useMemo(
     () => models.find((model) => model.model === activeModelId) ?? models[0] ?? null,
@@ -780,6 +780,13 @@ export default function Home() {
   const preferenceDirty = JSON.stringify(userPreferences.map(({ preferenceType, content, strength }) => ({ preferenceType, content, strength })))
     !== JSON.stringify(savedUserPreferences.map(({ preferenceType, content, strength }) => ({ preferenceType, content, strength })));
   const storyPromptDirty = storyPrompt !== savedStoryPrompt;
+
+  const completeRoutes = useCallback((source: Partial<Record<StoryPurpose, string>>): Record<StoryPurpose, string> | null => {
+    if (!providers) return null;
+    const entries = purposeRoutes.map(({ id }) => [id, source[id] ?? providers.purpose_defaults[id]] as const);
+    if (entries.some(([, model]) => !model)) return null;
+    return Object.fromEntries(entries) as Record<StoryPurpose, string>;
+  }, [providers]);
 
   useEffect(() => {
     if (!providers || !routeDirty) return;
@@ -805,20 +812,13 @@ export default function Home() {
       }
     }, 350);
     return () => window.clearTimeout(timer);
-  }, [providers, routeDirty, routeModels]);
+  }, [completeRoutes, providers, routeDirty, routeModels]);
 
   function setRouteModel(purpose: StoryPurpose, modelId: string) {
     setRouteModels((current) => ({ ...current, [purpose]: modelId }));
     if (purpose === selectedPurpose) setSelectedModel(modelId);
     setRouteNotice(null);
     setRouteError(null);
-  }
-
-  function completeRoutes(source: Partial<Record<StoryPurpose, string>>): Record<StoryPurpose, string> | null {
-    if (!providers) return null;
-    const entries = purposeRoutes.map(({ id }) => [id, source[id] ?? providers.purpose_defaults[id]] as const);
-    if (entries.some(([, model]) => !model)) return null;
-    return Object.fromEntries(entries) as Record<StoryPurpose, string>;
   }
 
   function handleRestoreSavedRoutes() {

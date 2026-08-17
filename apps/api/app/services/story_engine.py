@@ -1186,6 +1186,32 @@ class StoryEngine:
         branch_id: UUID,
         exclude_message_id: UUID | None = None,
     ) -> StoryState:
+        snapshot_state = await self._load_snapshot_state(
+            story_id,
+            branch_id,
+            exclude_message_id,
+        )
+        if snapshot_state is None:
+            return StoryState()
+        return StoryState(
+            location=snapshot_state.get("location", "未知地点"),
+            time=snapshot_state.get("time", "未知时间"),
+            mood=snapshot_state.get("mood", "未定义"),
+            objective=snapshot_state.get("objective", "继续推进剧情"),
+            inventory=snapshot_state.get("inventory", []),
+            open_threads=snapshot_state.get("open_threads", []),
+        )
+
+    async def _load_snapshot_state(
+        self,
+        story_id: UUID,
+        branch_id: UUID,
+        exclude_message_id: UUID | None = None,
+    ) -> dict | None:
+        cache_key = (story_id, branch_id, exclude_message_id)
+        if cache_key in self.turn_context.snapshot_states:
+            return self.turn_context.snapshot_states[cache_key]
+
         query = select(StoryStateSnapshot).where(
             StoryStateSnapshot.story_id == story_id,
             StoryStateSnapshot.branch_id == branch_id,
@@ -1203,16 +1229,9 @@ class StoryEngine:
             .limit(1)
         )
         snapshot = result.scalar_one_or_none()
-        if snapshot is None:
-            return StoryState()
-        return StoryState(
-            location=snapshot.state.get("location", "未知地点"),
-            time=snapshot.state.get("time", "未知时间"),
-            mood=snapshot.state.get("mood", "未定义"),
-            objective=snapshot.state.get("objective", "继续推进剧情"),
-            inventory=snapshot.state.get("inventory", []),
-            open_threads=snapshot.state.get("open_threads", []),
-        )
+        snapshot_state = dict(snapshot.state) if snapshot is not None else None
+        self.turn_context.snapshot_states[cache_key] = snapshot_state
+        return snapshot_state
 
     async def _load_relationships(
         self,
@@ -1220,29 +1239,23 @@ class StoryEngine:
         branch_id: UUID,
         exclude_message_id: UUID | None = None,
     ) -> list[dict]:
-        query = select(StoryStateSnapshot).where(
-            StoryStateSnapshot.story_id == story_id,
-            StoryStateSnapshot.branch_id == branch_id,
+        snapshot_state = await self._load_snapshot_state(
+            story_id,
+            branch_id,
+            exclude_message_id,
         )
-        if exclude_message_id is not None:
-            query = query.where(
-                or_(
-                    StoryStateSnapshot.message_id.is_(None),
-                    StoryStateSnapshot.message_id != exclude_message_id,
-                )
-            )
-        result = await self.session.execute(
-            query
-            .order_by(desc(StoryStateSnapshot.created_at))
-            .limit(1)
-        )
-        snapshot = result.scalar_one_or_none()
-        if snapshot is None:
+        if snapshot_state is None:
             return []
-        relationships = snapshot.state.get("relationships", [])
+        relationships = snapshot_state.get("relationships", [])
         return relationships if isinstance(relationships, list) else []
 
     async def _load_memories(self, story_id: UUID, branch_id: UUID, query: str | None = None) -> list[str]:
+        normalized_query = (query or "").strip()
+        cache_key = (story_id, branch_id, normalized_query)
+        cached = self.turn_context.memory_results.get(cache_key)
+        if cached is not None:
+            return list(cached)
+
         result = await self.session.execute(
             select(MemoryItem)
             .where(
@@ -1255,21 +1268,24 @@ class StoryEngine:
         )
         memories = list(result.scalars().all())
         if not memories:
-            return []
-        if not query or len(memories) <= MEMORY_VECTOR_SEARCH_MIN_ITEMS:
-            return [item.content for item in memories[:MEMORY_RESULT_LIMIT]]
+            selected: list[str] = []
+        elif not normalized_query or len(memories) <= MEMORY_VECTOR_SEARCH_MIN_ITEMS:
+            selected = [item.content for item in memories[:MEMORY_RESULT_LIMIT]]
+        else:
+            query_embedding = await self._embed_query_once(normalized_query)
+            if not query_embedding:
+                selected = [item.content for item in memories[:MEMORY_RESULT_LIMIT]]
+            else:
+                ranked = []
+                for index, memory in enumerate(memories):
+                    similarity = cosine_similarity(query_embedding, memory.embedding)
+                    score = similarity + (float(memory.importance or 5) / 20)
+                    ranked.append((score, -index, memory))
+                ranked.sort(key=lambda item: (item[0], item[1]), reverse=True)
+                selected = [memory.content for _, _, memory in ranked[:MEMORY_RESULT_LIMIT]]
 
-        query_embedding = await self._embed_query_once(query)
-        if not query_embedding:
-            return [item.content for item in memories[:MEMORY_RESULT_LIMIT]]
-
-        ranked = []
-        for index, memory in enumerate(memories):
-            similarity = cosine_similarity(query_embedding, memory.embedding)
-            score = similarity + (float(memory.importance or 5) / 20)
-            ranked.append((score, -index, memory))
-        ranked.sort(key=lambda item: (item[0], item[1]), reverse=True)
-        return [memory.content for _, _, memory in ranked[:MEMORY_RESULT_LIMIT]]
+        self.turn_context.memory_results[cache_key] = tuple(selected)
+        return selected
 
     async def _embed_query_once(self, query: str) -> list[float]:
         normalized = query.strip()
