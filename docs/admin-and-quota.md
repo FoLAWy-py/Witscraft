@@ -35,6 +35,8 @@ Role changes should be executed through controlled host access and recorded in t
 
 `USER_WEEKLY_TOKEN_QUOTA` defines the standard-user allowance and defaults to `500000` tokens. Administrators are exempt so that operational diagnosis and recovery are not blocked by the user budget.
 
+`USER_WEEKLY_TOKEN_SOFT_LIMIT_PERCENTAGE` defines a visible warning threshold and defaults to `80`. Reaching it changes the user's quota meter to a warning state without blocking requests or silently changing the selected model. The hard allowance continues to reject provider preflight with HTTP `429` and the reset boundary.
+
 The natural quota window starts each Monday at `00:00 UTC` and ends the following Monday at `00:00 UTC`. The user interface displays the boundary in the viewer's local time zone. Successful external LLM and embedding calls contribute their input and output token usage from the `model_calls` audit table. Local deterministic embeddings and dry-run model responses do not consume the allowance.
 
 Before an external request begins, the LLM Gateway checks the estimated input plus the configured maximum output against the remaining allowance. A rejected request returns HTTP `429`, includes `Retry-After`, and does not contact the model provider.

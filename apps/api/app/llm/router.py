@@ -62,6 +62,8 @@ class LLMGateway:
 
             for local_attempt in range(1, self.settings.llm_max_attempts + 1):
                 attempt_number += 1
+                if self.auditor is not None:
+                    self.auditor.reserve_external_call()
                 started = time.perf_counter()
                 try:
                     async with asyncio.timeout(self.settings.llm_total_timeout_seconds):
@@ -125,6 +127,8 @@ class LLMGateway:
 
             for local_attempt in range(1, self.settings.llm_max_attempts + 1):
                 attempt_number += 1
+                if self.auditor is not None:
+                    self.auditor.reserve_external_call()
                 started = time.perf_counter()
                 first_token_latency_ms: int | None = None
                 chunks: list[str] = []

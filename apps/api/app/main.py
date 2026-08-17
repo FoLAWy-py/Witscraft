@@ -13,6 +13,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.config import Settings, get_settings, validate_runtime_security
 from app.db.session import engine
+from app.llm.audit import TurnCallBudgetExceededError
 from app.logging_security import install_sensitive_log_filters
 from app.routers import admin, auth, chat, providers, quota, workspace
 from app.services.auth_service import SESSION_COOKIE_NAME
@@ -140,6 +141,19 @@ def create_app(
                 "quota": jsonable_encoder(snapshot_payload(error.snapshot)),
             },
             headers={"Retry-After": str(retry_after)},
+        )
+
+    @application.exception_handler(TurnCallBudgetExceededError)
+    async def turn_call_budget_handler(
+        _request: Request,
+        error: TurnCallBudgetExceededError,
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=429,
+            content={
+                "detail": "Per-turn external model call limit reached",
+                "limit": error.limit,
+            },
         )
 
     application.add_middleware(

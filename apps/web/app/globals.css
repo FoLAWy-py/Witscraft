@@ -1293,6 +1293,18 @@ html.theme-transition textarea {
   background: var(--teal);
 }
 
+.quotaMeter.warning .quotaTrack > span,
+.adminUsage.warning > div > span {
+  background: var(--amber);
+}
+
+.quotaWarning {
+  margin: 0;
+  color: var(--amber);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
 .quotaNumbers {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

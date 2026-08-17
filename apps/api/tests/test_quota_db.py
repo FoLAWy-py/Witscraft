@@ -83,12 +83,15 @@ def test_weekly_quota_reset_and_admin_bypass() -> None:
                 assert snapshot.used_tokens == 900
                 assert snapshot.remaining_tokens == 100
                 assert snapshot.percentage_used == 90
+                assert snapshot.soft_limit_percentage == 80
+                assert snapshot.soft_limit_reached is True
                 with pytest.raises(QuotaExceededError):
                     await ensure_quota(session, regular_id, 101, settings)
 
                 admin_snapshot = await ensure_quota(session, admin_id, 1000000, settings)
                 assert admin_snapshot.unlimited is True
                 assert admin_snapshot.limit_tokens is None
+                assert admin_snapshot.soft_limit_reached is False
 
                 standard_overview = await overview(
                     search="Quota",
@@ -139,6 +142,7 @@ def test_weekly_quota_reset_and_admin_bypass() -> None:
                 reset_snapshot = await quota_snapshot(session, regular, settings)
                 assert reset_snapshot.used_tokens == 0
                 assert reset_snapshot.remaining_tokens == 1000
+                assert reset_snapshot.soft_limit_reached is False
 
                 reset_overview = await overview(
                     search="Quota",

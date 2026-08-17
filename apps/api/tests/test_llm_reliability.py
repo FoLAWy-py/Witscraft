@@ -4,7 +4,7 @@ import time
 import pytest
 
 from app.config import Settings
-from app.llm.audit import CallAuditor
+from app.llm.audit import CallAuditor, TurnCallBudgetExceededError
 from app.llm.router import LLMGateway, PurposeInputBudgetExceededError, _CIRCUITS
 from app.schemas.llm import ChatMessage, LLMRequest, LLMResponse
 
@@ -188,3 +188,26 @@ def test_input_budget_rejects_request_before_provider_call() -> None:
         asyncio.run(gateway.generate(request))
 
     assert adapter.calls == []
+
+
+def test_per_turn_call_budget_stops_retry_and_fallback_chain() -> None:
+    settings = Settings(
+        llm_max_attempts=2,
+        llm_max_fallbacks=1,
+        llm_retry_base_seconds=0,
+        llm_max_external_calls_per_turn=2,
+    )
+    auditor = CapturingAuditor(settings)
+    adapter = ModelAwareAdapter(primary_failures=2)
+    gateway = LLMGateway(settings, auditor=auditor)
+    gateway.adapters["deepinfra"] = adapter
+
+    with pytest.raises(TurnCallBudgetExceededError, match="limit of 2"):
+        asyncio.run(gateway.generate(_request()))
+
+    assert adapter.calls == ["test-model", "test-model"]
+    assert [row.status for row in auditor.rows] == ["failed", "failed"]
+
+    auditor.begin_turn()
+    response = asyncio.run(gateway.generate(_request()))
+    assert response.text == "ok"

@@ -2,7 +2,7 @@
 
 **Document status:** Production baseline
 
-**Architecture version:** 2.6
+**Architecture version:** 2.7
 
 **Last updated:** 17 August 2026
 
@@ -280,7 +280,7 @@ Embeddings are appropriate when content is accepted into long-term memory or whe
 
 `TurnContext` owns query embedding reuse within one audited request. It is reset at the start of every turn. The first unique query records provider usage; a cache hit records zero billable tokens, zero cost, dimensions, and estimated avoided input tokens. This makes the optimization measurable without inflating quota consumption or billing reconciliation.
 
-Every model purpose has a central maximum input budget, default output budget, and hard output limit. The gateway applies these policies before provider execution to primary, auxiliary, fallback, streaming, and non-streaming requests. The effective output ceiling is the lower of the purpose limit and model capability. Oversized input is rejected before provider traffic. The current policy and values are maintained in `docs/model-cost-controls.md`.
+Every model purpose has a central maximum input budget, default output budget, and hard output limit. The gateway applies these policies before provider execution to primary, auxiliary, fallback, streaming, and non-streaming requests. The effective output ceiling is the lower of the purpose limit and model capability. Oversized input is rejected before provider traffic. In addition, the shared turn auditor reserves one slot for each real provider request and stops retries, fallbacks, auxiliary calls, and external embeddings when the per-turn ceiling is reached. The current policy and values are maintained in `docs/model-cost-controls.md`.
 
 The production direction remains to hash and deduplicate persisted content before embedding, record embedding model and dimensions with each memory, prevent comparisons across incompatible embedding versions, and re-embed asynchronously during model migrations.
 
@@ -291,6 +291,8 @@ Multi-model routing is supported by purpose. A multi-agent architecture is not t
 Standard users receive a configurable weekly allowance through `USER_WEEKLY_TOKEN_QUOTA`, with a default of 500,000 tokens. The natural period is Monday `00:00 UTC` through the following Monday. Successful external LLM and embedding audit rows contribute their recorded input and output tokens; deterministic local and dry-run operations do not consume the allowance.
 
 The provider-neutral gateway performs a preflight check using estimated input plus maximum output before contacting a provider. Rejection returns HTTP `429` and the next reset boundary. Administrators are exempt from the allowance.
+
+At the configurable soft threshold, 80% by default, the API marks the quota snapshot for a visible workspace warning while preserving the user's selected route. At the hard threshold, preflight blocks additional spend. The independent per-turn external-call ceiling defaults to 8 and bounds retry or orchestration amplification even when token estimates remain below the weekly allowance.
 
 A manual global reset creates an append-only `QuotaResetEvent`; historical `ModelCall` records remain intact. The latest reset within the current calendar week becomes the effective period start. The administrator overview separates global metrics from the bounded account list: global counts and token usage retain tenant-wide meaning, while search, role filters, and pagination affect only the returned user page. Per-page usage is read through a grouped aggregate query, and the latest 10 reset events provide operator, reason, and effective-time auditability. None of these queries join narrative content.
 
@@ -383,6 +385,7 @@ Evolution should occur in this order:
 | Selective embeddings | Controls cost and avoids low-value vector work on every turn |
 | Purpose-level gateway budgets | Bounds input, output, quota preflight, and fallback spend for every model task |
 | Audited request-scoped embedding cache | Measures avoided embedding work without crossing tenant or turn boundaries |
+| Soft weekly warning and hard turn ceiling | Warns before weekly exhaustion and stops abnormal provider-call amplification |
 | Backend-owned roles and weekly quotas | Enforces least privilege and gives users a predictable spend boundary |
 | Bounded administrator account queries | Preserves global metric meaning while preventing unbounded account payloads |
 | Single orchestrator by default | Keeps authorization and state transitions deterministic and observable |

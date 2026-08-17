@@ -20,6 +20,12 @@ logger = logging.getLogger(__name__)
 MILLION = Decimal("1000000")
 
 
+class TurnCallBudgetExceededError(RuntimeError):
+    def __init__(self, limit: int) -> None:
+        self.limit = limit
+        super().__init__(f"Per-turn external model call limit of {limit} reached")
+
+
 class CallAuditor:
     def __init__(
         self,
@@ -34,11 +40,21 @@ class CallAuditor:
         self.story_id = story_id
         self.request_id = request_id
         self.turn_id = uuid4()
+        self.external_calls = 0
 
     def begin_turn(self, story_id: UUID | None = None) -> UUID:
         self.story_id = story_id
         self.turn_id = uuid4()
+        self.external_calls = 0
         return self.turn_id
+
+    def reserve_external_call(self) -> None:
+        if self.settings.dry_run_llm:
+            return
+        limit = self.settings.llm_max_external_calls_per_turn
+        if self.external_calls >= limit:
+            raise TurnCallBudgetExceededError(limit)
+        self.external_calls += 1
 
     async def ensure_quota(self, requested_tokens: int) -> None:
         if self.user_id is None or self.settings.dry_run_llm:

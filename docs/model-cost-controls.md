@@ -37,4 +37,12 @@ Cache-hit rows therefore measure optimization value without consuming the weekly
 
 Quota preflight uses estimated input plus the normalized maximum output. Purpose limits therefore bound both the possible provider charge and the amount reserved by preflight. Successful external usage is later reconciled from recorded provider tokens. Local deterministic embeddings, dry-run responses, failed calls, and cache-hit rows do not consume the weekly allowance.
 
+Standard accounts receive an explicit soft warning at `USER_WEEKLY_TOKEN_SOFT_LIMIT_PERCENTAGE`, which defaults to 80%. The quota API returns both the threshold and whether it has been reached; the workspace changes the usage meter state and asks the user to monitor the remaining allowance. The soft threshold does not silently change model routing. At the hard weekly limit, provider preflight returns HTTP `429` with the current usage and reset boundary.
+
+## Per-turn call ceiling
+
+`LLM_MAX_EXTERNAL_CALLS_PER_TURN` defaults to 8 and applies to every real provider request in one audited turn. Each LLM retry, fallback attempt, auxiliary call, and external embedding request reserves one slot immediately before network execution. Local deterministic embeddings, cache hits, and dry-run model operations do not reserve slots.
+
+The auditor resets the counter when it begins a new turn. Exhaustion stops the chain before another provider request and returns an explicit HTTP or SSE `429` response. This ceiling bounds pathological retry or orchestration behavior independently of token estimates and the weekly allowance.
+
 These controls are intentionally deterministic. Model or prompt changes should modify the central budget table only after regression evidence demonstrates a quality need.

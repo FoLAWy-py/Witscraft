@@ -53,6 +53,7 @@ class EmbeddingService:
 
         if self.auditor is not None:
             await self.auditor.ensure_quota(input_tokens)
+            self.auditor.reserve_external_call()
 
         try:
             response = await self.client.embeddings.create(

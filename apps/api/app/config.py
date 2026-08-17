@@ -85,6 +85,7 @@ class Settings(BaseSettings):
     llm_retry_base_seconds: float = Field(default=0.5, ge=0)
     llm_retry_max_seconds: float = Field(default=4.0, ge=0)
     llm_max_fallbacks: int = Field(default=1, ge=0, le=3)
+    llm_max_external_calls_per_turn: int = Field(default=8, ge=2, le=20)
     llm_circuit_failure_threshold: int = Field(default=3, ge=1)
     llm_circuit_cooldown_seconds: float = Field(default=30.0, gt=0)
     stream_checkpoint_seconds: float = Field(default=1.0, gt=0)
@@ -101,6 +102,7 @@ class Settings(BaseSettings):
     auth_login_throttle_retention_hours: int = Field(default=24, ge=1)
     model_call_retention_days: int = Field(default=30, ge=1)
     user_weekly_token_quota: int = Field(default=500000, ge=1000)
+    user_weekly_token_soft_limit_percentage: int = Field(default=80, ge=1, le=99)
 
     smtp_host: str | None = None
     smtp_port: int = 465
@@ -232,6 +234,7 @@ def get_settings() -> Settings:
         "LLM_RETRY_BASE_SECONDS": ("llm_retry_base_seconds", float),
         "LLM_RETRY_MAX_SECONDS": ("llm_retry_max_seconds", float),
         "LLM_MAX_FALLBACKS": ("llm_max_fallbacks", int),
+        "LLM_MAX_EXTERNAL_CALLS_PER_TURN": ("llm_max_external_calls_per_turn", int),
         "LLM_CIRCUIT_FAILURE_THRESHOLD": ("llm_circuit_failure_threshold", int),
         "LLM_CIRCUIT_COOLDOWN_SECONDS": ("llm_circuit_cooldown_seconds", float),
         "STREAM_CHECKPOINT_SECONDS": ("stream_checkpoint_seconds", float),
@@ -243,6 +246,10 @@ def get_settings() -> Settings:
         ),
         "MODEL_CALL_RETENTION_DAYS": ("model_call_retention_days", int),
         "USER_WEEKLY_TOKEN_QUOTA": ("user_weekly_token_quota", int),
+        "USER_WEEKLY_TOKEN_SOFT_LIMIT_PERCENTAGE": (
+            "user_weekly_token_soft_limit_percentage",
+            int,
+        ),
         "RATE_LIMIT_ADMIN_RESET_REQUESTS": ("rate_limit_admin_reset_requests", int),
     }
     for env_key, (setting_name, parser) in numeric_settings.items():

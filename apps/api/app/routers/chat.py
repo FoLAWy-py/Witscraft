@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import get_verified_user_id
 from app.config import Settings, get_settings
 from app.db.session import get_session
-from app.llm.audit import CallAuditor
+from app.llm.audit import CallAuditor, TurnCallBudgetExceededError
 from app.llm.router import LLMGateway, PurposeInputBudgetExceededError
 from app.schemas.chat import ChatRequest, ChatResponse
 from app.services.story_engine import StoryEngine
@@ -96,6 +96,15 @@ async def stream_chat(
         except PurposeInputBudgetExceededError as error:
             await engine.fail_active_generation(error)
             event = {"type": "error", "status": 413, "detail": str(error)}
+            yield f"event: error\ndata: {json.dumps(event)}\n\n"
+        except TurnCallBudgetExceededError as error:
+            await engine.fail_active_generation(error)
+            event = {
+                "type": "error",
+                "status": 429,
+                "detail": "Per-turn external model call limit reached",
+                "limit": error.limit,
+            }
             yield f"event: error\ndata: {json.dumps(event)}\n\n"
         except Exception as error:
             await engine.fail_active_generation(error)

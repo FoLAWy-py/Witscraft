@@ -17,6 +17,8 @@ class QuotaSnapshot:
     used_tokens: int
     remaining_tokens: int | None
     percentage_used: float
+    soft_limit_percentage: int
+    soft_limit_reached: bool
     period_started_at: datetime
     resets_at: datetime
     unlimited: bool
@@ -88,14 +90,30 @@ def quota_snapshot_for_usage(
     used: int,
 ) -> QuotaSnapshot:
     if user.is_admin:
-        return QuotaSnapshot(None, used, None, 0.0, period_start, period_end, True)
+        return QuotaSnapshot(
+            None,
+            used,
+            None,
+            0.0,
+            settings.user_weekly_token_soft_limit_percentage,
+            False,
+            period_start,
+            period_end,
+            True,
+        )
     limit = settings.user_weekly_token_quota
     remaining = max(0, limit - used)
+    percentage_used = round(min(100.0, used * 100 / limit), 2)
+    soft_limit_reached = (
+        used * 100 >= limit * settings.user_weekly_token_soft_limit_percentage
+    )
     return QuotaSnapshot(
         limit,
         used,
         remaining,
-        round(min(100.0, used * 100 / limit), 2),
+        percentage_used,
+        settings.user_weekly_token_soft_limit_percentage,
+        soft_limit_reached,
         period_start,
         period_end,
         False,
@@ -123,6 +141,8 @@ def snapshot_payload(snapshot: QuotaSnapshot) -> dict:
         "used_tokens": snapshot.used_tokens,
         "remaining_tokens": snapshot.remaining_tokens,
         "percentage_used": snapshot.percentage_used,
+        "soft_limit_percentage": snapshot.soft_limit_percentage,
+        "soft_limit_reached": snapshot.soft_limit_reached,
         "period_started_at": snapshot.period_started_at,
         "resets_at": snapshot.resets_at,
         "unlimited": snapshot.unlimited,

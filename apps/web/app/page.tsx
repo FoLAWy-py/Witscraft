@@ -136,6 +136,9 @@ function classifyFailure(caught: unknown, fallback: string): { message: string; 
     if (caught.status === 429 && caught.message.toLowerCase().includes("quota")) {
       return { message: "本周 AI 额度不足。可在设置中查看用量与重置时间。", kind: "api" };
     }
+    if (caught.status === 429 && caught.message.toLowerCase().includes("per-turn")) {
+      return { message: "本轮已达到外部模型调用上限，已停止继续调用。请重新同步后再试。", kind: "api" };
+    }
     if (caught.status === 502) {
       return { message: "模型服务暂时没有完成请求。当前上下文未丢失，可重新同步后继续。", kind: "provider" };
     }
@@ -3745,12 +3748,15 @@ function QuotaMeter({ quota, uiLanguage, compact = false }: { quota: QuotaUsage 
   const percent = quota.unlimited ? 0 : Math.min(100, quota.percentage_used);
   const number = new Intl.NumberFormat(uiLanguage === "zh-CN" ? "zh-CN" : "en-AU", { notation: compact ? "compact" : "standard", maximumFractionDigits: 1 });
   return (
-    <div className={`quotaMeter ${compact ? "compact" : ""}`} title={`${uiText(uiLanguage, "重置时间", "Resets")} ${resetLabel}`}>
+    <div className={`quotaMeter ${compact ? "compact" : ""} ${quota.soft_limit_reached ? "warning" : ""}`} title={`${uiText(uiLanguage, "重置时间", "Resets")} ${resetLabel}`}>
       <div className="quotaMeterLabel">
         <span>{quota.unlimited ? uiText(uiLanguage, "管理员不限额", "Admin unlimited") : `${quota.percentage_used.toFixed(1)}%`}</span>
         {!compact && <small>{uiText(uiLanguage, "重置", "Resets")} {resetLabel}</small>}
       </div>
       {!quota.unlimited && <div className="quotaTrack" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}><span style={{ width: `${percent}%` }} /></div>}
+      {!compact && quota.soft_limit_reached && !quota.unlimited && (
+        <p className="quotaWarning">{uiText(uiLanguage, `已达到 ${quota.soft_limit_percentage}% 提醒线，请留意剩余额度。`, `${quota.soft_limit_percentage}% warning threshold reached. Monitor the remaining allowance.`)}</p>
+      )}
       {!compact && (
         <div className="quotaNumbers">
           <span><b>{number.format(quota.used_tokens)}</b><small>{uiText(uiLanguage, "已用 tokens", "tokens used")}</small></span>

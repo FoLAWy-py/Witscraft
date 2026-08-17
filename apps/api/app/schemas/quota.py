@@ -8,6 +8,8 @@ class QuotaResponse(BaseModel):
     used_tokens: int
     remaining_tokens: int | None
     percentage_used: float
+    soft_limit_percentage: int
+    soft_limit_reached: bool
     period_started_at: datetime
     resets_at: datetime
     unlimited: bool

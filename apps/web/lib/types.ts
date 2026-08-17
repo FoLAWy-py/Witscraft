@@ -71,6 +71,8 @@ export type QuotaUsage = {
   used_tokens: number;
   remaining_tokens: number | null;
   percentage_used: number;
+  soft_limit_percentage: number;
+  soft_limit_reached: boolean;
   period_started_at: string;
   resets_at: string;
   unlimited: boolean;
