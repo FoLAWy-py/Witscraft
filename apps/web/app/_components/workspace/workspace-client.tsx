@@ -379,8 +379,10 @@ export default function WorkspaceClient() {
   const [memoryDraft, setMemoryDraft] = useState<KnowledgeDraft>({ content: "", importance: 5 });
   const [savingMemoryId, setSavingMemoryId] = useState<string | null>(null);
   const [editingCanonFactId, setEditingCanonFactId] = useState<string | null>(null);
+  const [editingCanonFactOriginalContent, setEditingCanonFactOriginalContent] = useState("");
   const [canonFactDraft, setCanonFactDraft] = useState<KnowledgeDraft>({ content: "", importance: 5 });
   const [savingCanonFactId, setSavingCanonFactId] = useState<string | null>(null);
+  const [confirmingCanonFactId, setConfirmingCanonFactId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [recoveryKind, setRecoveryKind] = useState<RecoveryKind | null>(null);
   const streamAbortRef = useRef<AbortController | null>(null);
@@ -1595,18 +1597,29 @@ export default function WorkspaceClient() {
 
   function handleStartEditCanonFact(fact: CanonFactSummary) {
     if (!fact.id) return;
+    setConfirmingCanonFactId(null);
     setEditingCanonFactId(fact.id);
+    setEditingCanonFactOriginalContent(fact.content);
     setCanonFactDraft({ content: fact.content, importance: fact.importance });
   }
 
   function handleCancelEditCanonFact() {
+    setConfirmingCanonFactId(null);
     setEditingCanonFactId(null);
+    setEditingCanonFactOriginalContent("");
     setCanonFactDraft({ content: "", importance: 5 });
   }
 
   async function handleSaveCanonFact() {
     const content = canonFactDraft.content.trim();
     if (!editingCanonFactId || !content || savingCanonFactId) return;
+    const original = canonFactItems.find((fact) => fact.id === editingCanonFactId);
+    if (!original || !editingCanonFactOriginalContent) return;
+    const contentChanged = content !== editingCanonFactOriginalContent;
+    if (contentChanged && confirmingCanonFactId !== editingCanonFactId) {
+      setConfirmingCanonFactId(editingCanonFactId);
+      return;
+    }
 
     setSavingCanonFactId(editingCanonFactId);
     setError(null);
@@ -1615,14 +1628,28 @@ export default function WorkspaceClient() {
         editingCanonFactId,
         {
           content,
-          importance: normalizeImportance(canonFactDraft.importance)
+          importance: normalizeImportance(canonFactDraft.importance),
+          ...(contentChanged
+            ? {
+                expectedContent: editingCanonFactOriginalContent,
+                branchId,
+                branchVersion: branchList.find((branch) => branch.id === branchId)?.version ?? 0,
+                roadmapVersion,
+                confirmFutureInvalidation: true
+              }
+            : {})
         },
         storyId
       );
       applyWorkspace(data);
       handleCancelEditCanonFact();
-    } catch {
-      setError("更新既定事实失败。请确认数据库服务正在运行。");
+    } catch (saveError) {
+      if (saveError instanceof ApiError && saveError.status === 409) {
+        await loadWorkspace(storyId, branchId, "replace");
+        setError(uiText(uiLanguage, "既定事实或路线图已变化，请重新检查后再修正。", "Canon or the roadmap changed. Review it again before correcting."));
+      } else {
+        setError(uiText(uiLanguage, "更新既定事实失败。请稍后重试。", "Could not update the canon fact. Try again."));
+      }
     } finally {
       setSavingCanonFactId(null);
     }
@@ -1979,14 +2006,20 @@ export default function WorkspaceClient() {
               savingMemoryId={savingMemoryId}
               editingCanonFactId={editingCanonFactId}
               canonFactDraft={canonFactDraft}
+              editingCanonFactOriginalContent={editingCanonFactOriginalContent}
               savingCanonFactId={savingCanonFactId}
+              confirmingCanonFactId={confirmingCanonFactId}
+              plannedFutureChapterCount={chapters.filter((chapter) => chapter.status === "planned").length}
               onStartEditMemory={handleStartEditMemory}
               onCancelEditMemory={handleCancelEditMemory}
               onChangeMemoryDraft={setMemoryDraft}
               onSaveMemory={handleSaveMemory}
               onStartEditCanonFact={handleStartEditCanonFact}
               onCancelEditCanonFact={handleCancelEditCanonFact}
-              onChangeCanonFactDraft={setCanonFactDraft}
+              onChangeCanonFactDraft={(nextDraft) => {
+                setCanonFactDraft(nextDraft);
+                setConfirmingCanonFactId(null);
+              }}
               onSaveCanonFact={handleSaveCanonFact}
             />
           </aside>
@@ -2448,7 +2481,10 @@ function RightInspector({
   savingMemoryId,
   editingCanonFactId,
   canonFactDraft,
+  editingCanonFactOriginalContent,
   savingCanonFactId,
+  confirmingCanonFactId,
+  plannedFutureChapterCount,
   onCreateBranch,
   onSwitchBranch,
   onStartEditBranch,
@@ -2494,7 +2530,10 @@ function RightInspector({
   savingMemoryId: string | null;
   editingCanonFactId: string | null;
   canonFactDraft: KnowledgeDraft;
+  editingCanonFactOriginalContent: string;
   savingCanonFactId: string | null;
+  confirmingCanonFactId: string | null;
+  plannedFutureChapterCount: number;
   onCreateBranch: () => void;
   onSwitchBranch: (branchId: string) => void;
   onStartEditBranch: (branch: BranchSummary) => void;
@@ -2745,6 +2784,9 @@ function RightInspector({
                       type="canon"
                       draft={canonFactDraft}
                       saving={isSaving}
+                      originalContent={editingCanonFactOriginalContent}
+                      confirmingCorrection={confirmingCanonFactId === fact.id}
+                      affectedFutureCount={plannedFutureChapterCount}
                       onChange={onChangeCanonFactDraft}
                       onSave={onSaveCanonFact}
                       onCancel={onCancelEditCanonFact}
@@ -2850,6 +2892,9 @@ function KnowledgeEditForm({
   type,
   draft,
   saving,
+  originalContent,
+  confirmingCorrection = false,
+  affectedFutureCount = 0,
   onChange,
   onSave,
   onCancel
@@ -2858,11 +2903,15 @@ function KnowledgeEditForm({
   type: "memory" | "canon";
   draft: KnowledgeDraft;
   saving: boolean;
+  originalContent?: string;
+  confirmingCorrection?: boolean;
+  affectedFutureCount?: number;
   onChange: (draft: KnowledgeDraft) => void;
   onSave: () => void;
   onCancel: () => void;
 }) {
   const label = type === "memory" ? uiText(uiLanguage, "记忆", "Memory") : uiText(uiLanguage, "既定事实", "Canon fact");
+  const isCanonCorrection = type === "canon" && originalContent !== undefined && draft.content.trim() !== originalContent;
 
   return (
     <div className="worldEditForm knowledgeEditForm">
@@ -2887,10 +2936,30 @@ function KnowledgeEditForm({
           aria-label={`${label} ${uiText(uiLanguage, "重要度", "importance")}`}
         />
       </label>
+      {confirmingCorrection && isCanonCorrection && (
+        <div className="canonCorrectionReview" data-testid="canon-correction-review" role="alert">
+          <strong>{uiText(uiLanguage, "确认修正影响", "Confirm correction impact")}</strong>
+          <dl>
+            <div><dt>{uiText(uiLanguage, "修正前", "Before")}</dt><dd>{originalContent}</dd></div>
+            <div><dt>{uiText(uiLanguage, "修正后", "After")}</dt><dd>{draft.content.trim()}</dd></div>
+          </dl>
+          <p>
+            {uiText(
+              uiLanguage,
+              `不会改写已完成正文；将使 ${affectedFutureCount} 个未来章节计划和暂定结局失效。`,
+              `Completed prose will remain unchanged; ${affectedFutureCount} future chapter plan(s) and the provisional ending will be invalidated.`
+            )}
+          </p>
+        </div>
+      )}
       <div className="formActions">
         <button className="cmdButton primary" onClick={onSave} disabled={saving || !draft.content.trim()}>
           {saving ? <RefreshCw size={13} className="spinIcon" /> : <Check size={13} />}
-          {uiText(uiLanguage, "保存", "Save")}
+          {confirmingCorrection && isCanonCorrection
+            ? uiText(uiLanguage, "确认修正", "Confirm correction")
+            : isCanonCorrection
+              ? uiText(uiLanguage, "检查影响", "Review impact")
+              : uiText(uiLanguage, "保存", "Save")}
         </button>
         <button className="cmdButton" onClick={onCancel} disabled={saving}>
           <X size={13} />

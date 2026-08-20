@@ -41,6 +41,8 @@ async function installApiFixture(page: Page) {
   let branchVersion = 0;
   let plannedChapterCount = 12;
   let roadmapVersion = 1;
+  let canonContent = "The archive door has never opened.";
+  let canonCorrected = false;
   let storyState = { location: "Archive", time: "Midnight", mood: "tense", objective: "Find the key", inventory: [] as string[], open_threads: [] as string[] };
   const messages = [
     {
@@ -81,9 +83,14 @@ async function installApiFixture(page: Page) {
     story_state: storyState,
     relationships: [],
     retrieved_memories: [],
-    canon_facts: [],
+    canon_facts: [canonContent],
     memory_items: [],
-    canon_fact_items: [],
+    canon_fact_items: [{
+      id: "00000000-0000-0000-0000-000000000801",
+      content: canonContent,
+      importance: 8,
+      type: canonCorrected ? "player_correction" : "llm_state_extraction"
+    }],
     summaries: [],
     model_call: null,
     onboarding_required: false,
@@ -97,12 +104,12 @@ async function installApiFixture(page: Page) {
     prose_language: "en",
     roadmap_version: roadmapVersion,
     roadmap_source: roadmapVersion === 1 ? "provider" : "deterministic_fallback",
-    ending_title: "The Last Archive",
+    ending_title: canonCorrected ? "Awaiting the player's path" : "The Last Archive",
     chapters: Array.from({ length: plannedChapterCount }, (_, index) => ({
       id: `00000000-0000-0000-0000-${String(600 + index).padStart(12, "0")}`,
       number: index + 1,
-      title: `Chapter ${index + 1}`,
-      objective: `Objective ${index + 1}`,
+      title: canonCorrected && index > 0 ? `Unwritten Chapter ${String(index + 1).padStart(2, "0")}` : `Chapter ${index + 1}`,
+      objective: canonCorrected && index > 0 ? "Adapt this chapter to the player's established path and next decision." : `Objective ${index + 1}`,
       status: index === 0 ? "active" : "planned",
       roadmap_version: index < 12 ? 1 : roadmapVersion,
       message_id: null,
@@ -254,6 +261,23 @@ async function installApiFixture(page: Page) {
       }
       return json(route, workspace());
     }
+    if (path.endsWith("/api/workspace/canon-facts/00000000-0000-0000-0000-000000000801") && request.method() === "PATCH") {
+      const payload = request.postDataJSON();
+      expect(payload).toMatchObject({
+        content: "The archive door opened before midnight.",
+        importance: 8,
+        expected_content: "The archive door has never opened.",
+        branch_id: "00000000-0000-0000-0000-000000000401",
+        branch_version: 0,
+        roadmap_version: 2,
+        confirm_future_invalidation: true
+      });
+      canonContent = payload.content;
+      canonCorrected = true;
+      roadmapVersion += 1;
+      branchVersion += 1;
+      return json(route, workspace());
+    }
     if (path.endsWith("/api/chat/stream")) {
       const payload = request.postDataJSON();
       expect(payload).not.toHaveProperty("provider");
@@ -310,6 +334,19 @@ test("player signs in and directs the next scene", async ({ page }) => {
   await page.getByRole("button", { name: "更新章节数" }).click();
   await expect(page.getByText("计划已调整为 15 章", { exact: false })).toBeVisible();
   await expect(page.getByText("Chapter 15", { exact: true })).toBeVisible();
+
+  await page.getByTestId("edit-canon-00000000-0000-0000-0000-000000000801").click();
+  await page.getByLabel("既定事实 content").fill("The archive door opened before midnight.");
+  await page.getByRole("button", { name: "检查影响" }).click();
+  const correctionReview = page.getByTestId("canon-correction-review");
+  await expect(correctionReview).toContainText("The archive door has never opened.");
+  await expect(correctionReview).toContainText("The archive door opened before midnight.");
+  await expect(correctionReview).toContainText("14 个未来章节计划");
+  const correctionRequest = page.waitForRequest((request) => request.url().includes("/api/workspace/canon-facts/"));
+  await page.getByRole("button", { name: "确认修正" }).click();
+  await correctionRequest;
+  await expect(page.getByText("The archive door opened before midnight.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Unwritten Chapter 15", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "设置", exact: true }).click();
   await expect(page.getByText("12.5%", { exact: true }).first()).toBeVisible();

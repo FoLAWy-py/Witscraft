@@ -446,6 +446,11 @@ export type UpdateMemoryInput = {
 export type UpdateCanonFactInput = {
   content: string;
   importance: number;
+  expectedContent?: string;
+  branchId?: string;
+  branchVersion?: number;
+  roadmapVersion?: number;
+  confirmFutureInvalidation?: boolean;
 };
 
 export type ChatResponse = {

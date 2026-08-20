@@ -4,7 +4,7 @@ This document defines the production data boundary for Witscraft. It describes a
 
 ## Account export
 
-An authenticated user can download a JSON export from `GET /api/auth/export` or the Data and account section in Settings. Export schema version 2 contains the account profile, session metadata, worlds, characters, abstract style profiles, stories, branches, chapter roadmaps, messages, generation records, plot events, state snapshots, summaries, canon facts, memories, preferences, model routes and their change history, and sanitized model-call metadata.
+An authenticated user can download a JSON export from `GET /api/auth/export` or the Data and account section in Settings. Export schema version 2 contains the account profile, session metadata, worlds, characters, abstract style profiles, stories, branches, chapter roadmaps, messages, generation records, plot events, state snapshots, summaries, canon facts (including inactive superseded correction history), memories, preferences, model routes and their change history, and sanitized model-call metadata. A story export presents only the branch's currently active canon facts so obsolete facts are not treated as narrative truth.
 
 Exports never contain password hashes, session token hashes, action-token hashes, provider API keys, SMTP credentials, or raw embedding vectors. Export files are generated on demand and are not retained by the application.
 

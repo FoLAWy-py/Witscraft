@@ -2,7 +2,7 @@
 
 **Document status:** Production baseline
 
-**Architecture version:** 3.28
+**Architecture version:** 3.29
 
 **Last updated:** 21 August 2026
 
@@ -147,6 +147,8 @@ Every new player turn is bound to the branch's single active chapter before a ge
 Worlds may declare exact machine-readable `impossible_actions` entries with player-facing reasons. Matching is local and conservative: only an explicitly declared action is rejected, and the system does not infer new prohibitions from prose. Rejection occurs before generation claim, message persistence, quota preflight, provider traffic, branch version change, or chapter movement. A successfully accepted new response completes the locked chapter with its assistant-message foreign key and activates the next chapter in the same final transaction.
 
 After structured state extraction, a best-effort `normal_chat` request may revise only the next four chapter titles/objectives and the provisional branch ending. The request contains a bounded accepted-chapter tail, the player action, current state, and that editable window; exact chapter numbers, count, global title uniqueness, field limits, and protagonist agency are validated before any change. A valid revision increments the branch roadmap version and marks its latest source as provider-generated. Failure, malformed output, or auxiliary quota exhaustion leaves the prior roadmap intact without discarding the already authored chapter. Completed chapters and future chapters outside the small window remain untouched. Regenerate and rewrite replace an existing chapter response without advancing or revising the roadmap. The final chapter marks the story completed.
+
+An ordinary player can correct an active branch's canon through a two-stage before/after review. Confirmation binds the exact prior content and roadmap version, then supersedes rather than overwrites the old fact. The transaction increments both branch generation and roadmap versions, preserves accepted chapters and messages, replaces only planned chapter titles/objectives with agency-neutral placeholders, and invalidates the provisional ending. A concurrent generation or roadmap change makes the request stale instead of allowing a silent overwrite. The operation is deterministic and makes no model or embedding call; later accepted turns repopulate the existing short roadmap window.
 
 Consistency checks are deterministic local rules over canon, scene state, character constraints, and world rules. Their evidence includes error and warning counts plus the highest severity. Warnings never call a provider. In automatic mode, a revision call is permitted only when a local rule emits `severity=error`; the revised prose is accepted only if a second local pass reduces the error count to zero. Provider failure or a surviving error preserves the original AI-authored response and records the reason. Manual mode exposes the same evidence for a player decision without automatic revision spend.
 

@@ -59,6 +59,7 @@ from app.schemas.chat import (
 from app.schemas.llm import ChatMessage, LLMRequest
 from app.services.embeddings import embedding_content_hash, stored_embedding
 from app.services.branch_manager import clone_story_branch
+from app.services.canon_corrections import CanonCorrectionError, correct_canon_fact
 from app.services.memory_embedding_tasks import enqueue_memory_embedding
 from app.services.session_summarizer import generate_session_summary
 from app.services.quota_service import QuotaExceededError
@@ -1535,13 +1536,45 @@ async def update_canon_fact(
     story = await _get_story_for_user(session, fact.story_id, user_id)
     if story is None:
         raise HTTPException(status_code=404, detail="Canon fact not found")
+    if not fact.is_active:
+        raise HTTPException(
+            status_code=409, detail="The canon fact changed; reload before editing it"
+        )
 
     content = request.content.strip()
     if not content:
         raise HTTPException(status_code=422, detail="Canon fact content cannot be empty")
 
-    fact.content = content
-    fact.importance = request.importance
+    if content != fact.content:
+        requested_branch_id = _parse_uuid_or_none(request.branch_id or "")
+        if (
+            request.expected_content is None
+            or requested_branch_id is None
+            or request.branch_version is None
+            or request.roadmap_version is None
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="Reload canon and confirm the affected future roadmap before correcting it",
+            )
+        try:
+            fact = await correct_canon_fact(
+                session,
+                fact_id=fact.id,
+                user_id=user_id,
+                new_content=content,
+                importance=request.importance,
+                expected_content=request.expected_content,
+                branch_id=requested_branch_id,
+                expected_branch_version=request.branch_version,
+                expected_roadmap_version=request.roadmap_version,
+                confirmed=request.confirm_future_invalidation,
+            )
+        except CanonCorrectionError as exc:
+            status_code = 404 if exc.code == "not_found" else 409
+            raise HTTPException(status_code=status_code, detail=exc.detail) from exc
+    else:
+        fact.importance = request.importance
     await session.commit()
 
     active_id = _parse_uuid(active_story_id or "", fact.story_id or DEFAULT_STORY_ID)

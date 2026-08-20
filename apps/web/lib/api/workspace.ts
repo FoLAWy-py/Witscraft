@@ -496,7 +496,12 @@ export async function updateCanonFact(factId: string, input: UpdateCanonFactInpu
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       content: input.content,
-      importance: input.importance
+      importance: input.importance,
+      expected_content: input.expectedContent,
+      branch_id: input.branchId,
+      branch_version: input.branchVersion,
+      roadmap_version: input.roadmapVersion,
+      confirm_future_invalidation: input.confirmFutureInvalidation ?? false
     })
   });
 }

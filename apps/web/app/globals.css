@@ -3072,6 +3072,42 @@ html.theme-transition textarea {
   max-width: 96px;
 }
 
+.canonCorrectionReview {
+  display: grid;
+  gap: 8px;
+  border: 1px solid color-mix(in srgb, var(--amber) 48%, var(--line));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--amber) 8%, var(--paper));
+  padding: 10px;
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.canonCorrectionReview dl,
+.canonCorrectionReview p {
+  margin: 0;
+}
+
+.canonCorrectionReview dl {
+  display: grid;
+  gap: 6px;
+}
+
+.canonCorrectionReview dl > div {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 7px;
+}
+
+.canonCorrectionReview dt {
+  color: var(--muted);
+}
+
+.canonCorrectionReview dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 .memoryList p {
   margin: 0;
   white-space: pre-line;

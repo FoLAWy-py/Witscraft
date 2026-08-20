@@ -18,7 +18,7 @@ class ChapterPlanResizeError(Exception):
         return self.detail
 
 
-def _extension_copy(
+def provisional_chapter_copy(
     *,
     chapter_number: int,
     ending_title: str,
@@ -140,7 +140,7 @@ async def resize_story_chapter_plan(
         else:
             existing_titles = {chapter.title.strip().casefold() for chapter in chapters}
             for chapter_number in range(old_count + 1, new_chapter_count + 1):
-                title, objective = _extension_copy(
+                title, objective = provisional_chapter_copy(
                     chapter_number=chapter_number,
                     ending_title=branch.ending_title or "",
                     prose_language=story.prose_language,

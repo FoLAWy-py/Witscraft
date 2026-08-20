@@ -69,7 +69,7 @@ Regenerate, rewrite, branch, and canon correction are ordinary-player features r
 - **Regenerate** replaces an unaccepted model response from the same player intent and does not duplicate the intent.
 - **Rewrite** accepts a bounded player instruction and produces a replacement chapter while preserving facts the player did not explicitly change.
 - **Branch** retains the source history and creates an independent future from the selected point.
-- **Canon correction** proposes an explicit before/after change, shows affected facts, and requires confirmation before invalidating dependent future material.
+- **Canon correction** proposes an explicit before/after change and shows how many future chapter plans plus the provisional ending will be invalidated. Confirmation binds the exact prior fact, branch generation version, and roadmap version. The old fact remains as inactive superseded history, accepted prose is never rewritten, and only the current branch's unstarted plan is reset to neutral placeholders before normal dynamic planning resumes.
 
 Every operation must remain idempotent, branch-scoped, authorized, and auditable without storing provider credentials or unrestricted prompt/response bodies in operational logs.
 

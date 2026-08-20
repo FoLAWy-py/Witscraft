@@ -267,6 +267,11 @@ class UpdateMemoryRequest(BaseModel):
 class UpdateCanonFactRequest(BaseModel):
     content: str = Field(min_length=1, max_length=8000)
     importance: int = Field(default=5, ge=1, le=10)
+    expected_content: str | None = Field(default=None, max_length=8000)
+    branch_id: str | None = None
+    branch_version: int | None = Field(default=None, ge=0)
+    roadmap_version: int | None = Field(default=None, ge=0)
+    confirm_future_invalidation: bool = False
 
 
 class GenerateSummaryRequest(BaseModel):

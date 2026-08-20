@@ -37,6 +37,8 @@ Route changes are serialized per account and store complete before/after snapsho
 
 Canon, scene-state, character, and world-rule checks execute locally and add no model call. Their result separates high-severity errors from warnings. A warning is retained as local evidence and cannot trigger the `consistency_check` route. In automatic mode, only at least one local error permits a single revision request. The revised narrative is checked again locally and replaces the original only when its error count is zero; an empty revision, provider failure, or surviving error keeps the original response. Manual mode never invokes the revision route automatically.
 
+Player-confirmed canon correction is also local. It supersedes the selected fact and resets only unstarted branch roadmap material to deterministic placeholders, without requesting prose, extracting state, creating an embedding, or consuming weekly model allowance. Subsequent accepted story turns may update the normal four-chapter planning window under the existing call and quota limits.
+
 ## Embedding reuse
 
 `TurnContext` owns query embedding reuse for one request/turn. The context is reset whenever a new audited turn begins, so cached narrative inputs cannot cross requests, stories, users, or turns.
