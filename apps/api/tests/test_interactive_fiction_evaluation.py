@@ -102,6 +102,34 @@ def test_provider_capture_replay_reports_provider_scores_and_deterministic_gates
     assert report.measurements["provider_calls"] == 7
 
 
+def test_reviewed_real_provider_capture_passes_current_gate() -> None:
+    case = _load("case.json")
+    reference = (EVAL_ROOT / "reference.txt").read_text(encoding="utf-8")
+    thresholds = {
+        key: float(value) for key, value in _load("thresholds.json")["thresholds"].items()
+    }
+
+    report = evaluate_provider_capture(
+        case,
+        reference,
+        _load("provider-capture.json"),
+        thresholds,
+    )
+
+    assert report.passed is True
+    assert report.score_source == "provider_capture"
+    assert report.scores == {
+        "profile_adherence": 74,
+        "narrative_quality": 86,
+        "player_agency": 94,
+        "world_canon": 88,
+        "roadmap_length": 96,
+        "overall": 86,
+    }
+    assert report.measurements["measured_length"] == 574
+    assert report.measurements["provider_calls"] == 8
+
+
 def test_evaluator_rejects_synthetic_or_tampered_model_score_evidence() -> None:
     case = _load("case.json")
     reference = (EVAL_ROOT / "reference.txt").read_text(encoding="utf-8")

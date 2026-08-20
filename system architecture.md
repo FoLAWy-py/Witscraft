@@ -2,7 +2,7 @@
 
 **Document status:** Production baseline
 
-**Architecture version:** 3.26
+**Architecture version:** 3.27
 
 **Last updated:** 21 August 2026
 
@@ -408,6 +408,8 @@ For every pull request and push to `main`, GitHub Actions provisions PostgreSQL 
 Database authorization and lifecycle behavior use real PostgreSQL integration tests. The main API journey logs in through a real session cookie, creates an interactive novel, proves an explicit impossible action has zero narrative or generation writes, performs regular and SSE dry-run chapter completion, verifies regeneration does not advance a chapter, cancels a blocked stream and verifies its durable checkpoint, creates and activates a branch, and exports the narrative. A separate Playwright gate runs the production client in Chromium with deterministic API fixtures and verifies login UI, workspace hydration, explicit player-action/Continue control modes, SSE consumption, narrative rendering, and the final synchronized story state. Provider adapters use deterministic fake-client contracts that exercise OpenAI Responses and DeepInfra Chat Completions parameter mapping, structured output options, token usage, stream filtering, split timeout configuration, disabled SDK retries, and exception propagation. Gateway tests separately prove transient and permanent HTTP status classification. Controlled live validation remains optional when API expenditure is explicitly permitted; CI never requires provider credentials.
 
 The structured-state route has an additional versioned evaluation gate. Model quality scores use the reviewed `state-extraction-v2` DeepInfra responses as their evidence source. CI replays that immutable provider capture through the production parser and grounding path, reports it explicitly as `score_source=provider_capture`, and calculates parse success, scalar accuracy, collection and relationship F1, critical invariant pass rate, and accepted hallucination rate. The current capture passes every quality threshold with zero accepted hallucinations after deterministic source grounding. Separate synthetic responses test evaluator correctness only and cannot score or approve a provider model. A replacement default requires a complete provider capture bound to the corpus hash and prompt version.
+
+AI-authoring quality has a separate versioned interactive-fiction gate. Its public-domain corpus and thresholds are checked in independently of the sanitized real-provider capture. The capture traverses authenticated story creation, cached local style profiling, chapter generation, mandatory player-agency editing, structured extraction, and roadmap adaptation, then uses an independent provider judge. It is capped at eight sequential calls and records audited route identities without credentials or raw reference text. CI and release preflight perform an offline replay that verifies corpus and generated-prose hashes, prompt/style versions, route and call counts, prose length, reference-overlap safety, deterministic style measurements, and provider scores. Synthetic evaluator fixtures cannot approve a release.
 
 A successful workflow is required release evidence. CI also proves that a clean checkout can create the release manifest after the production build. Branch protection and the deployment procedure must require that result; CI does not replace staging validation, authenticated smoke tests, or post-deployment observation.
 

@@ -25,6 +25,7 @@ apps/
 - [`docs/model-cost-controls.md`](./docs/model-cost-controls.md): purpose-level model budgets, embedding cache metrics, and quota interaction
 - [`docs/structured-extraction-evaluation.md`](./docs/structured-extraction-evaluation.md): versioned state-extraction corpus, metrics, evidence classes, and model-approval gate
 - [`docs/interactive-fiction-contract.md`](./docs/interactive-fiction-contract.md): player-agency, chapter, roadmap, revision, reference-text, and provider-evaluation acceptance rules
+- [`docs/interactive-fiction-evaluation.md`](./docs/interactive-fiction-evaluation.md): versioned public-domain corpus, bounded live capture, provider scores, and offline release gate
 - [`docs/security-checks.md`](./docs/security-checks.md): dependency, secret, and production artifact security gates
 - [`docs/release-process.md`](./docs/release-process.md): executable preflight, release manifest, smoke checks, and rollback contract
 
@@ -94,6 +95,8 @@ The browser submits the story purpose rather than assembling a provider/model pa
 Route updates are serialized per account and append an immutable before/after snapshot in the same database transaction as the active routes. The settings view can undo the latest change; that undo is itself audited and can be undone again. No-op saves create no audit noise. Route history is included in account export and removed with the account.
 
 The `state_update` default is pinned to a versioned route-approval record. Its model-quality score is calculated from the reviewed eight-case `state-extraction-v2` DeepInfra responses; the synthetic contract tests the evaluator only. The default CI command directly replays the immutable provider capture without new network spend and reports `score_source=provider_capture`; it does not substitute a synthetic score. The current route passes every parse, accuracy, F1, critical-invariant, and hallucination threshold. A replacement default still requires its own complete provider capture bound to the exact case hash and prompt version; see [`docs/structured-extraction-evaluation.md`](./docs/structured-extraction-evaluation.md).
+
+The AI-authoring release gate follows the same evidence rule. Its reviewed end-to-end capture uses DeepInfra `Qwen/Qwen3-Max` to author the chapter and OpenAI `gpt-5.5` to enforce agency and independently judge quality. CI replays the sanitized capture without provider credentials and verifies its corpus, prompt versions, route audit, length, non-reproduction measurements, and real-provider scores. See [`docs/interactive-fiction-evaluation.md`](./docs/interactive-fiction-evaluation.md).
 
 ## Model Call Auditing
 

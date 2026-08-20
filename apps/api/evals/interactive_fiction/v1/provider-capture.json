@@ -1,0 +1,80 @@
+{
+  "abstract_profile": {
+    "analysis_method": "deterministic",
+    "descriptive_density": 0.0,
+    "dialogue_ratio": 0.412,
+    "figurative_density": 0.0,
+    "pacing": "fast",
+    "paragraph_rhythm": "compact",
+    "sentence_length_mean": 44.7,
+    "sentence_length_variation": "high",
+    "tense": "mixed",
+    "viewpoint": "third"
+  },
+  "author": {
+    "model": "Qwen/Qwen3-Max",
+    "provider": "deepinfra"
+  },
+  "calls": {
+    "call_limit": 8,
+    "judge_calls": 1,
+    "lifecycle_calls": 7,
+    "lifecycle_routes": [
+      "deepinfra:Qwen/Qwen3-Max:normal_chat",
+      "deepinfra:Qwen/Qwen3-Max:normal_chat",
+      "deepinfra:Qwen/Qwen3-Max:normal_chat",
+      "openai:gpt-5.5:consistency_check",
+      "openai:gpt-5.5:consistency_check",
+      "deepinfra:Qwen/Qwen3-Max:state_update",
+      "deepinfra:Qwen/Qwen3-Max:normal_chat"
+    ],
+    "profiling_calls": 0
+  },
+  "capture_base_url_class": "loopback_http",
+  "capture_method": "bounded_live_provider_end_to_end",
+  "captured_at": "2026-08-20T19:21:18.039068Z",
+  "case_sha256": "149018ace297b7e5488d1a9f64d42b8a5c8d15f342250c6482891e62f2e357ce",
+  "deployment_revision": "9ee5b84bdca2235066e2c34c09241bc29db3119d",
+  "evaluation_version": "interactive-fiction-style-v1",
+  "evidence_kind": "provider_capture",
+  "generated_chapter": "## 2. Tea and Contradictions\n\nRain held Ashcombe House in place, muting the gravel sweep beyond the drawing-room windows. The unopened letter lay on the side table where breakfast had left it, seal intact, arrival too convenient for the room to ignore.\n\nEleanor remained by the window and asked the housekeeper whether any letters had arrived. No letter was opened or accepted.\n\nMrs. Poole set down the tea tray with a careful chime of china. Her eyes moved once toward the side table, then back to the silver pot.\n\n“One arrived this morning, miss. Addressed to you.”\n\nThe mantel clock clicked through a few dry seconds.\n\n“It came with the first post,” Mrs. Poole added. “At half-past eight, or thereabouts. I placed it there myself after Mr. Ashcombe had finished with the tray.”\n\nFrom the hearth, Lady Marwood lowered her embroidery hoop. “After Mr. Ashcombe had finished with it? That sounds less innocent than you perhaps intended, Poole.”\n\n“The tray, my lady.”\n\n“Of course. One must be exact in a house full of listeners.”\n\nThe door opened before the housekeeper could answer. Julian Ashcombe entered with a small leather-bound volume under one arm and mud darkening the edges of his boots. He halted when he saw the arrangement of faces and the letter between them all.\n\n“Still discussing the post?” Julian said. “Ashcombe has become starved of diversion.”\n\nLady Marwood’s needle flashed. “Then feed us with truth, Julian. Was there one delivery or two?”\n\nJulian placed the book on the pianoforte. “One, surely. The road is half under water.”\n\nMrs. Poole lifted the teapot. “Two, sir.”\n\nHis smile held a moment too long. “Was there?”\n\n“Yes, sir. The second cart came after ten. Thomas brought the bag through the west passage because the front steps were slick.”\n\nLady Marwood laughed without warmth. “How enterprising of Thomas. And how forgetful of you.”\n\nJulian crossed to the mantel. “If a second post came, it brought nothing of consequence.”\n\n“A parcel for the study, sir,” Mrs. Poole said.\n\nThe teapot paused over the cup.\n\nJulian looked at her then. “Ah. That.”\n\n“A brown parcel,” she continued. “Tied with black string. No sender marked.”\n\nLady Marwood set her embroidery aside. “How the morning improves. A letter no one touches, a parcel no one remembers, and boots that have seen more of the grounds than their owner admits.”\n\nJulian glanced down. The mud had begun to dry pale along the welt.\n\n“I walked as far as the orangery before breakfast,” he said.\n\nMrs. Poole placed a cup beside the unopened letter, close enough that the saucer nearly met the paper’s edge. “Before breakfast, sir? Thomas swept the orangery steps after breakfast. He said the first prints appeared nearer eleven.”\n\n“Thomas says a great deal when encouraged by kitchen gossip.”\n\n“He says less when frightened,” Lady Marwood replied.\n\nA brief silence followed. Somewhere belowstairs, a door shut with the force of a suppressed quarrel.\n\nJulian took the cup Mrs. Poole had not offered him. “This is absurd. If the letter is the trouble, burn it. If the parcel is the trouble, open that. I have nothing to conceal from guests, servants, or elderly relations with theatrical instincts.”\n\n“Then perhaps the study key will not object to being produced,” Lady Marwood said.\n\nJulian’s fingers tightened around the cup. The china gave a small, sharp sound.\n\nOn the side table, the letter remained sealed. In the passage beyond the drawing-room door, footsteps stopped and did not continue.",
+  "generated_chapter_sha256": "66996acac91060e89e64a336da9c3d934ae189f2b3afa6567d2995d392b8d834",
+  "generated_features": {
+    "analysis_method": "deterministic",
+    "descriptive_density": 0.0,
+    "dialogue_ratio": 0.258,
+    "figurative_density": 0.0,
+    "pacing": "moderate",
+    "paragraph_rhythm": "compact",
+    "sentence_length_mean": 32.5,
+    "sentence_length_variation": "high",
+    "tense": "mixed",
+    "viewpoint": "third"
+  },
+  "judge": {
+    "input_tokens": 1195,
+    "latency_ms": 7574,
+    "model": "gpt-5.5",
+    "output_tokens": 422,
+    "prompt_version": "interactive-fiction-judge-v1",
+    "provider": "openai"
+  },
+  "profile_reused": true,
+  "reference_source_url": "https://www.gutenberg.org/ebooks/1342",
+  "schema_version": 1,
+  "scores": {
+    "narrative_quality": 86,
+    "overall": 86,
+    "player_agency": 94,
+    "profile_adherence": 74,
+    "reasons": [
+      "Maintains third-person viewpoint, compact paragraphing, high sentence-length variation, and minimal figurative/descriptive density.",
+      "Dialogue is sharp and tension-building, though the dialogue ratio is notably below the target and pacing reads more moderate than fast.",
+      "The player action is respected without adding unrequested protagonist speech, thoughts, consent, or new decisions.",
+      "Scene continuity is coherent, with the unopened letter and later parcel creating effective mystery without obvious canon conflicts.",
+      "Length is close to the 500-word target."
+    ],
+    "roadmap_length": 96,
+    "world_canon": 88
+  }
+}
