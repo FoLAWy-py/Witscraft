@@ -134,6 +134,9 @@ function classifyFailure(caught: unknown, fallback: string): { message: string; 
     if (caught.status === 503 && caught.message.toLowerCase().includes("database")) {
       return { message: "数据库暂时不可用。请稍后重试，现有小说数据不会被清空。", kind: "database" };
     }
+    if (caught.status === 422 && caught.message.startsWith("Action rejected:")) {
+      return { message: `行动未成立：${caught.message.slice("Action rejected:".length).trim()}`, kind: "api" };
+    }
     return { message: `API 请求失败（${caught.status}）：${caught.message}`, kind: "api" };
   }
   if (caught instanceof TypeError || (caught instanceof Error && caught.message === "Network request failed")) {
@@ -1008,7 +1011,7 @@ export default function WorkspaceClient() {
     }
   }
 
-  async function handleSend(override?: string) {
+  async function handleSend(override?: string, controlMode: "player_action" | "continue" = "player_action") {
     const text = (override ?? draft).trim();
     if (!text || pending) return;
     if (!storyId || !branchId) {
@@ -1036,7 +1039,8 @@ export default function WorkspaceClient() {
           branchId,
           idempotencyKey,
           branchVersion,
-          signal: controller.signal
+          signal: controller.signal,
+          controlMode
         },
         {
           onDelta: (content) => {
@@ -1099,6 +1103,13 @@ export default function WorkspaceClient() {
         setError("生成已停止。若模型已返回部分文本，后端会保存 partial 记录供后续恢复。");
         setRecoveryKind("stopped");
       } else {
+        if (caught instanceof ApiError && caught.status === 422) {
+          try {
+            applyWorkspace(await getWorkspace(storyId));
+          } catch {
+            // Keep the explicit rejection even if the background resync is unavailable.
+          }
+        }
         const issue = classifyFailure(caught, "生成请求失败。当前上下文已保留，可重新同步后继续。");
         setError(issue.message);
         setRecoveryKind(issue.kind);
@@ -1884,7 +1895,7 @@ export default function WorkspaceClient() {
               onConsistencyModeChange={(mode) => void handleConsistencyModeChange(mode)}
               onStop={handleStopGeneration}
               onResync={() => void handleResyncWorkspace()}
-              onContinue={() => void handleSend("继续当前场景，但不要替我做重大决定。")}
+              onContinue={() => void handleSend(uiText(uiLanguage, "继续", "Continue"), "continue")}
               onRegenerate={(messageId) => void handleMessageCommand(messageId, "regenerate")}
               onRewrite={(messageId) => void handleMessageCommand(messageId, "rewrite")}
               onConfirmConsistency={(messageId) => void handleMessageCommand(messageId, "rewrite", "修复后端一致性检查发现的全部参数、人物、剧情与世界设定冲突；保留原有文风、节奏和剧情意图，只输出修订后的正文。")}

@@ -1,6 +1,6 @@
 # Witscraft
 
-Witscraft is a customizable AI-authored interactive novel. The AI acts as the author and narrator, while the user plays a character and decides the direction of the plot through actions and choices. The application follows the architecture in `system architecture.md`: a Next.js frontend, a FastAPI backend, PostgreSQL with fixed-dimension pgvector memory storage, and an LLM Gateway that hides OpenAI and DeepInfra differences from story logic.
+Witscraft is a customizable AI-authored interactive novel. The AI acts as the author and narrator, while the user plays a character and decides the direction of the plot through actions and choices. Stories support 3–120 chapter roadmaps and language-aware chapter targets. Normal turns preserve exclusive player control over the protagonist; an explicit Continue action delegates only one reversible turn. The application follows the architecture in `system architecture.md`: a Next.js frontend, a FastAPI backend, PostgreSQL with fixed-dimension pgvector memory storage, and an LLM Gateway that hides OpenAI and DeepInfra differences from story logic.
 
 ## Project Shape
 

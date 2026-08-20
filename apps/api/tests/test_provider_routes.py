@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
@@ -67,6 +68,14 @@ def test_client_model_hint_must_match_backend_route() -> None:
         stream=False,
     )
     assert matching.model == "zai-org/GLM-5.2"
+
+    long_chapter = engine._routed_generation_request(
+        ChatRequest(message="continue", story_id="story"),
+        messages,
+        SimpleNamespace(target_chapter_length=5000, chapter_length_unit="words"),
+        stream=False,
+    )
+    assert long_chapter.max_output_tokens == 4096
 
     with pytest.raises(HTTPException) as caught:
         engine._routed_generation_request(

@@ -27,6 +27,7 @@ from app.db.models import (
     ModelCall,
     Story,
     StoryBranch,
+    StoryChapter,
     StoryStateSnapshot,
     StorySummary,
     UserPreference,
@@ -44,6 +45,11 @@ from app.services.embeddings import (
     stored_embedding,
 )
 from app.services.memory_embedding_tasks import new_memory_embedding_task
+from app.services.player_agency import (
+    chapter_authoring_instruction,
+    ensure_chapter_heading,
+    reject_known_impossible_action,
+)
 from app.services.state_extractor import extract_story_updates_with_llm
 from app.services.turn_context import TurnContext
 
@@ -199,6 +205,7 @@ class StoryEngine:
         story = await self._get_story(story_id)
         branch_id = self._parse_uuid(request.branch_id, story.current_branch_id or DEFAULT_BRANCH_ID)
         branch = await self._get_branch(story.id, branch_id)
+        chapter = await self._preflight_player_turn(request, story, branch)
         generation, replay = await self._claim_generation(request, story, branch)
         if replay is not None:
             return replay
@@ -232,11 +239,14 @@ class StoryEngine:
             recent_exclude_message_ids={user_message.id} if user_message else None,
         )
         prompt_messages = context.prompt_messages
+        if chapter is not None:
+            prompt_messages.insert(1, self._chapter_prompt(story, request, chapter))
         await self.session.commit()
 
         llm_request = self._routed_generation_request(
             generation_request,
             prompt_messages,
+            story,
             stream=generation_request.stream,
         )
         llm_response = await self.llm_gateway.generate(llm_request)
@@ -244,6 +254,10 @@ class StoryEngine:
             llm_response.text,
             story.interaction_mode or "choices",
         )
+        if chapter is not None:
+            response_content = ensure_chapter_heading(
+                response_content, chapter.chapter_number, chapter.title
+            )
         response_choices = await self._ensure_story_choices(
             story.interaction_mode or "choices",
             response_content,
@@ -256,6 +270,10 @@ class StoryEngine:
             context,
             story.consistency_mode or "auto",
         )
+        if chapter is not None:
+            response_content = ensure_chapter_heading(
+                response_content, chapter.chapter_number, chapter.title
+            )
         llm_response = llm_response.model_copy(update={"text": response_content})
 
         perspective_character = await self._main_character_name(story)
@@ -296,6 +314,9 @@ class StoryEngine:
             assistant_message.content = llm_response.text
             assistant_message.token_count = llm_response.output_tokens
         await self.session.flush()
+
+        if target_message is None and chapter is not None:
+            await self._complete_story_chapter(story, branch, chapter, assistant_message)
 
         assistant_message.meta = {
             "author": "叙事引擎",
@@ -383,6 +404,11 @@ class StoryEngine:
         branch_id = self._parse_uuid(request.branch_id, story.current_branch_id or DEFAULT_BRANCH_ID)
         branch = await self._get_branch(story.id, branch_id)
         try:
+            chapter = await self._preflight_player_turn(request, story, branch)
+        except HTTPException as error:
+            yield {"type": "error", "status": error.status_code, "detail": error.detail}
+            return
+        try:
             generation, replay = await self._claim_generation(request, story, branch)
         except HTTPException as error:
             yield {"type": "error", "status": error.status_code, "detail": error.detail}
@@ -413,11 +439,14 @@ class StoryEngine:
             recent_exclude_message_ids={user_message.id},
         )
         prompt_messages = context.prompt_messages
+        if chapter is not None:
+            prompt_messages.insert(1, self._chapter_prompt(story, request, chapter))
         await self.session.commit()
 
         llm_request = self._routed_generation_request(
             request,
             prompt_messages,
+            story,
             stream=True,
         )
         started = time.perf_counter()
@@ -483,6 +512,17 @@ class StoryEngine:
             raw_response_text,
             story.interaction_mode or "choices",
         )
+        if chapter is not None:
+            titled_content = ensure_chapter_heading(
+                response_content, chapter.chapter_number, chapter.title
+            )
+            if titled_content != response_content:
+                response_content = titled_content
+                stream_message = await self._save_stream_partial(
+                    story, branch, stream_message, response_content
+                )
+                delivered_text = response_content
+                yield {"type": "replace", "content": response_content}
         response_choices = await self._ensure_story_choices(
             story.interaction_mode or "choices",
             response_content,
@@ -504,6 +544,10 @@ class StoryEngine:
             context,
             story.consistency_mode or "auto",
         )
+        if chapter is not None:
+            final_content = ensure_chapter_heading(
+                final_content, chapter.chapter_number, chapter.title
+            )
         if final_content != response_content:
             response_content = final_content
             stream_message = await self._save_stream_partial(
@@ -536,6 +580,7 @@ class StoryEngine:
             consistency_check,
             consistency_revision,
             generation,
+            chapter,
         )
         yield {"type": "done", "response": response.model_dump()}
 
@@ -559,6 +604,7 @@ class StoryEngine:
         self,
         request: ChatRequest,
         messages: list[ChatMessage],
+        story: Story | None = None,
         *,
         stream: bool,
     ) -> LLMRequest:
@@ -567,7 +613,110 @@ class StoryEngine:
         updates: dict = {"stream": stream}
         if request.max_output_tokens is not None:
             updates["max_output_tokens"] = request.max_output_tokens
+        elif story is not None:
+            unit_multiplier = 1.6 if story.chapter_length_unit == "words" else 1.15
+            updates["max_output_tokens"] = max(
+                routed.max_output_tokens,
+                math.ceil(story.target_chapter_length * unit_multiplier) + 256,
+            )
         return self.llm_gateway.normalize_request(routed.model_copy(update=updates))
+
+    async def _preflight_player_turn(
+        self,
+        request: ChatRequest,
+        story: Story,
+        branch: StoryBranch,
+    ) -> StoryChapter | None:
+        if request.command is not None:
+            return None
+        if request.control_mode == "player_action":
+            world = await self.session.get(World, story.world_id)
+            rejection = reject_known_impossible_action(
+                request.message,
+                world.rules if world is not None else {},
+            )
+            if rejection is not None:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Action rejected: {rejection.reason}",
+                )
+        chapter = await self.session.scalar(
+            select(StoryChapter)
+            .where(
+                StoryChapter.story_id == story.id,
+                StoryChapter.branch_id == branch.id,
+                StoryChapter.status == "active",
+            )
+            .limit(1)
+        )
+        if chapter is None:
+            if request.idempotency_key:
+                completed_replay = await self.session.scalar(
+                    select(GenerationRequest.id).where(
+                        GenerationRequest.user_id == self.user_id,
+                        GenerationRequest.idempotency_key == request.idempotency_key,
+                        GenerationRequest.status == "completed",
+                    )
+                )
+                if completed_replay is not None:
+                    return None
+            raise HTTPException(status_code=409, detail="This branch has reached its ending")
+        return chapter
+
+    @staticmethod
+    def _chapter_prompt(
+        story: Story,
+        request: ChatRequest,
+        chapter: StoryChapter,
+    ) -> ChatMessage:
+        return ChatMessage(
+            role="developer",
+            content=chapter_authoring_instruction(
+                control_mode=request.control_mode,
+                chapter_number=chapter.chapter_number,
+                chapter_title=chapter.title,
+                chapter_objective=chapter.objective or "Advance the current dramatic pressure.",
+                target_length=story.target_chapter_length,
+                length_unit=story.chapter_length_unit,
+                prose_language=story.prose_language,
+            ),
+        )
+
+    async def _complete_story_chapter(
+        self,
+        story: Story,
+        branch: StoryBranch,
+        chapter: StoryChapter,
+        assistant_message: Message,
+    ) -> None:
+        current = await self.session.scalar(
+            select(StoryChapter)
+            .where(
+                StoryChapter.id == chapter.id,
+                StoryChapter.story_id == story.id,
+                StoryChapter.branch_id == branch.id,
+                StoryChapter.status == "active",
+            )
+            .with_for_update()
+        )
+        if current is None:
+            raise HTTPException(status_code=409, detail="Active chapter changed during generation")
+        current.status = "completed"
+        current.message_id = assistant_message.id
+        current.completed_at = datetime.now(timezone.utc)
+        next_chapter = await self.session.scalar(
+            select(StoryChapter)
+            .where(
+                StoryChapter.story_id == story.id,
+                StoryChapter.branch_id == branch.id,
+                StoryChapter.chapter_number == current.chapter_number + 1,
+            )
+            .limit(1)
+        )
+        if next_chapter is None:
+            story.status = "completed"
+        else:
+            next_chapter.status = "active"
 
     def _validate_request_route(self, request: ChatRequest) -> None:
         if not (request.provider or request.model):
@@ -941,6 +1090,7 @@ class StoryEngine:
         consistency_check: dict | None = None,
         consistency_revision: dict | None = None,
         generation: GenerationRequest | None = None,
+        chapter: StoryChapter | None = None,
     ) -> ChatResponse:
         choices = response_choices or []
         perspective_character = await self._main_character_name(story)
@@ -984,6 +1134,9 @@ class StoryEngine:
                 "stream": True,
                 "choices": choices,
             }
+
+        if generation is not None and chapter is not None:
+            await self._complete_story_chapter(story, branch, chapter, assistant_message)
 
         consistency_check = consistency_check or self._check_consistency(llm_response.text, state, context)
         consistency_revision = consistency_revision or {

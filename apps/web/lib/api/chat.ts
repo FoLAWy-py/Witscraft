@@ -11,6 +11,7 @@ type StoryMessageInput = {
   signal?: AbortSignal;
   idempotencyKey?: string;
   branchVersion?: number;
+  controlMode?: "player_action" | "continue";
 };
 
 export async function sendStoryMessage(input: StoryMessageInput): Promise<ChatResponse> {
@@ -28,7 +29,8 @@ export async function sendStoryMessage(input: StoryMessageInput): Promise<ChatRe
       command: input.command,
       target_message_id: input.targetMessageId,
       idempotency_key: input.idempotencyKey,
-      branch_version: input.branchVersion
+      branch_version: input.branchVersion,
+      control_mode: input.controlMode ?? "player_action"
     })
   });
 }
@@ -63,7 +65,8 @@ export async function streamStoryMessage(
       branch_id: input.branchId,
       purpose: input.purpose ?? "normal_chat",
       idempotency_key: input.idempotencyKey,
-      branch_version: input.branchVersion
+      branch_version: input.branchVersion,
+      control_mode: input.controlMode ?? "player_action"
     })
   });
   if (!response.ok || !response.body) {

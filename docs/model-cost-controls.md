@@ -81,6 +81,8 @@ The auditor resets the counter when it begins a new turn. Exhaustion stops the c
 
 Story creation makes one logical `normal_chat` request to plan the requested 3–120 chapter roadmap. Output is capped at the smaller of 8,192 tokens or the planner's count-scaled budget, and the request remains subject to the shared weekly quota, route budget, retry/fallback policy, and external-call ceiling. Quota exhaustion is reported instead of silently downgrading. Other provider failures or invalid structured output use a deterministic local roadmap so story creation remains available, and `roadmap_source` preserves whether the accepted plan was provider-generated or fallback-generated. The planner does not create embeddings.
 
+Narrative output allowance scales with the configured chapter target: the conservative request uses 1.15 tokens per requested CJK character or 1.6 tokens per requested whitespace-delimited word, plus a small structural reserve, and never exceeds the selected purpose/model hard ceiling. This is an allowance rather than a claim that the provider will exactly meet the target; real-provider chapter-length scoring remains a release evaluation requirement. Explicit machine-readable impossible actions are rejected locally before quota preflight, and Continue changes the authoring constraint without adding an auxiliary call.
+
 ## Summary generation
 
 Session summaries are user-triggered and are not generated on every narrative turn. The summarizer sends the previous cumulative branch summary together with only messages after its coverage boundary, then persists a complete replacement summary. A request with no newly uncovered message returns HTTP `409` before quota preflight or provider execution, preventing repeated charges for the same range.

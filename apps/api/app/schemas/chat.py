@@ -32,6 +32,7 @@ class ChatRequest(BaseModel):
         pattern=r"^[A-Za-z0-9._:-]+$",
     )
     branch_version: int | None = Field(default=None, ge=0)
+    control_mode: Literal["player_action", "continue"] = "player_action"
 
     @model_validator(mode="after")
     def validate_command(self) -> Self:

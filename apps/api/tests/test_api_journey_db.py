@@ -3,14 +3,23 @@ from __future__ import annotations
 import asyncio
 import json
 from datetime import datetime, timezone
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import httpx
 import pytest
 from sqlalchemy import delete, select
 
 from app.config import Settings, get_settings
-from app.db.models import AuthCredential, GenerationRequest, Message, User, UserModelRoute
+from app.db.models import (
+    AuthCredential,
+    GenerationRequest,
+    Message,
+    Story,
+    StoryChapter,
+    User,
+    UserModelRoute,
+    World,
+)
 from app.db.session import AsyncSessionLocal, engine
 from app.llm.router import LLMGateway
 from app.main import create_app
@@ -184,6 +193,86 @@ def test_authenticated_interactive_novel_api_journey(monkeypatch) -> None:
                     chapter["status"] == "planned" for chapter in workspace["chapters"][2:]
                 )
 
+                async with AsyncSessionLocal() as verification:
+                    story_row = await verification.get(Story, UUID(story_id))
+                    assert story_row is not None
+                    world_row = await verification.get(World, story_row.world_id)
+                    assert world_row is not None
+                    world_row.rules = {
+                        "impossible_actions": [
+                            {
+                                "action": "teleport",
+                                "reason": "Teleportation does not exist in the archive.",
+                            }
+                        ]
+                    }
+                    before_invalid_messages = len(
+                        list(
+                            (
+                                await verification.scalars(
+                                    select(Message).where(Message.story_id == story_row.id)
+                                )
+                            ).all()
+                        )
+                    )
+                    before_invalid_generations = len(
+                        list(
+                            (
+                                await verification.scalars(
+                                    select(GenerationRequest).where(
+                                        GenerationRequest.story_id == story_row.id
+                                    )
+                                )
+                            ).all()
+                        )
+                    )
+                    await verification.commit()
+
+                impossible = await client.post(
+                    "/api/chat/send",
+                    json={
+                        "message": "I teleport through the sealed archive door.",
+                        "story_id": story_id,
+                        "branch_id": main_branch_id,
+                        "branch_version": 0,
+                    },
+                )
+                assert impossible.status_code == 422
+                assert "Teleportation does not exist" in impossible.json()["detail"]
+                async with AsyncSessionLocal() as verification:
+                    assert len(
+                        list(
+                            (
+                                await verification.scalars(
+                                    select(Message).where(Message.story_id == UUID(story_id))
+                                )
+                            ).all()
+                        )
+                    ) == before_invalid_messages
+                    assert len(
+                        list(
+                            (
+                                await verification.scalars(
+                                    select(GenerationRequest).where(
+                                        GenerationRequest.story_id == UUID(story_id)
+                                    )
+                                )
+                            ).all()
+                        )
+                    ) == before_invalid_generations
+                    active_chapter = await verification.scalar(
+                        select(StoryChapter).where(
+                            StoryChapter.story_id == UUID(story_id),
+                            StoryChapter.status == "active",
+                        )
+                    )
+                    assert active_chapter is not None
+                    assert active_chapter.chapter_number == 2
+                    story_row = await verification.get(Story, UUID(story_id))
+                    world_row = await verification.get(World, story_row.world_id)
+                    world_row.rules = {}
+                    await verification.commit()
+
                 stale_route = await client.post(
                     "/api/chat/send",
                     headers={"Idempotency-Key": f"journey-{marker}-stale-route"},
@@ -234,6 +323,17 @@ def test_authenticated_interactive_novel_api_journey(monkeypatch) -> None:
                 assert first_reply["branch_version"] == 1
                 assert first_reply["model_call"]["dry_run"] is True
                 assert first_reply["model_call"]["model"] == "zai-org/GLM-5.2"
+                assert first_reply["content"].startswith(
+                    f"## 2. {workspace['chapters'][1]['title']}"
+                )
+                after_first_turn = await client.get(
+                    "/api/workspace",
+                    params={"story_id": story_id, "branch_id": main_branch_id},
+                )
+                first_turn_chapters = after_first_turn.json()["chapters"]
+                assert first_turn_chapters[1]["status"] == "completed"
+                assert first_turn_chapters[1]["message_id"] == first_reply["message_id"]
+                assert first_turn_chapters[2]["status"] == "active"
 
                 regenerated = await client.post(
                     "/api/chat/send",
@@ -250,6 +350,11 @@ def test_authenticated_interactive_novel_api_journey(monkeypatch) -> None:
                 )
                 assert regenerated.status_code == 200, regenerated.text
                 assert regenerated.json()["branch_version"] == 2
+                after_regeneration = await client.get(
+                    "/api/workspace",
+                    params={"story_id": story_id, "branch_id": main_branch_id},
+                )
+                assert after_regeneration.json()["chapters"][2]["status"] == "active"
 
                 streamed = await client.post(
                     "/api/chat/stream",
@@ -266,6 +371,12 @@ def test_authenticated_interactive_novel_api_journey(monkeypatch) -> None:
                 assert streamed.status_code == 200, streamed.text
                 done = _done_event(streamed.text)
                 assert done["response"]["branch_version"] == 3
+                after_stream = await client.get(
+                    "/api/workspace",
+                    params={"story_id": story_id, "branch_id": main_branch_id},
+                )
+                assert after_stream.json()["chapters"][2]["status"] == "completed"
+                assert after_stream.json()["chapters"][3]["status"] == "active"
 
                 stream_waiting = asyncio.Event()
                 never_finish = asyncio.Event()

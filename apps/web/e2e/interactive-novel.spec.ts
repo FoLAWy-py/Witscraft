@@ -224,6 +224,7 @@ async function installApiFixture(page: Page) {
       expect(payload).not.toHaveProperty("provider");
       expect(payload).not.toHaveProperty("model");
       expect(payload.purpose).toBe("normal_chat");
+      expect(payload.control_mode).toBe(payload.message === "继续" ? "continue" : "player_action");
       const reply = "Mira turns the key, and the sealed archive answers.";
       branchVersion += 1;
       storyState = { location: "Sealed archive", time: "Midnight", mood: "tense", objective: "Read the answer", inventory: ["key"], open_threads: [] };
@@ -290,6 +291,13 @@ test("player signs in and directs the next scene", async ({ page }) => {
   await expect(page.getByText("I turn the key and enter the sealed room.")).toBeVisible();
   await expect(page.getByText("Mira turns the key, and the sealed archive answers.")).toBeVisible();
   await expect(page.getByText("Sealed archive", { exact: true }).first()).toBeVisible();
+  const continued = page.waitForRequest((request) => (
+    request.url().endsWith("/api/chat/stream")
+    && request.postDataJSON().control_mode === "continue"
+  ));
+  await page.getByRole("button", { name: "继续", exact: true }).last().click();
+  await continued;
+  await expect(page.getByText("继续", { exact: true }).last()).toBeVisible();
 });
 
 test("player configures chapter count and chapter length during story creation", async ({ page }) => {
