@@ -51,6 +51,7 @@ from app.services.player_agency import (
     reject_known_impossible_action,
 )
 from app.services.state_extractor import extract_story_updates_with_llm
+from app.services.story_roadmap import revise_roadmap_window
 from app.services.turn_context import TurnContext
 
 
@@ -286,6 +287,15 @@ class StoryEngine:
             relationships=relationships,
             perspective_character=perspective_character,
         )
+        if target_message is None and chapter is not None:
+            await self._revise_future_roadmap(
+                story,
+                branch,
+                chapter,
+                source_user_text,
+                llm_response.text,
+                extraction.state,
+            )
         prepared_memories, prepared_canon_facts = await self._prepare_extracted_knowledge(
             story,
             branch,
@@ -718,6 +728,73 @@ class StoryEngine:
         else:
             next_chapter.status = "active"
 
+    async def _revise_future_roadmap(
+        self,
+        story: Story,
+        branch: StoryBranch,
+        completed_chapter: StoryChapter,
+        player_action: str,
+        accepted_chapter: str,
+        state: StoryState,
+    ) -> None:
+        result = await self.session.execute(
+            select(StoryChapter)
+            .where(
+                StoryChapter.story_id == story.id,
+                StoryChapter.branch_id == branch.id,
+            )
+            .order_by(StoryChapter.chapter_number.asc())
+        )
+        all_chapters = list(result.scalars().all())
+        future = [
+            chapter
+            for chapter in all_chapters
+            if chapter.chapter_number > completed_chapter.chapter_number
+        ]
+        window = future[:4]
+        if not window:
+            return
+        editable_ids = {chapter.id for chapter in window}
+        locked_titles = {
+            chapter.title.strip().casefold()
+            for chapter in all_chapters
+            if chapter.id not in editable_ids
+        }
+        payload = [
+            {
+                "chapter_number": chapter.chapter_number,
+                "title": chapter.title,
+                "objective": chapter.objective or "",
+            }
+            for chapter in window
+        ]
+        await self.session.commit()
+        revision = await revise_roadmap_window(
+            gateway=self.llm_gateway,
+            future_chapters=payload,
+            current_ending_title=branch.ending_title or "",
+            player_action=player_action,
+            accepted_chapter=accepted_chapter,
+            story_state=state.model_dump(mode="json"),
+        )
+        if revision is None:
+            return
+        revised_titles = {chapter.title.strip().casefold() for chapter in revision.chapters}
+        if revised_titles & locked_titles:
+            return
+        next_version = branch.roadmap_version + 1
+        branch.roadmap_version = next_version
+        branch.roadmap_source = "provider"
+        branch.ending_title = revision.ending_title
+        revisions_by_number = {
+            chapter.chapter_number: chapter for chapter in revision.chapters
+        }
+        for chapter in window:
+            revised = revisions_by_number[chapter.chapter_number]
+            chapter.title = revised.title
+            chapter.objective = revised.objective
+            chapter.roadmap_version = next_version
+
     def _validate_request_route(self, request: ChatRequest) -> None:
         if not (request.provider or request.model):
             return
@@ -1103,6 +1180,15 @@ class StoryEngine:
             relationships=relationships,
             perspective_character=perspective_character,
         )
+        if generation is not None and chapter is not None:
+            await self._revise_future_roadmap(
+                story,
+                branch,
+                chapter,
+                request.message,
+                llm_response.text,
+                extraction.state,
+            )
         prepared_memories, prepared_canon_facts = await self._prepare_extracted_knowledge(
             story,
             branch,

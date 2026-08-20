@@ -11,6 +11,7 @@ from app.schemas.llm import LLMResponse
 from app.services.story_roadmap import (
     deterministic_initial_roadmap,
     plan_initial_roadmap,
+    revise_roadmap_window,
     validate_provider_roadmap,
 )
 
@@ -106,3 +107,42 @@ def test_valid_provider_roadmap_is_authoritative(monkeypatch: pytest.MonkeyPatch
         "失名卷宗",
         "最后一页",
     ]
+
+
+def test_provider_revises_only_the_supplied_future_window(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = {
+        "ending_title": "潮汐之后",
+        "chapters": [
+            {"chapter_number": 7, "title": "逆流", "objective": "承接玩家拒绝交易的后果。"},
+            {"chapter_number": 8, "title": "无字契约", "objective": "把新的选择交还玩家。"},
+        ],
+    }
+
+    async def fake_generate(self: LLMGateway, request: object) -> LLMResponse:
+        return LLMResponse(
+            text=json.dumps(payload, ensure_ascii=False),
+            provider="deepinfra",
+            model="Qwen/Qwen3-Max",
+        )
+
+    monkeypatch.setattr(LLMGateway, "generate", fake_generate)
+    gateway = LLMGateway(Settings(dry_run_llm=True))
+    revision = asyncio.run(
+        revise_roadmap_window(
+            gateway=gateway,
+            future_chapters=[
+                {"chapter_number": 7, "title": "旧七", "objective": "旧目标七"},
+                {"chapter_number": 8, "title": "旧八", "objective": "旧目标八"},
+            ],
+            current_ending_title="旧结局",
+            player_action="我拒绝交易。",
+            accepted_chapter="交易被拒绝。",
+            story_state={"objective": "离开港口"},
+        )
+    )
+
+    assert revision is not None
+    assert revision.ending_title == "潮汐之后"
+    assert [chapter.chapter_number for chapter in revision.chapters] == [7, 8]

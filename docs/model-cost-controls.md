@@ -83,6 +83,8 @@ Story creation makes one logical `normal_chat` request to plan the requested 3â€
 
 Narrative output allowance scales with the configured chapter target: the conservative request uses 1.15 tokens per requested CJK character or 1.6 tokens per requested whitespace-delimited word, plus a small structural reserve, and never exceeds the selected purpose/model hard ceiling. This is an allowance rather than a claim that the provider will exactly meet the target; real-provider chapter-length scoring remains a release evaluation requirement. Explicit machine-readable impossible actions are rejected locally before quota preflight, and Continue changes the authoring constraint without adding an auxiliary call.
 
+After an accepted new chapter, roadmap adaptation may make one additional `normal_chat` request for at most the next four chapters and the provisional ending. Its output allowance is 900â€“1,280 tokens for the normal four-chapter window and never exceeds 2,400. It does not resend the full transcript or full 120-chapter plan, does not generate embeddings, and does not run for regenerate/rewrite or after the final chapter. Invalid output, provider failure, or unavailable auxiliary quota preserves the current roadmap and the accepted narrative; no retry loop exists outside the Gateway's global bounded policy.
+
 ## Summary generation
 
 Session summaries are user-triggered and are not generated on every narrative turn. The summarizer sends the previous cumulative branch summary together with only messages after its coverage boundary, then persists a complete replacement summary. A request with no newly uncovered message returns HTTP `409` before quota preflight or provider execution, preventing repeated charges for the same range.

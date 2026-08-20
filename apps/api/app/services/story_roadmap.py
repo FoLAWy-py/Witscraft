@@ -23,6 +23,14 @@ class PlannedRoadmap:
     source: RoadmapSource
 
 
+class RoadmapWindowChapter(StoryRoadmapChapterDraft):
+    pass
+
+
+class RoadmapWindowRevision(StoryRoadmapDraft):
+    chapters: list[RoadmapWindowChapter]
+
+
 def deterministic_initial_roadmap(request: CreateStoryRequest) -> StoryRoadmapDraft:
     chapter_count = request.planned_chapter_count
     premise = " ".join(request.premise.split())
@@ -141,3 +149,59 @@ async def plan_initial_roadmap(
         raise
     except Exception:
         return PlannedRoadmap(draft=fallback, source="deterministic_fallback")
+
+
+async def revise_roadmap_window(
+    *,
+    gateway: LLMGateway,
+    future_chapters: list[dict],
+    current_ending_title: str,
+    player_action: str,
+    accepted_chapter: str,
+    story_state: dict,
+) -> RoadmapWindowRevision | None:
+    """Best-effort provider revision of only the next four chapters and ending."""
+    window = future_chapters[:4]
+    if not window:
+        return None
+    expected_numbers = [int(chapter["chapter_number"]) for chapter in window]
+    payload = {
+        "player_action": player_action[:2000],
+        "accepted_chapter_tail": accepted_chapter[-2400:],
+        "current_state": story_state,
+        "current_ending_title": current_ending_title,
+        "editable_future_window": window,
+    }
+    messages = [
+        ChatMessage(
+            role="system",
+            content=(
+                "Revise a small future window for a player-led interactive novel. Return JSON "
+                "only with ending_title and chapters. Preserve the supplied chapter numbers and "
+                "count exactly. Adapt titles and objectives to the accepted player choice, but do "
+                "not predetermine protagonist speech, thoughts, irreversible choices, sacrifice, "
+                "allegiance, or ending. Titles must be distinct. Do not summarize completed history."
+            ),
+        ),
+        ChatMessage(role="user", content=json.dumps(payload, ensure_ascii=False, sort_keys=True)),
+    ]
+    request = gateway.request_for_purpose("normal_chat", messages).model_copy(
+        update={
+            "max_output_tokens": min(2400, max(900, len(window) * 320)),
+            "temperature": 0.5,
+            "top_p": 0.85,
+            "response_format": "json",
+            "stream": False,
+        }
+    )
+    try:
+        response = await gateway.generate(gateway.normalize_request(request))
+        revision = RoadmapWindowRevision.model_validate_json(response.text)
+        if [chapter.chapter_number for chapter in revision.chapters] != expected_numbers:
+            return None
+        titles = [chapter.title.strip().casefold() for chapter in revision.chapters]
+        if len(set(titles)) != len(titles):
+            return None
+        return revision
+    except Exception:
+        return None

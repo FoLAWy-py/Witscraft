@@ -2,7 +2,7 @@
 
 **Document status:** Production baseline
 
-**Architecture version:** 3.23
+**Architecture version:** 3.24
 
 **Last updated:** 21 August 2026
 
@@ -144,7 +144,9 @@ The engine does not grant model output authority over database identity, authori
 
 Every new player turn is bound to the branch's single active chapter before a generation ledger row or provider call is created. The browser sends an explicit `player_action` or `continue` control mode. A normal turn forbids invented protagonist speech, private thought, consent, decisions, and unrequested action. `continue` delegates reversible protagonist behavior for that response only and requires the AI author to stop before an avoidable irreversible decision. The canonical chapter number, title, provisional objective, prose language, and language-aware target length are injected as a developer constraint; the application supplies the canonical Markdown heading. Output allowance scales with the configured word/character target while remaining capped by the purpose and model hard limits.
 
-Worlds may declare exact machine-readable `impossible_actions` entries with player-facing reasons. Matching is local and conservative: only an explicitly declared action is rejected, and the system does not infer new prohibitions from prose. Rejection occurs before generation claim, message persistence, quota preflight, provider traffic, branch version change, or chapter movement. A successfully accepted new response completes the locked chapter with its assistant-message foreign key and activates the next chapter in the same final transaction. Regenerate and rewrite replace an existing chapter response without advancing the roadmap. The final chapter marks the story completed.
+Worlds may declare exact machine-readable `impossible_actions` entries with player-facing reasons. Matching is local and conservative: only an explicitly declared action is rejected, and the system does not infer new prohibitions from prose. Rejection occurs before generation claim, message persistence, quota preflight, provider traffic, branch version change, or chapter movement. A successfully accepted new response completes the locked chapter with its assistant-message foreign key and activates the next chapter in the same final transaction.
+
+After structured state extraction, a best-effort `normal_chat` request may revise only the next four chapter titles/objectives and the provisional branch ending. The request contains a bounded accepted-chapter tail, the player action, current state, and that editable window; exact chapter numbers, count, global title uniqueness, field limits, and protagonist agency are validated before any change. A valid revision increments the branch roadmap version and marks its latest source as provider-generated. Failure, malformed output, or auxiliary quota exhaustion leaves the prior roadmap intact without discarding the already authored chapter. Completed chapters and future chapters outside the small window remain untouched. Regenerate and rewrite replace an existing chapter response without advancing or revising the roadmap. The final chapter marks the story completed.
 
 Consistency checks are deterministic local rules over canon, scene state, character constraints, and world rules. Their evidence includes error and warning counts plus the highest severity. Warnings never call a provider. In automatic mode, a revision call is permitted only when a local rule emits `severity=error`; the revised prose is accepted only if a second local pass reduces the error count to zero. Provider failure or a surviving error preserves the original AI-authored response and records the reason. Manual mode exposes the same evidence for a player decision without automatic revision spend.
 
