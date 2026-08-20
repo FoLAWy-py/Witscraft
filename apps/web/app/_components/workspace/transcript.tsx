@@ -45,9 +45,13 @@ export function Transcript({
   branchName,
   chapters,
   plannedChapterCount,
+  minimumPlannedChapterCount,
   targetChapterLength,
   chapterLengthUnit,
   endingTitle,
+  roadmapVersion,
+  savingChapterCount,
+  chapterCountNotice,
   draft,
   setDraft,
   pending,
@@ -64,6 +68,7 @@ export function Transcript({
   storyPromptNotice,
   onChangeStoryPrompt,
   onSaveStoryPrompt,
+  onChapterCountChange,
   onSend,
   onSelectChoice,
   onInteractionModeChange,
@@ -82,9 +87,13 @@ export function Transcript({
   branchName: string;
   chapters: WorkspaceResponse["chapters"];
   plannedChapterCount: number;
+  minimumPlannedChapterCount: number;
   targetChapterLength: number;
   chapterLengthUnit: "characters" | "words";
   endingTitle: string;
+  roadmapVersion: number;
+  savingChapterCount: boolean;
+  chapterCountNotice: string | null;
   draft: string;
   setDraft: (value: string) => void;
   pending: boolean;
@@ -101,6 +110,7 @@ export function Transcript({
   storyPromptNotice: string | null;
   onChangeStoryPrompt: (value: string) => void;
   onSaveStoryPrompt: () => void;
+  onChapterCountChange: (count: number) => void;
   onSend: () => void;
   onSelectChoice: (choice: string) => void;
   onInteractionModeChange: (mode: InteractionMode) => void;
@@ -117,11 +127,17 @@ export function Transcript({
   const [customChoiceActive, setCustomChoiceActive] = useState(false);
   const [dismissedConsistencyIds, setDismissedConsistencyIds] = useState<Set<string>>(new Set());
   const [promptOpen, setPromptOpen] = useState(false);
+  const [chapterCountDraft, setChapterCountDraft] = useState(plannedChapterCount);
   const hasStreamingAssistant = pending && messages[messages.length - 1]?.role === "assistant";
   const lastAssistantIndex = messages.reduce((last, message, index) => message.role === "assistant" ? index : last, -1);
   const currentChapter = chapters.find((chapter) => chapter.status === "active")
     ?? [...chapters].reverse().find((chapter) => chapter.status === "completed")
     ?? chapters[0];
+  const protectedChapterNumber = Math.max(3, minimumPlannedChapterCount);
+
+  useEffect(() => {
+    setChapterCountDraft(plannedChapterCount);
+  }, [plannedChapterCount, roadmapVersion]);
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
@@ -187,6 +203,41 @@ export function Transcript({
               ))}
             </ol>
             {endingTitle && <p className="roadmapEnding"><Sparkles size={14} />{uiText(uiLanguage, "当前结局：", "Current ending: ")}<strong>{endingTitle}</strong></p>}
+            <div className="chapterPlanControls">
+              <label>
+                <span>{uiText(uiLanguage, "计划总章节", "Planned chapter total")}</span>
+                <input
+                  aria-label={uiText(uiLanguage, "调整计划总章节", "Change planned chapter total")}
+                  type="number"
+                  min={protectedChapterNumber}
+                  max={120}
+                  value={chapterCountDraft}
+                  onChange={(event) => setChapterCountDraft(Number(event.target.value))}
+                  disabled={savingChapterCount || pending}
+                />
+              </label>
+              <button
+                className="cmdButton"
+                type="button"
+                disabled={
+                  savingChapterCount
+                  || pending
+                  || chapterCountDraft === plannedChapterCount
+                  || chapterCountDraft < protectedChapterNumber
+                  || chapterCountDraft > 120
+                }
+                onClick={() => onChapterCountChange(chapterCountDraft)}
+              >
+                {savingChapterCount ? <RefreshCw size={13} className="spinIcon" /> : <Check size={13} />}
+                {uiText(uiLanguage, "更新章节数", "Update chapter count")}
+              </button>
+              <small>{uiText(
+                uiLanguage,
+                `可设 ${protectedChapterNumber}–120；已完成和当前章节不会被删除。`,
+                `Choose ${protectedChapterNumber}–120. Completed and active chapters are never removed.`
+              )}</small>
+              {chapterCountNotice && <span role="status">{chapterCountNotice}</span>}
+            </div>
           </div>
         </details>
       )}

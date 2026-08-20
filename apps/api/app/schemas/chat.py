@@ -195,14 +195,30 @@ class UpdateStoryRequest(BaseModel):
     custom_prompt: str | None = Field(default=None, max_length=12000)
     interaction_mode: Literal["choices", "open"] | None = None
     consistency_mode: Literal["manual", "auto", "off"] | None = None
+    planned_chapter_count: int | None = Field(default=None, ge=3, le=120)
+    branch_id: str | None = None
+    roadmap_version: int | None = Field(default=None, ge=0)
 
     @model_validator(mode="after")
     def require_change(self) -> Self:
+        if self.planned_chapter_count is not None and (
+            self.branch_id is None or self.roadmap_version is None
+        ):
+            raise ValueError(
+                "branch_id and roadmap_version are required with planned_chapter_count"
+            )
+        if self.planned_chapter_count is None and (
+            self.branch_id is not None or self.roadmap_version is not None
+        ):
+            raise ValueError(
+                "branch_id and roadmap_version are only valid with planned_chapter_count"
+            )
         if (
             self.title is None
             and self.custom_prompt is None
             and self.interaction_mode is None
             and self.consistency_mode is None
+            and self.planned_chapter_count is None
         ):
             raise ValueError("At least one story field is required")
         if self.title is not None and not self.title.strip():
@@ -302,6 +318,7 @@ class WorkspaceResponse(BaseModel):
     interaction_mode: Literal["choices", "open"] = "choices"
     consistency_mode: Literal["manual", "auto", "off"] = "auto"
     planned_chapter_count: int = 12
+    minimum_planned_chapter_count: int = 3
     target_chapter_length: int = 1800
     chapter_length_unit: Literal["characters", "words"] = "characters"
     prose_language: str = "zh-CN"

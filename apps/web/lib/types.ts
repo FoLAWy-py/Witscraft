@@ -325,6 +325,7 @@ export type WorkspaceResponse = {
   interaction_mode: "choices" | "open";
   consistency_mode: "manual" | "auto" | "off";
   planned_chapter_count: number;
+  minimum_planned_chapter_count: number;
   target_chapter_length: number;
   chapter_length_unit: "characters" | "words";
   prose_language: string;
@@ -421,6 +422,9 @@ export type UpdateStoryInput = {
   customPrompt?: string;
   interactionMode?: "choices" | "open";
   consistencyMode?: "manual" | "auto" | "off";
+  plannedChapterCount?: number;
+  branchId?: string;
+  roadmapVersion?: number;
 };
 
 export type UpdateWorldInput = {

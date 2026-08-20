@@ -311,6 +311,8 @@ export default function WorkspaceClient() {
   const [savedStoryPrompt, setSavedStoryPrompt] = useState("");
   const [savingStoryPrompt, setSavingStoryPrompt] = useState(false);
   const [storyPromptNotice, setStoryPromptNotice] = useState<string | null>(null);
+  const [savingChapterCount, setSavingChapterCount] = useState(false);
+  const [chapterCountNotice, setChapterCountNotice] = useState<string | null>(null);
   const [interactionMode, setInteractionMode] = useState<InteractionMode>("choices");
   const [savingInteractionMode, setSavingInteractionMode] = useState(false);
   const [consistencyMode, setConsistencyMode] = useState<ConsistencyMode>("auto");
@@ -319,6 +321,8 @@ export default function WorkspaceClient() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [chapters, setChapters] = useState<StoryChapterSummary[]>([]);
   const [plannedChapterCount, setPlannedChapterCount] = useState(12);
+  const [minimumPlannedChapterCount, setMinimumPlannedChapterCount] = useState(3);
+  const [roadmapVersion, setRoadmapVersion] = useState(0);
   const [targetChapterLength, setTargetChapterLength] = useState(1800);
   const [chapterLengthUnit, setChapterLengthUnit] = useState<"characters" | "words">("characters");
   const [endingTitle, setEndingTitle] = useState("");
@@ -411,6 +415,8 @@ export default function WorkspaceClient() {
     );
     setChapters(data.chapters ?? []);
     setPlannedChapterCount(data.planned_chapter_count ?? 12);
+    setMinimumPlannedChapterCount(data.minimum_planned_chapter_count ?? 3);
+    setRoadmapVersion(data.roadmap_version ?? 0);
     setTargetChapterLength(data.target_chapter_length ?? 1800);
     setChapterLengthUnit(data.chapter_length_unit ?? "characters");
     setEndingTitle(data.ending_title ?? "");
@@ -447,6 +453,8 @@ export default function WorkspaceClient() {
     setMessages([]);
     setChapters([]);
     setPlannedChapterCount(12);
+    setMinimumPlannedChapterCount(3);
+    setRoadmapVersion(0);
     setTargetChapterLength(1800);
     setChapterLengthUnit("characters");
     setEndingTitle("");
@@ -460,6 +468,7 @@ export default function WorkspaceClient() {
     setSavedUserPreferences([]);
     setStoryPrompt("");
     setSavedStoryPrompt("");
+    setChapterCountNotice(null);
     setInteractionMode("choices");
     setAuthSessions([]);
     setConfirmRevokeSessionId(null);
@@ -968,6 +977,31 @@ export default function WorkspaceClient() {
       setStoryPromptNotice(caught instanceof ApiError ? caught.message : uiText(uiLanguage, "保存小说 Prompt 失败，请稍后重试。", "Could not save the story prompt. Please try again."));
     } finally {
       setSavingStoryPrompt(false);
+    }
+  }
+
+  async function handleChapterCountChange(nextCount: number) {
+    if (!storyId || !branchId || savingChapterCount || nextCount === plannedChapterCount) return;
+    setSavingChapterCount(true);
+    setChapterCountNotice(null);
+    try {
+      const data = await updateStory(storyId, {
+        plannedChapterCount: nextCount,
+        branchId,
+        roadmapVersion
+      });
+      applyWorkspace(data);
+      setChapterCountNotice(uiText(
+        uiLanguage,
+        `计划已调整为 ${nextCount} 章；新增远期章节会在接近时随剧情更新。`,
+        `Plan updated to ${nextCount} chapters. New distant chapters will adapt as the story approaches them.`
+      ));
+    } catch (caught) {
+      setChapterCountNotice(caught instanceof ApiError
+        ? caught.message
+        : uiText(uiLanguage, "调整章节数失败，请稍后重试。", "Could not change the chapter count. Please try again."));
+    } finally {
+      setSavingChapterCount(false);
     }
   }
 
@@ -1870,9 +1904,13 @@ export default function WorkspaceClient() {
               branchName={activeBranchName}
               chapters={chapters}
               plannedChapterCount={plannedChapterCount}
+              minimumPlannedChapterCount={minimumPlannedChapterCount}
               targetChapterLength={targetChapterLength}
               chapterLengthUnit={chapterLengthUnit}
               endingTitle={endingTitle}
+              roadmapVersion={roadmapVersion}
+              savingChapterCount={savingChapterCount}
+              chapterCountNotice={chapterCountNotice}
               draft={draft}
               setDraft={setDraft}
               pending={pending}
@@ -1889,6 +1927,7 @@ export default function WorkspaceClient() {
               storyPromptNotice={storyPromptNotice}
               onChangeStoryPrompt={(value) => { setStoryPrompt(value); setStoryPromptNotice(null); }}
               onSaveStoryPrompt={handleSaveStoryPrompt}
+              onChapterCountChange={(count) => void handleChapterCountChange(count)}
               onSend={() => void handleSend()}
               onSelectChoice={(choice) => void handleSend(choice)}
               onInteractionModeChange={(mode) => void handleInteractionModeChange(mode)}

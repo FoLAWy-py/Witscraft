@@ -91,6 +91,8 @@ An ordinary player-action turn adds one mandatory OpenAI `gpt-5.5` agency-edit c
 
 After an accepted new chapter, roadmap adaptation may make one additional `normal_chat` request for at most the next four chapters and the provisional ending. Its output allowance is 900–1,280 tokens for the normal four-chapter window and never exceeds 2,400. It does not resend the full transcript or full 120-chapter plan, does not generate embeddings, and does not run for regenerate/rewrite or after the final chapter. Invalid output, provider failure, or unavailable auxiliary quota preserves the current roadmap and the accepted narrative; no retry loop exists outside the Gateway's global bounded policy.
 
+Changing an active story's planned chapter count is deterministic and local. The service appends or removes only provisional roadmap rows across all branches in one locked transaction and performs no model, embedding, or quota operation. Newly appended distant chapters carry neutral placeholders; the existing bounded four-chapter adaptation request personalizes them only when they enter the active future window during normal play.
+
 ## Summary generation
 
 Session summaries are user-triggered and are not generated on every narrative turn. The summarizer sends the previous cumulative branch summary together with only messages after its coverage boundary, then persists a complete replacement summary. A request with no newly uncovered message returns HTTP `409` before quota preflight or provider execution, preventing repeated charges for the same range.

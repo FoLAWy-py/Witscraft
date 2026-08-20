@@ -2,7 +2,7 @@
 
 **Document status:** Production baseline
 
-**Architecture version:** 3.27
+**Architecture version:** 3.28
 
 **Last updated:** 21 August 2026
 
@@ -230,6 +230,8 @@ Migration `0017` installs pgvector and adds fixed `vector(1024)` storage for cur
 Migration `0020` adds the persistence foundation for configurable long-form stories. A story stores a planned chapter count from 3 through 120, a target chapter length from 500 through 5,000, a language-aware unit, and prose language. Branches own a roadmap version and provisional ending title. `StoryChapter` rows represent planned, active, or completed entries; database checks permit at most one active chapter per branch, require a completed chapter to reference its branch-scoped assistant message, and prevent cross-story or cross-branch bindings.
 
 Story creation accepts those chapter settings and generates the complete branch-local roadmap before the story transaction is committed. The configured `normal_chat` route receives one bounded structured request; schema, sequence, count, and unique-title validation run before persistence. Quota exhaustion is returned to the player, while an unavailable or malformed provider response uses a deterministic player-agency-safe roadmap and records that source explicitly. A custom opening completes chapter 1 and activates chapter 2; a blank opening activates chapter 1. Branch duplication copies roadmap state while remapping completed chapter message references. The workspace returns the configuration and ordered chapters; the web client shows only current progress by default and places future titles, objectives, and the provisional ending behind an explicit spoiler disclosure. Migration `0021` adds the audited `provider`, `deterministic_fallback`, or `legacy` roadmap source.
+
+An ordinary player can change the total chapter count while the story is active. The update is serialized by locking the story and every branch roadmap, and it requires the active branch's currently loaded roadmap version. Every branch must contain the exact existing sequence before mutation. Extension appends provisional, agency-neutral chapters to every branch; reduction deletes only unstarted `planned` rows and is rejected if it would cross any branch's completed or active chapter. The operation updates the story count and every branch roadmap version atomically, marks the locally created plan source as `deterministic_fallback`, and makes no model or embedding call. The normal four-chapter adaptation window personalizes appended chapters as play approaches them.
 
 `StyleProfile` stores only an account owner, provenance category, normalized content hash, analysis version, language, abstract feature JSON, and an internal fixed-size Bloom signature for non-reproduction checks. The schema has no raw-reference column. The authenticated creation flow accepts pasted UTF-8 text or browser-read `.txt`/`.md` files only after an ownership, permission, or public-domain attestation. Normalization, profile extraction, and overlap-signature construction are deterministic and local: importing a reference does not call a model or create an embedding. A compatible account-scoped content-hash cache returns the existing profile under concurrent or repeated import.
 

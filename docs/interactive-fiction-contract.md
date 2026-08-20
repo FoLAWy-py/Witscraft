@@ -58,7 +58,7 @@ Story creation generates a branch-local roadmap containing all planned chapter n
 
 Completed chapters are immutable history on their branch. The active and future roadmap is revised after each accepted chapter to reflect player choices, established facts, unresolved threads, and remaining chapter budget. Revisions must not silently change the configured chapter count.
 
-The player may change the planned count while the story is active, provided that the new value is between the number of completed chapters and 120 and never below 3. A branch normally reaches its ending in the configured final chapter. An earlier terminal failure is allowed only as a fair consequence of an established, irreversible risk; ordinary users must be able to regenerate, rewrite, or branch before that outcome.
+The player may change the planned count while the story is active, provided that the new value is between the highest completed/current chapter on every branch and 120 and never below 3. The change is atomic across branches; completed and active chapters cannot be removed, and stale roadmap versions must be reloaded rather than overwritten. A branch normally reaches its ending in the configured final chapter. An earlier terminal failure is allowed only as a fair consequence of an established, irreversible risk; ordinary users must be able to regenerate, rewrite, or branch before that outcome.
 
 Ending titles are branch-specific and may change with the roadmap. A final title becomes immutable only when its ending is committed.
 

@@ -319,7 +319,10 @@ export async function updateStory(storyId: string, input: UpdateStoryInput): Pro
       title: input.title,
       custom_prompt: input.customPrompt,
       interaction_mode: input.interactionMode,
-      consistency_mode: input.consistencyMode
+      consistency_mode: input.consistencyMode,
+      planned_chapter_count: input.plannedChapterCount,
+      branch_id: input.branchId,
+      roadmap_version: input.roadmapVersion
     })
   });
 }

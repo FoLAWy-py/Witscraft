@@ -549,7 +549,45 @@ def test_authenticated_interactive_novel_api_journey(monkeypatch) -> None:
                     f"/api/workspace/stories/{story_id}/branches/{main_branch_id}/activate"
                 )
                 assert switched.status_code == 200, switched.text
-                assert switched.json()["branch_id"] == main_branch_id
+                switched_payload = switched.json()
+                assert switched_payload["branch_id"] == main_branch_id
+
+                resized = await client.patch(
+                    f"/api/workspace/stories/{story_id}",
+                    json={
+                        "planned_chapter_count": 15,
+                        "branch_id": main_branch_id,
+                        "roadmap_version": switched_payload["roadmap_version"],
+                    },
+                )
+                assert resized.status_code == 200, resized.text
+                resized_payload = resized.json()
+                assert resized_payload["planned_chapter_count"] == 15
+                assert len(resized_payload["chapters"]) == 15
+                assert resized_payload["roadmap_source"] == "deterministic_fallback"
+                assert all(
+                    chapter["status"] == "planned" for chapter in resized_payload["chapters"][12:]
+                )
+
+                stale_resize = await client.patch(
+                    f"/api/workspace/stories/{story_id}",
+                    json={
+                        "planned_chapter_count": 16,
+                        "branch_id": main_branch_id,
+                        "roadmap_version": switched_payload["roadmap_version"],
+                    },
+                )
+                assert stale_resize.status_code == 409
+                assert "reload" in stale_resize.json()["detail"]
+
+                resized_other_branch = await client.patch(
+                    f"/api/workspace/stories/{story_id}/branches/{new_branch_id}/activate"
+                )
+                assert resized_other_branch.status_code == 200
+                assert len(resized_other_branch.json()["chapters"]) == 15
+                await client.patch(
+                    f"/api/workspace/stories/{story_id}/branches/{main_branch_id}/activate"
+                )
 
                 exported = await client.get(
                     f"/api/workspace/stories/{story_id}/branches/{main_branch_id}/export",

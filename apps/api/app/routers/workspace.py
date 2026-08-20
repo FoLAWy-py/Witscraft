@@ -70,6 +70,7 @@ from app.services.story_exporter import (
     render_story_markdown,
 )
 from app.services.story_roadmap import plan_initial_roadmap
+from app.services.story_chapter_plan import ChapterPlanResizeError, resize_story_chapter_plan
 from app.services.style_profiles import (
     STYLE_ANALYSIS_VERSION,
     analyze_style_features,
@@ -335,6 +336,12 @@ async def workspace(
     model_call = await _load_model_call(session, story.id)
     active_branch = await session.get(StoryBranch, active_branch_id)
     chapters = await _load_chapters(session, story.id, active_branch_id)
+    protected_chapter_number = await session.scalar(
+        select(func.max(StoryChapter.chapter_number)).where(
+            StoryChapter.story_id == story.id,
+            StoryChapter.status.in_(("active", "completed")),
+        )
+    )
 
     return WorkspaceResponse(
         story_id=str(story.id),
@@ -358,6 +365,7 @@ async def workspace(
         interaction_mode=story.interaction_mode or "choices",
         consistency_mode=story.consistency_mode or "auto",
         planned_chapter_count=story.planned_chapter_count,
+        minimum_planned_chapter_count=max(3, protected_chapter_number or 0),
         target_chapter_length=story.target_chapter_length,
         chapter_length_unit=story.chapter_length_unit,
         prose_language=story.prose_language,
@@ -925,9 +933,26 @@ async def update_story(
     user_id: UUID = Depends(get_verified_user_id),
 ) -> WorkspaceResponse:
     requested_story_id = _parse_uuid(story_id, DEFAULT_STORY_ID)
-    story = await _get_story_for_user(session, requested_story_id, user_id)
-    if story is None:
-        raise HTTPException(status_code=404, detail="Story not found")
+    if request.planned_chapter_count is not None:
+        requested_branch_id = _parse_uuid_or_none(request.branch_id or "")
+        if requested_branch_id is None:
+            raise HTTPException(status_code=404, detail="Branch not found")
+        try:
+            story = await resize_story_chapter_plan(
+                session,
+                story_id=requested_story_id,
+                user_id=user_id,
+                active_branch_id=requested_branch_id,
+                expected_roadmap_version=request.roadmap_version or 0,
+                new_chapter_count=request.planned_chapter_count,
+            )
+        except ChapterPlanResizeError as exc:
+            status_code = 404 if exc.code == "not_found" else 409
+            raise HTTPException(status_code=status_code, detail=exc.detail) from exc
+    else:
+        story = await _get_story_for_user(session, requested_story_id, user_id)
+        if story is None:
+            raise HTTPException(status_code=404, detail="Story not found")
 
     if request.title is not None:
         story.title = request.title.strip()

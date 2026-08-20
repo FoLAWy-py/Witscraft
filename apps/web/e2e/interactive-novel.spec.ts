@@ -39,6 +39,8 @@ function json(route: Route, body: unknown, status = 200) {
 async function installApiFixture(page: Page) {
   let authenticated = false;
   let branchVersion = 0;
+  let plannedChapterCount = 12;
+  let roadmapVersion = 1;
   let storyState = { location: "Archive", time: "Midnight", mood: "tense", objective: "Find the key", inventory: [] as string[], open_threads: [] as string[] };
   const messages = [
     {
@@ -60,8 +62,8 @@ async function installApiFixture(page: Page) {
       created_at: "2026-08-17T00:00:00Z",
       active: true,
       version: branchVersion,
-      roadmap_version: 1,
-      roadmap_source: "provider",
+      roadmap_version: roadmapVersion,
+      roadmap_source: roadmapVersion === 1 ? "provider" : "deterministic_fallback",
       ending_title: "The Last Archive"
     }],
     stories: [{
@@ -88,20 +90,21 @@ async function installApiFixture(page: Page) {
     story_prompt: "",
     interaction_mode: "open",
     consistency_mode: "auto",
-    planned_chapter_count: 12,
+    planned_chapter_count: plannedChapterCount,
+    minimum_planned_chapter_count: 3,
     target_chapter_length: 1800,
     chapter_length_unit: "words",
     prose_language: "en",
-    roadmap_version: 1,
-    roadmap_source: "provider",
+    roadmap_version: roadmapVersion,
+    roadmap_source: roadmapVersion === 1 ? "provider" : "deterministic_fallback",
     ending_title: "The Last Archive",
-    chapters: Array.from({ length: 12 }, (_, index) => ({
+    chapters: Array.from({ length: plannedChapterCount }, (_, index) => ({
       id: `00000000-0000-0000-0000-${String(600 + index).padStart(12, "0")}`,
       number: index + 1,
       title: `Chapter ${index + 1}`,
       objective: `Objective ${index + 1}`,
       status: index === 0 ? "active" : "planned",
-      roadmap_version: 1,
+      roadmap_version: index < 12 ? 1 : roadmapVersion,
       message_id: null,
       completed_at: null
     }))
@@ -238,6 +241,19 @@ async function installApiFixture(page: Page) {
       expect(payload.style_profile_id).toBe(styleProfileId);
       return json(route, workspace());
     }
+    if (path.endsWith("/api/workspace/stories/00000000-0000-0000-0000-000000000301") && request.method() === "PATCH") {
+      const payload = request.postDataJSON();
+      if (payload.planned_chapter_count !== undefined) {
+        expect(payload).toMatchObject({
+          planned_chapter_count: 15,
+          branch_id: "00000000-0000-0000-0000-000000000401",
+          roadmap_version: 1
+        });
+        plannedChapterCount = payload.planned_chapter_count;
+        roadmapVersion += 1;
+      }
+      return json(route, workspace());
+    }
     if (path.endsWith("/api/chat/stream")) {
       const payload = request.postDataJSON();
       expect(payload).not.toHaveProperty("provider");
@@ -290,6 +306,10 @@ test("player signs in and directs the next scene", async ({ page }) => {
   await roadmap.click();
   await expect(page.getByText("当前结局：", { exact: false })).toBeVisible();
   await expect(page.getByText("The Last Archive", { exact: true })).toBeVisible();
+  await page.getByLabel("调整计划总章节").fill("15");
+  await page.getByRole("button", { name: "更新章节数" }).click();
+  await expect(page.getByText("计划已调整为 15 章", { exact: false })).toBeVisible();
+  await expect(page.getByText("Chapter 15", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "设置", exact: true }).click();
   await expect(page.getByText("12.5%", { exact: true }).first()).toBeVisible();
