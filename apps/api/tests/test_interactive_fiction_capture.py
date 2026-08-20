@@ -10,7 +10,14 @@ def test_live_interactive_fiction_capture_has_a_hard_call_cap_and_safe_url_bound
     namespace = runpy.run_path(str(CAPTURE_SCRIPT), run_name="interactive_capture_test")
 
     assert namespace["MAX_PROVIDER_CALLS"] == 8
-    assert namespace["_safe_base_url"]("https://example.com/witscraft", False) == (
-        "https://example.com/witscraft"
-    )
-    assert namespace["_safe_base_url"]("http://127.0.0.1:8000", True) == ("http://127.0.0.1:8000")
+    https_base = namespace["_safe_base_url"]("https://example.com/witscraft", False)
+    loopback_base = namespace["_safe_base_url"]("http://127.0.0.1:8000", True)
+
+    assert https_base == "https://example.com/witscraft/"
+    assert loopback_base == "http://127.0.0.1:8000/"
+
+    httpx = namespace["httpx"]
+    with httpx.Client(base_url=https_base) as client:
+        assert str(client.base_url.join("api/auth/login")) == (
+            "https://example.com/witscraft/api/auth/login"
+        )

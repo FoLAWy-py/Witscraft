@@ -56,13 +56,13 @@ def _safe_base_url(value: str, allow_http_loopback: bool) -> str:
     if parsed.username or parsed.password or parsed.query or parsed.fragment:
         raise ValueError("Base URL must not contain credentials, query parameters, or fragments")
     if parsed.scheme == "https" and parsed.netloc:
-        return value.rstrip("/")
+        return f"{value.rstrip('/')}/"
     if (
         allow_http_loopback
         and parsed.scheme == "http"
         and parsed.hostname in {"127.0.0.1", "localhost", "::1"}
     ):
-        return value.rstrip("/")
+        return f"{value.rstrip('/')}/"
     raise ValueError("Capture target must use HTTPS; HTTP requires explicit loopback approval")
 
 
@@ -143,7 +143,7 @@ async def _capture(args: argparse.Namespace) -> dict[str, Any]:
             headers=headers,
         ) as client:
             login = await client.post(
-                "/api/auth/login",
+                "api/auth/login",
                 json={
                     "email": email,
                     "password": password,
@@ -162,10 +162,10 @@ async def _capture(args: argparse.Namespace) -> dict[str, Any]:
                 "raw_text": reference_text,
                 "rights_attested": True,
             }
-            profiled = await client.post("/api/workspace/style-profiles", json=profile_request)
+            profiled = await client.post("api/workspace/style-profiles", json=profile_request)
             profiled.raise_for_status()
             profile_payload = profiled.json()
-            repeated = await client.post("/api/workspace/style-profiles", json=profile_request)
+            repeated = await client.post("api/workspace/style-profiles", json=profile_request)
             repeated.raise_for_status()
             if repeated.json().get("id") != profile_payload.get("id") or not repeated.json().get(
                 "reused"
@@ -206,14 +206,14 @@ async def _capture(args: argparse.Namespace) -> dict[str, Any]:
                     "opening_mode": "custom",
                 }
             )
-            created = await client.post("/api/workspace/stories", json=create_payload)
+            created = await client.post("api/workspace/stories", json=create_payload)
             created.raise_for_status()
             workspace = created.json()
             calls_before_turn = await _model_calls(user_id)
             prior_call_ids = {call.id for call in calls_before_turn}
             idempotency_key = f"interactive-fiction-capture-{marker}"
             generated = await client.post(
-                "/api/chat/send",
+                "api/chat/send",
                 headers={"Idempotency-Key": idempotency_key, **headers},
                 json={
                     "message": _required_string(scenario, "player_action"),
