@@ -665,44 +665,61 @@ class StoryEngine:
         ):
             return content, None
         measured = measured_chapter_length(content, story.chapter_length_unit)
+        minimum = math.ceil(story.target_chapter_length * 0.85)
         unit = (
             "visible CJK characters"
             if story.chapter_length_unit == "characters"
             else "whitespace-delimited words"
         )
-        expansion_instruction = ChatMessage(
-            role="user",
-            content=(
-                "The draft above is materially shorter than the player's chapter-length setting. "
-                f"Rewrite it as one complete replacement chapter of approximately "
-                f"{story.target_chapter_length} {unit} (acceptable range ±15%); the current draft "
-                f"measures only {measured}. Preserve its established events and the player's "
-                "explicit action, deepen concrete consequence, atmosphere, dialogue from other "
-                "characters, and sensory detail, but do not invent any additional protagonist "
-                "speech, private thought, decision, consent, or action unless this turn used "
-                f"Continue ({request.control_mode == 'continue'}). Return prose only, with no "
-                "chapter heading, commentary, or story-choice list."
-            ),
-        )
-        expansion_request = llm_request.model_copy(
-            update={
-                "messages": [
-                    *llm_request.messages,
-                    ChatMessage(role="assistant", content=content),
-                    expansion_instruction,
-                ],
-                "stream": False,
-                "temperature": min(llm_request.temperature, 0.72),
-            }
-        )
-        try:
-            response = await self.llm_gateway.generate(expansion_request)
-        except Exception:
-            return content, None
-        expanded, _ = split_story_response(response.text, "open")
-        if measured_chapter_length(expanded, story.chapter_length_unit) <= measured:
-            return content, None
-        return expanded, response
+        best_content = content
+        best_response: LLMResponse | None = None
+        best_measure = measured
+        for _attempt in range(2):
+            paragraph_guidance = (
+                "For CJK prose, use 5–7 developed paragraphs and do not stop before the hard "
+                f"minimum of {minimum} visible characters. "
+                if story.chapter_length_unit == "characters"
+                else f"Do not stop before the hard minimum of {minimum} words. "
+            )
+            expansion_instruction = ChatMessage(
+                role="user",
+                content=(
+                    "The draft above is materially shorter than the player's chapter-length "
+                    f"setting. Rewrite it as one complete replacement chapter of approximately "
+                    f"{story.target_chapter_length} {unit} (acceptable range ±15%); the current "
+                    f"draft measures only {best_measure}. {paragraph_guidance}Preserve its "
+                    "established events and the player's explicit action, deepen concrete "
+                    "consequence, atmosphere, dialogue from other characters, and sensory detail, "
+                    "but do not invent any additional protagonist speech, private thought, "
+                    "decision, consent, or action unless this turn used Continue "
+                    f"({request.control_mode == 'continue'}). Return prose only, with no chapter "
+                    "heading, commentary, or story-choice list."
+                ),
+            )
+            expansion_request = llm_request.model_copy(
+                update={
+                    "messages": [
+                        *llm_request.messages,
+                        ChatMessage(role="assistant", content=best_content),
+                        expansion_instruction,
+                    ],
+                    "stream": False,
+                    "temperature": min(llm_request.temperature, 0.72),
+                }
+            )
+            try:
+                response = await self.llm_gateway.generate(expansion_request)
+            except Exception:
+                break
+            expanded, _ = split_story_response(response.text, "open")
+            expanded_measure = measured_chapter_length(expanded, story.chapter_length_unit)
+            if expanded_measure > best_measure:
+                best_content = expanded
+                best_response = response
+                best_measure = expanded_measure
+            if best_measure >= minimum:
+                break
+        return best_content, best_response
 
     async def _preflight_player_turn(
         self,
