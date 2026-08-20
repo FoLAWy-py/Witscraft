@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import dataclass
 
@@ -69,6 +70,17 @@ def chapter_authoring_instruction(
         "Do not output a chapter heading; the application supplies the canonical title.\n"
         f"{agency}"
     )
+
+
+def measured_chapter_length(text: str, length_unit: str) -> int:
+    """Measure prose using the same user-facing units promised by story setup."""
+    if length_unit == "words":
+        return len(re.findall(r"\S+", text))
+    return len(re.sub(r"\s+", "", text))
+
+
+def chapter_needs_expansion(text: str, target_length: int, length_unit: str) -> bool:
+    return measured_chapter_length(text, length_unit) < math.ceil(target_length * 0.85)
 
 
 def ensure_chapter_heading(text: str, chapter_number: int, chapter_title: str) -> str:

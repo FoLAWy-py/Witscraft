@@ -1,6 +1,8 @@
 from app.services.player_agency import (
+    chapter_needs_expansion,
     chapter_authoring_instruction,
     ensure_chapter_heading,
+    measured_chapter_length,
     reject_known_impossible_action,
 )
 
@@ -53,3 +55,10 @@ def test_canonical_chapter_heading_is_idempotent() -> None:
     titled = ensure_chapter_heading("The gate opens.", 3, "The Last Lock")
     assert titled.startswith("## 3. The Last Lock\n\n")
     assert ensure_chapter_heading(titled, 3, "The Last Lock") == titled
+
+
+def test_chapter_length_uses_player_facing_units_and_fifteen_percent_floor() -> None:
+    assert measured_chapter_length("潮 声\n又近了。", "characters") == 6
+    assert measured_chapter_length("Three precise words", "words") == 3
+    assert chapter_needs_expansion("潮" * 424, 500, "characters") is True
+    assert chapter_needs_expansion("潮" * 425, 500, "characters") is False

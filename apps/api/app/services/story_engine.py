@@ -46,8 +46,10 @@ from app.services.embeddings import (
 )
 from app.services.memory_embedding_tasks import new_memory_embedding_task
 from app.services.player_agency import (
+    chapter_needs_expansion,
     chapter_authoring_instruction,
     ensure_chapter_heading,
+    measured_chapter_length,
     reject_known_impossible_action,
 )
 from app.services.state_extractor import extract_story_updates_with_llm
@@ -255,6 +257,15 @@ class StoryEngine:
             llm_response.text,
             story.interaction_mode or "choices",
         )
+        response_content, expanded_response = await self._expand_short_chapter(
+            response_content,
+            story=story,
+            request=request,
+            chapter=chapter,
+            llm_request=llm_request,
+        )
+        if expanded_response is not None:
+            llm_response = expanded_response.model_copy(update={"text": response_content})
         if chapter is not None:
             response_content = ensure_chapter_heading(
                 response_content, chapter.chapter_number, chapter.title
@@ -522,6 +533,13 @@ class StoryEngine:
             raw_response_text,
             story.interaction_mode or "choices",
         )
+        response_content, _ = await self._expand_short_chapter(
+            response_content,
+            story=story,
+            request=request,
+            chapter=chapter,
+            llm_request=llm_request,
+        )
         if chapter is not None:
             titled_content = ensure_chapter_heading(
                 response_content, chapter.chapter_number, chapter.title
@@ -630,6 +648,61 @@ class StoryEngine:
                 math.ceil(story.target_chapter_length * unit_multiplier) + 256,
             )
         return self.llm_gateway.normalize_request(routed.model_copy(update=updates))
+
+    async def _expand_short_chapter(
+        self,
+        content: str,
+        *,
+        story: Story,
+        request: ChatRequest,
+        chapter: StoryChapter | None,
+        llm_request: LLMRequest,
+    ) -> tuple[str, LLMResponse | None]:
+        if chapter is None or not chapter_needs_expansion(
+            content,
+            story.target_chapter_length,
+            story.chapter_length_unit,
+        ):
+            return content, None
+        measured = measured_chapter_length(content, story.chapter_length_unit)
+        unit = (
+            "visible CJK characters"
+            if story.chapter_length_unit == "characters"
+            else "whitespace-delimited words"
+        )
+        expansion_instruction = ChatMessage(
+            role="user",
+            content=(
+                "The draft above is materially shorter than the player's chapter-length setting. "
+                f"Rewrite it as one complete replacement chapter of approximately "
+                f"{story.target_chapter_length} {unit} (acceptable range ±15%); the current draft "
+                f"measures only {measured}. Preserve its established events and the player's "
+                "explicit action, deepen concrete consequence, atmosphere, dialogue from other "
+                "characters, and sensory detail, but do not invent any additional protagonist "
+                "speech, private thought, decision, consent, or action unless this turn used "
+                f"Continue ({request.control_mode == 'continue'}). Return prose only, with no "
+                "chapter heading, commentary, or story-choice list."
+            ),
+        )
+        expansion_request = llm_request.model_copy(
+            update={
+                "messages": [
+                    *llm_request.messages,
+                    ChatMessage(role="assistant", content=content),
+                    expansion_instruction,
+                ],
+                "stream": False,
+                "temperature": min(llm_request.temperature, 0.72),
+            }
+        )
+        try:
+            response = await self.llm_gateway.generate(expansion_request)
+        except Exception:
+            return content, None
+        expanded, _ = split_story_response(response.text, "open")
+        if measured_chapter_length(expanded, story.chapter_length_unit) <= measured:
+            return content, None
+        return expanded, response
 
     async def _preflight_player_turn(
         self,
