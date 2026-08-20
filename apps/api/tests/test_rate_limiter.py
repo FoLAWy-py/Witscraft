@@ -46,6 +46,7 @@ def _production_settings(**updates) -> Settings:
         "smtp_username": "smtp-user",
         "smtp_password": "smtp-password",
         "smtp_from_email": "noreply@example.com",
+        "operational_metrics_log_path": "/tmp/witscraft-rate-limit-metrics.log",
     }
     values.update(updates)
     return Settings(**values)

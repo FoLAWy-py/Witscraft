@@ -2,7 +2,7 @@
 
 **Document status:** Production baseline
 
-**Architecture version:** 3.29
+**Architecture version:** 3.30
 
 **Last updated:** 21 August 2026
 
@@ -372,7 +372,9 @@ Every LLM and embedding attempt can record the provider, model, request and turn
 
 Prompt and response text are not stored in `ModelCall`. Request identifiers provide correlation across application and access logs without requiring request-body logging.
 
-The current implementation uses structured application logs and PostgreSQL audit records. OpenTelemetry-compatible traces, external metrics, and alerting remain planned operational enhancements.
+The production API also writes a dedicated rotating metadata-only access stream. It contains a UTC timestamp, request ID, HTTP method, matched route template, status code, and duration; it excludes raw paths, query strings, network addresses, tenant identifiers, headers, bodies, prompts, and responses. `scripts/check-production-slos.py` evaluates the versioned host policy from this stream, public readiness, real external-provider audit aggregates, generation/embedding coordination state, and complete encrypted-backup sidecars. It persists private active/resolved alert state so observations remain explainable across monitor executions. Low-traffic windows are explicitly insufficient rather than treated as synthetic availability evidence.
+
+This host-level monitor is appropriate for the current single API process. OpenTelemetry-compatible distributed traces, a remote metrics store, dashboards, and an external paging destination remain planned operational enhancements and require a data-transfer review before adoption.
 
 ## 12. Migration and Release Contract
 
@@ -386,7 +388,7 @@ The release order is:
 4. Run `alembic upgrade head` as an explicit deployment step.
 5. Start or restart the application processes.
 6. Require `/health/ready` to return HTTP `200`.
-7. Run authenticated smoke tests and observe logs before completing the release.
+7. Run authenticated smoke tests and the production SLO evaluator before completing the release.
 
 `scripts/release-preflight.sh` implements the reproducible local quality and security gate. After
 the production frontend build, it creates a non-sensitive JSON manifest binding the full Git
@@ -426,7 +428,7 @@ The following constraints are known and accepted for the current deployment:
 - Legacy embeddings with non-current dimensions remain in JSONB until an operator runs the bounded, cost-reviewed re-index workflow.
 - Daily encrypted local backup and application-level restoration drills are operational; approved off-site replication and independent recovery-key escrow remain P0 work.
 - A production-equivalent staging environment has not yet been established.
-- Metrics, tracing, and alerting are not yet connected to a dedicated observability platform.
+- Versioned metadata-only SLO evaluation and persistent host alert state are operational; metrics, tracing, dashboards, and paging are not yet connected to a dedicated observability platform.
 - Database query plans are benchmarked locally, but production slow-query telemetry and tenant-skew analysis are not yet available.
 - Weekly quotas use provider-call preflight checks without durable concurrent token reservations.
 

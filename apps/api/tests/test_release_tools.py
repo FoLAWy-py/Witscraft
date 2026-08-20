@@ -5,6 +5,8 @@ import json
 import subprocess
 from pathlib import Path
 
+import pytest
+
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -27,7 +29,7 @@ def test_release_shell_script_is_valid_and_contains_complete_gate() -> None:
         "uv sync --frozen",
         "pip-audit",
         "ruff check",
-        "pytest -q",
+        "run-backend-tests-isolated.sh",
         "npm ci",
         "npm audit",
         "npm run lint",
@@ -38,6 +40,48 @@ def test_release_shell_script_is_valid_and_contains_complete_gate() -> None:
         "create-release-manifest.py",
     ):
         assert required in content
+
+
+def test_backend_test_runner_creates_and_drops_an_isolated_database() -> None:
+    script = ROOT / "scripts/run-backend-tests-isolated.sh"
+    result = subprocess.run(["zsh", "-n", str(script)], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    content = script.read_text()
+    for required in (
+        "witscraft_preflight_test_",
+        "createdb",
+        "dropdb",
+        "--force",
+        "APP_ENVIRONMENT=test",
+        'DATABASE_NAME="$TEST_DATABASE_NAME"',
+        "unset WITSCRAFT_SECRETS_FILE",
+        "Do not let unrelated production settings leak into pytest",
+        "uv run alembic upgrade head",
+    ):
+        assert required in content
+    assert 'TEST_DATABASE_NAME="$BASE_DATABASE_NAME"' not in content
+
+
+def test_slo_monitor_rejects_unsafe_targets_and_writes_private_state(tmp_path) -> None:
+    module = _load_script("check-production-slos.py")
+
+    assert module._safe_base_url("https://example.invalid/app/", False) == (
+        "https://example.invalid/app"
+    )
+    assert module._safe_base_url("http://127.0.0.1:8000", True) == ("http://127.0.0.1:8000")
+    for unsafe in (
+        "http://example.invalid",
+        "https://user:secret@example.invalid",
+        "https://example.invalid/?token=secret",
+    ):
+        with pytest.raises(ValueError):
+            module._safe_base_url(unsafe, False)
+
+    state_file = tmp_path / "private" / "state.json"
+    module._write_private_json(state_file, {"active_alerts": []})
+    assert json.loads(state_file.read_text()) == {"active_alerts": []}
+    assert state_file.stat().st_mode & 0o777 == 0o600
+    assert state_file.parent.stat().st_mode & 0o777 == 0o700
 
 
 def test_release_manifest_is_non_sensitive_and_bound_to_source(monkeypatch, tmp_path) -> None:

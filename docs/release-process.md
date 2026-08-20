@@ -39,12 +39,19 @@ The target PostgreSQL 17 installation must provide the pgvector extension before
 8. In staging, use a dedicated synthetic account to verify login, story loading, one dry-run
    generation, cancellation, branch switching, regeneration, and export. Never use recovered user
    content or a billable provider for this gate.
-9. Observe error rate, readiness, model failures, memory embedding queue age/dead letters, database saturation, and logs for the agreed
-   release window before declaring the release complete.
+9. Run `scripts/check-production-slos.py` with the deployment's private access-log, backup,
+   state, and report paths. Require no active alert; low-traffic `insufficient_samples` must be
+   recorded but does not fabricate an error-rate decision. Repeat after the agreed observation
+   window before declaring the release complete. See `docs/observability.md`.
 
 Smoke URLs are runtime arguments and must not be committed. HTTPS is mandatory except for an
 explicit loopback check using `--allow-http-loopback`. URLs containing credentials, query strings,
 or fragments are rejected.
+
+The local preflight never runs pytest against the configured production database. It creates a
+uniquely named temporary PostgreSQL database from the deployment credentials, migrates it to head,
+runs the backend suite with `APP_ENVIRONMENT=test`, and force-drops only that exact temporary name
+on every exit path. Direct backend pytest execution under production configuration is rejected.
 
 ## Rollback Contract
 

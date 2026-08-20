@@ -18,6 +18,7 @@ apps/
 - [`docs/data-privacy.md`](./docs/data-privacy.md): account export, deletion, retention, and model-provider data boundaries
 - [`docs/database-performance.md`](./docs/database-performance.md): repeatable PostgreSQL query-plan benchmark and index policy
 - [`docs/backup-recovery.md`](./docs/backup-recovery.md): encrypted backup operation, restore procedure, RPO/RTO, and drill evidence
+- [`docs/observability.md`](./docs/observability.md): metadata-only production SLOs, host alerts, and incident runbooks
 - [`docs/development-story-reset.md`](./docs/development-story-reset.md): guarded, backup-required cleanup of development story data
 - [`docs/memory-retrieval-evaluation.md`](./docs/memory-retrieval-evaluation.md): fixed Recall@8, error-recall, and PostgreSQL latency gate
 - [`docs/background-jobs.md`](./docs/background-jobs.md): durable memory embedding worker, re-indexing, and queue monitoring
@@ -70,11 +71,13 @@ Migration `0012` adds concurrently-built indexes for branch timelines, active me
 
 Operational probes have separate meanings: `/health/live` checks only process responsiveness, while `/health/ready` verifies required non-billable configuration, PostgreSQL connectivity, and the deployed Alembic revision. A release is not ready until the database revision matches the application migration head.
 
+Production also writes a private rotating access-metrics stream containing only request IDs, route templates, status codes, and durations. A five-minute host monitor combines it with readiness, real-provider audit aggregates, generation/embedding coordination state, and encrypted-backup freshness under the versioned `production-slo-v1` policy. It never exports user content; external paging and distributed tracing remain future operator-approved integrations.
+
 The production host runs `scripts/backup-postgres.sh` daily through a LaunchAgent. Backups use PostgreSQL custom format, Zstandard compression, and CMS AES-256-GCM public-key encryption. Recovery operation and the latest drill evidence are documented in `docs/backup-recovery.md`; off-site replication remains disabled until its external destination is explicitly approved.
 
 ## Production Security Boundary
 
-Production startup fails unless database credentials, at least one model provider, SMTP, HTTPS cookies, an HTTPS frontend URL, exact CORS origins and an explicit Host allowlist are configured. Wildcard hosts, wildcard CORS, private-LAN CORS regexes and dry-run models are rejected.
+Production startup fails unless database credentials, at least one model provider, SMTP, HTTPS cookies, an HTTPS frontend URL, exact CORS origins, an explicit Host allowlist, and an absolute operational-metrics path are configured. Wildcard hosts, wildcard CORS, private-LAN CORS regexes and dry-run models are rejected.
 
 Unsafe browser requests validate `Origin` against the frontend/CORS allowlist. Cross-site requests carrying the session cookie are rejected even when `Origin` is absent but `Sec-Fetch-Site: cross-site` is present. CLI/API requests without browser cross-site metadata remain supported. Uvicorn trusts forwarded headers only from the local Nginx address.
 

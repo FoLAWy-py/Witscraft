@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.witscraft.slo-monitor</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>__PROJECT_ROOT__/apps/api/.venv/bin/python</string>
+    <string>__PROJECT_ROOT__/scripts/check-production-slos.py</string>
+    <string>__PUBLIC_BASE_URL__</string>
+    <string>--api-log</string>
+    <string>__PROJECT_ROOT__/.runtime/access-metrics.log</string>
+    <string>--backup-dir</string>
+    <string>__PROJECT_ROOT__/.runtime/backups</string>
+    <string>--state-file</string>
+    <string>__PROJECT_ROOT__/.runtime/slo-alert-state.json</string>
+    <string>--report-file</string>
+    <string>__PROJECT_ROOT__/.runtime/slo-report.json</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>__PROJECT_ROOT__</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/opt/postgresql@18/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+    <key>WITSCRAFT_SECRETS_FILE</key>
+    <string>__PROJECT_ROOT__/.runtime/api.env</string>
+  </dict>
+  <key>StartInterval</key>
+  <integer>300</integer>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>StandardOutPath</key>
+  <string>__PROJECT_ROOT__/.runtime/slo-monitor.log</string>
+  <key>StandardErrorPath</key>
+  <string>__PROJECT_ROOT__/.runtime/slo-monitor.log</string>
+</dict>
+</plist>

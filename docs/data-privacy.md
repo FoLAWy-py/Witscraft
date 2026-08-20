@@ -12,7 +12,7 @@ Exports never contain password hashes, session token hashes, action-token hashes
 
 `DELETE /api/auth/account` requires the active session, the current password, and the exact confirmation value `DELETE`. A successful request removes the user and all owned application data in one database transaction, explicitly removes associated model-call records, revokes every session, and expires the browser cookie.
 
-Deletion is immediate in the primary database. Login-throttle identifiers are irreversible hashes and are retained for no more than 24 hours under normal request traffic. Redacted operational logs may retain request metadata, but not request bodies, credentials, or full prompts.
+Deletion is immediate in the primary database. Login-throttle identifiers are irreversible hashes and are retained for no more than 24 hours under normal request traffic. The dedicated access-metrics stream retains only time, request ID, method, matched route template, status, and duration. It never records raw paths or query strings, network addresses, account/story identifiers, headers, request bodies, credentials, prompts, or responses.
 
 Before production backups are enabled, the operator must define a maximum backup retention of 30 days or less, encryption, access control, and a process that prevents deleted accounts from being restored into the live service. Until that process exists, backups must not be represented as deletion-compliant.
 
@@ -44,3 +44,7 @@ Upstream retention, abuse monitoring, regional processing, and training controls
 ## Operational review
 
 Review this policy whenever a new provider, telemetry sink, backup system, analytics product, or user-data field is introduced. Changes that expand external transfer or retention require a security review before release.
+
+The current SLO evaluator runs on the application host and writes private local state. It does not
+send telemetry to another party. Connecting a remote metrics, tracing, dashboard, or paging service
+is a new transfer boundary and requires this review before deployment.

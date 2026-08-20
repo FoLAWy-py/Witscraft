@@ -1,4 +1,5 @@
 import re
+import time
 from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -15,6 +16,12 @@ from app.config import Settings, get_settings, validate_runtime_security
 from app.db.session import engine
 from app.llm.audit import TurnCallBudgetExceededError
 from app.logging_security import install_sensitive_log_filters
+from app.operational_logging import (
+    close_operational_access_logger,
+    configure_operational_access_logger,
+    log_access_metric,
+    route_template,
+)
 from app.routers import admin, auth, chat, providers, quota, workspace
 from app.services.auth_service import SESSION_COOKIE_NAME
 from app.services.health import ReadinessReport, check_readiness
@@ -48,11 +55,13 @@ def create_app(
     app_settings = settings or get_settings()
     validate_runtime_security(app_settings)
     install_sensitive_log_filters()
+    operational_access_logger = configure_operational_access_logger(app_settings)
     production = app_settings.app_environment == "production"
 
     @asynccontextmanager
     async def lifespan(_application: FastAPI):
         yield
+        close_operational_access_logger(operational_access_logger)
         await database_engine.dispose()
 
     application = FastAPI(
@@ -109,6 +118,7 @@ def create_app(
 
     @application.middleware("http")
     async def request_id_middleware(request: Request, call_next):
+        started = time.perf_counter()
         supplied = request.headers.get("X-Request-ID", "").strip()
         normalized = supplied.replace("-", "").replace("_", "")
         request_id = (
@@ -117,9 +127,21 @@ def create_app(
             else uuid4().hex
         )
         request.state.request_id = request_id
-        response = await call_next(request)
-        response.headers["X-Request-ID"] = request_id
-        return response
+        status_code = 500
+        try:
+            response = await call_next(request)
+            status_code = response.status_code
+            response.headers["X-Request-ID"] = request_id
+            return response
+        finally:
+            log_access_metric(
+                operational_access_logger,
+                request_id=request_id,
+                method=request.method,
+                route=route_template(request.scope),
+                status_code=status_code,
+                duration_ms=(time.perf_counter() - started) * 1000,
+            )
 
     @application.exception_handler(SQLAlchemyError)
     async def database_handler(_request: Request, _error: SQLAlchemyError) -> JSONResponse:

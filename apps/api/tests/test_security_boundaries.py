@@ -23,6 +23,7 @@ def _production_settings(**updates) -> Settings:
         "smtp_username": "smtp-user",
         "smtp_password": "smtp-password",
         "smtp_from_email": "noreply@example.com",
+        "operational_metrics_log_path": "/tmp/witscraft-test-access-metrics.log",
     }
     values.update(updates)
     return Settings(**values)
@@ -58,6 +59,7 @@ def test_production_runtime_rejects_missing_services_and_broad_boundaries() -> N
     assert "CORS_ORIGIN_REGEX" in message
     assert "wildcard CORS" in message
     assert "ALLOWED_HOSTS" in message
+    assert "OPERATIONAL_METRICS_LOG_PATH" in message
 
 
 def test_trusted_host_rejects_unknown_hosts() -> None:
@@ -148,6 +150,7 @@ def test_production_secret_file_does_not_fall_back_to_env_md(
                 'CORS_ORIGINS=["https://app.example.com"]',
                 "CORS_ORIGIN_REGEX=",
                 'ALLOWED_HOSTS=["app.example.com"]',
+                f"OPERATIONAL_METRICS_LOG_PATH={tmp_path / 'access-metrics.log'}",
             ]
         )
     )

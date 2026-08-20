@@ -116,6 +116,9 @@ class Settings(BaseSettings):
     model_call_retention_days: int = Field(default=30, ge=1)
     user_weekly_token_quota: int = Field(default=500000, ge=1000)
     user_weekly_token_soft_limit_percentage: int = Field(default=80, ge=1, le=99)
+    operational_metrics_log_path: str | None = None
+    operational_metrics_log_max_bytes: int = Field(default=5_000_000, ge=100_000)
+    operational_metrics_log_backup_count: int = Field(default=5, ge=1, le=30)
 
     smtp_host: str | None = None
     smtp_port: int = 465
@@ -179,6 +182,14 @@ class Settings(BaseSettings):
             )
         return self
 
+    @model_validator(mode="after")
+    def validate_operational_metrics_path(self) -> Self:
+        if self.operational_metrics_log_path and not Path(
+            self.operational_metrics_log_path
+        ).is_absolute():
+            raise ValueError("OPERATIONAL_METRICS_LOG_PATH must be absolute")
+        return self
+
 
 def validate_runtime_security(settings: Settings) -> None:
     if settings.app_environment != "production":
@@ -200,6 +211,8 @@ def validate_runtime_security(settings: Settings) -> None:
         errors.append("wildcard CORS origins are forbidden")
     if not settings.allowed_hosts or any("*" in host for host in settings.allowed_hosts):
         errors.append("ALLOWED_HOSTS must be explicit")
+    if not settings.operational_metrics_log_path:
+        errors.append("OPERATIONAL_METRICS_LOG_PATH is required")
     frontend_host = urlsplit(settings.frontend_base_url).hostname
     if frontend_host not in settings.allowed_hosts:
         errors.append("ALLOWED_HOSTS must include the frontend hostname")
