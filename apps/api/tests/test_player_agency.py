@@ -5,6 +5,7 @@ import pytest
 
 from app.schemas.llm import ChatMessage, LLMRequest, LLMResponse
 from app.services.player_agency import (
+    agency_editor_instruction,
     chapter_needs_expansion,
     chapter_prose,
     chapter_authoring_instruction,
@@ -62,6 +63,24 @@ def test_normal_turn_preserves_protagonist_control() -> None:
     assert "quoted dialogue" in instruction
     assert "NPC dialogue and reactions" in instruction
     assert "approximately 1800" in instruction
+
+
+def test_agency_editor_must_retain_every_explicit_player_action() -> None:
+    instruction = agency_editor_instruction(
+        player_action=(
+            "I remain by the window and ask the housekeeper whether any letters arrived, "
+            "without opening one."
+        ),
+        target_length=500,
+        length_unit="words",
+        abstract_style_profile="Dialogue-led and compact.",
+    )
+
+    assert "MUST visibly complete each affirmative item exactly once" in instruction
+    assert "preserve each negative boundary" in instruction
+    assert "retain its stated subject" in instruction
+    assert "insert that item in indirect narration" in instruction
+    assert "do not compose protagonist dialogue" in instruction
 
 
 def test_continue_delegates_exactly_one_reversible_turn() -> None:
