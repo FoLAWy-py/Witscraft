@@ -2,7 +2,7 @@
 
 **Document status:** Production baseline
 
-**Architecture version:** 3.24
+**Architecture version:** 3.25
 
 **Last updated:** 21 August 2026
 
@@ -231,7 +231,9 @@ Migration `0020` adds the persistence foundation for configurable long-form stor
 
 Story creation accepts those chapter settings and generates the complete branch-local roadmap before the story transaction is committed. The configured `normal_chat` route receives one bounded structured request; schema, sequence, count, and unique-title validation run before persistence. Quota exhaustion is returned to the player, while an unavailable or malformed provider response uses a deterministic player-agency-safe roadmap and records that source explicitly. A custom opening completes chapter 1 and activates chapter 2; a blank opening activates chapter 1. Branch duplication copies roadmap state while remapping completed chapter message references. The workspace returns the configuration and ordered chapters; the web client shows only current progress by default and places future titles, objectives, and the provisional ending behind an explicit spoiler disclosure. Migration `0021` adds the audited `provider`, `deterministic_fallback`, or `legacy` roadmap source.
 
-`StyleProfile` stores only an account owner, provenance category, normalized content hash, analysis version, language, and abstract feature JSON. The schema has no raw-reference column. Profiles can be reused by multiple stories for one account, are removed with that account, and are set to `NULL` on a story when the profile is deleted. Reference ingestion, transient raw-text handling, overlap rejection, and provider-backed scoring remain service-layer gates defined by `docs/interactive-fiction-contract.md`.
+`StyleProfile` stores only an account owner, provenance category, normalized content hash, analysis version, language, abstract feature JSON, and an internal fixed-size Bloom signature for non-reproduction checks. The schema has no raw-reference column. The authenticated creation flow accepts pasted UTF-8 text or browser-read `.txt`/`.md` files only after an ownership, permission, or public-domain attestation. Normalization, profile extraction, and overlap-signature construction are deterministic and local: importing a reference does not call a model or create an embedding. A compatible account-scoped content-hash cache returns the existing profile under concurrent or repeated import.
+
+The browser keeps raw reference text outside its persisted wizard draft and clears it after profiling. API responses, account exports, and story exports remove the internal safety signature and expose only abstract features. Generation receives those abstract features as an explicit no-author-imitation/no-source-wording instruction. The raw source, source label, and profile name are never included. Before a styled response is persisted or released from the SSE buffer, normalized character and word n-grams are tested against the versioned Bloom signature; suspicious overlap returns `422`. Styled streams deliberately disable partial checkpoints and buffer prose until this gate succeeds. Profiles can be reused by multiple stories for one account, are removed with that account, and are set to `NULL` on a story when the profile is deleted. Provider-backed quality scoring remains a separate release-evaluation gate.
 
 ### 6.1 Query and Index Strategy
 

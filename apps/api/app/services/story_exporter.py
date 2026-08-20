@@ -19,6 +19,7 @@ from app.db.models import (
     World,
 )
 from app.services.embeddings import stored_embedding
+from app.services.style_profiles import public_style_features
 
 
 async def build_story_export_payload(
@@ -212,7 +213,7 @@ def _style_profile_payload(profile: StyleProfile | None) -> dict:
         "content_hash": profile.content_hash,
         "analysis_version": profile.analysis_version,
         "language": profile.language,
-        "features": profile.features,
+        "features": public_style_features(profile.features),
     }
 
 

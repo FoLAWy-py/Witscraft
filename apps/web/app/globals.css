@@ -856,6 +856,37 @@ html.theme-transition textarea {
   font-weight: 700;
 }
 
+.draftPromptField > small {
+  color: var(--muted);
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.draftCardFields .fileInputLabel input[type="file"] {
+  height: auto;
+  padding: 7px;
+  font-weight: 500;
+}
+
+.draftCardFields .fileInputLabel > span,
+.draftCardFields .inlineCheck {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.draftCardFields .inlineCheck {
+  grid-template-columns: auto minmax(0, 1fr);
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.draftCardFields .inlineCheck input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
 .confirmStoryButton {
   width: 100%;
   min-height: 40px;

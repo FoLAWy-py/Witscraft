@@ -30,6 +30,7 @@ from app.db.models import (
     StoryChapter,
     StoryStateSnapshot,
     StorySummary,
+    StyleProfile,
     UserPreference,
     World,
 )
@@ -54,6 +55,10 @@ from app.services.player_agency import (
 )
 from app.services.state_extractor import extract_story_updates_with_llm
 from app.services.story_roadmap import revise_roadmap_window
+from app.services.style_profiles import (
+    assert_non_reproducing,
+    style_prompt,
+)
 from app.services.turn_context import TurnContext
 
 
@@ -270,6 +275,7 @@ class StoryEngine:
             response_content = ensure_chapter_heading(
                 response_content, chapter.chapter_number, chapter.title
             )
+        await self._assert_style_safety(story, response_content)
         response_choices = await self._ensure_story_choices(
             story.interaction_mode or "choices",
             response_content,
@@ -286,6 +292,7 @@ class StoryEngine:
             response_content = ensure_chapter_heading(
                 response_content, chapter.chapter_number, chapter.title
             )
+        await self._assert_style_safety(story, response_content)
         llm_response = llm_response.model_copy(update={"text": response_content})
 
         perspective_character = await self._main_character_name(story)
@@ -422,6 +429,7 @@ class StoryEngine:
             return
         story_id = self._parse_uuid(request.story_id, DEFAULT_STORY_ID)
         story = await self._get_story(story_id)
+        style_profile = await self._load_style_profile(story)
         branch_id = self._parse_uuid(request.branch_id, story.current_branch_id or DEFAULT_BRANCH_ID)
         branch = await self._get_branch(story.id, branch_id)
         try:
@@ -490,6 +498,8 @@ class StoryEngine:
                 delta = visible_text[len(delivered_text) :]
                 if not delta:
                     continue
+                if style_profile is not None:
+                    continue
                 delivered_text = visible_text
                 now = time.monotonic()
                 should_checkpoint = self._should_checkpoint_stream(
@@ -501,7 +511,7 @@ class StoryEngine:
                     character_threshold=self.llm_gateway.settings.stream_checkpoint_characters,
                     time_threshold=self.llm_gateway.settings.stream_checkpoint_seconds,
                 )
-                if should_checkpoint:
+                if should_checkpoint and style_profile is None:
                     stream_message = await self._save_stream_partial(
                         story,
                         branch,
@@ -516,7 +526,7 @@ class StoryEngine:
             with anyio.CancelScope(shield=True):
                 with suppress(Exception):
                     await self.session.rollback()
-                if partial_text:
+                if partial_text and style_profile is None:
                     with suppress(Exception):
                         await self._persist_partial_stream(
                             story,
@@ -546,11 +556,18 @@ class StoryEngine:
             )
             if titled_content != response_content:
                 response_content = titled_content
-                stream_message = await self._save_stream_partial(
-                    story, branch, stream_message, response_content
-                )
-                delivered_text = response_content
-                yield {"type": "replace", "content": response_content}
+                if style_profile is None:
+                    stream_message = await self._save_stream_partial(
+                        story, branch, stream_message, response_content
+                    )
+                    delivered_text = response_content
+                    yield {"type": "replace", "content": response_content}
+        if style_profile is not None:
+            assert_non_reproducing(
+                response_content,
+                style_profile.content_hash,
+                style_profile.features,
+            )
         response_choices = await self._ensure_story_choices(
             story.interaction_mode or "choices",
             response_content,
@@ -559,13 +576,15 @@ class StoryEngine:
         )
         remaining_text = response_content[len(delivered_text) :]
         if remaining_text:
-            stream_message = await self._save_stream_partial(
-                story,
-                branch,
-                stream_message,
-                response_content,
-            )
-            yield {"type": "delta", "content": remaining_text}
+            if style_profile is None:
+                stream_message = await self._save_stream_partial(
+                    story,
+                    branch,
+                    stream_message,
+                    response_content,
+                )
+            if style_profile is None:
+                yield {"type": "delta", "content": remaining_text}
         final_content, consistency_check, consistency_revision = await self._apply_consistency_policy(
             response_content,
             state,
@@ -578,11 +597,20 @@ class StoryEngine:
             )
         if final_content != response_content:
             response_content = final_content
-            stream_message = await self._save_stream_partial(
-                story,
-                branch,
-                stream_message,
+            if style_profile is None:
+                stream_message = await self._save_stream_partial(
+                    story,
+                    branch,
+                    stream_message,
+                    response_content,
+                )
+            if style_profile is None:
+                yield {"type": "replace", "content": response_content}
+        if style_profile is not None:
+            assert_non_reproducing(
                 response_content,
+                style_profile.content_hash,
+                style_profile.features,
             )
             yield {"type": "replace", "content": response_content}
         llm_response = LLMResponse(
@@ -1000,6 +1028,11 @@ class StoryEngine:
             recent_exclusions,
             summary.to_message_id if summary else None,
         )
+        profile = await self._load_style_profile(story)
+        profile_instruction = style_prompt(profile.features) if profile is not None else ""
+        combined_story_prompt = "\n\n".join(
+            item for item in (story.custom_prompt or "", profile_instruction) if item
+        )
         context = assemble_story_context(
             request.message,
             state,
@@ -1008,12 +1041,26 @@ class StoryEngine:
             world_context,
             character_context,
             preferences,
-            story.custom_prompt or "",
+            combined_story_prompt,
             story.interaction_mode or "choices",
             recent_messages,
             summary.content if summary else "",
         )
         return state, relationships, context
+
+    async def _load_style_profile(self, story: Story) -> StyleProfile | None:
+        style_profile_id = getattr(story, "style_profile_id", None)
+        if style_profile_id is None:
+            return None
+        profile = await self.session.get(StyleProfile, style_profile_id)
+        if profile is None or profile.user_id != story.user_id:
+            return None
+        return profile
+
+    async def _assert_style_safety(self, story: Story, text: str) -> None:
+        profile = await self._load_style_profile(story)
+        if profile is not None:
+            assert_non_reproducing(text, profile.content_hash, profile.features)
 
     def _check_consistency(self, response_text: str, state: StoryState, context: ContextAssembly) -> dict:
         sections = context.preview.get("sections", {})

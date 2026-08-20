@@ -1,9 +1,11 @@
 import type {
+  AnalyzeStyleProfileInput,
   CreateBranchInput,
   CreateStoryInput,
   StoryDraftSuggestion,
   StoryInterviewMessage,
   StoryInterviewResponse,
+  StyleProfile,
   UpdateCanonFactInput,
   UpdateCharacterInput,
   UpdateMemoryInput,
@@ -36,6 +38,7 @@ export async function createStory(input: CreateStoryInput): Promise<WorkspaceRes
       protagonist_name: input.protagonistName,
       protagonist_role: input.protagonistRole,
       tone: input.tone,
+      style_profile_id: input.styleProfileId,
       opening_mode: input.openingMode,
       opening_text: input.openingText,
       custom_prompt: input.customPrompt,
@@ -48,6 +51,43 @@ export async function createStory(input: CreateStoryInput): Promise<WorkspaceRes
   });
 }
 
+export async function analyzeStyleProfile(input: AnalyzeStyleProfileInput): Promise<StyleProfile> {
+  type StyleProfileWire = {
+    id: string;
+    name: string;
+    source_type: StyleProfile["sourceType"];
+    source_label?: string | null;
+    content_hash: string;
+    analysis_version: string;
+    language: string;
+    features: Record<string, string | number>;
+    reused: boolean;
+  };
+  const response = await requestJson<StyleProfileWire>(`${API_BASE_URL}/api/workspace/style-profiles`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: input.name,
+      source_type: input.sourceType,
+      source_label: input.sourceLabel,
+      language: input.language,
+      raw_text: input.rawText,
+      rights_attested: input.rightsAttested
+    })
+  });
+  return {
+    id: response.id,
+    name: response.name,
+    sourceType: response.source_type,
+    sourceLabel: response.source_label,
+    contentHash: response.content_hash,
+    analysisVersion: response.analysis_version,
+    language: response.language,
+    features: response.features,
+    reused: response.reused
+  };
+}
+
 export async function generateStoryDraft(input: CreateStoryInput): Promise<StoryDraftSuggestion> {
   type StoryDraftWire = {
     title: string;
@@ -57,6 +97,7 @@ export async function generateStoryDraft(input: CreateStoryInput): Promise<Story
     protagonist_name: string;
     protagonist_role: string;
     tone: string;
+    style_profile_id?: string | null;
     opening_text: string;
   };
   const suggestion = await requestJson<StoryDraftWire>(`${API_BASE_URL}/api/workspace/story-draft`, {
@@ -96,6 +137,7 @@ type InterviewWire = {
     protagonist_name: string;
     protagonist_role: string;
     tone: string;
+    style_profile_id?: string | null;
     opening_mode: "blank" | "custom";
     opening_text: string;
     custom_prompt: string;
@@ -125,6 +167,7 @@ function serializeStoryInterview(input: {
       protagonist_name: input.draft.protagonistName,
       protagonist_role: input.draft.protagonistRole,
       tone: input.draft.tone,
+      style_profile_id: input.draft.styleProfileId,
       opening_mode: input.draft.openingMode,
       opening_text: input.draft.openingText,
       custom_prompt: input.draft.customPrompt,
@@ -151,6 +194,7 @@ function mapStoryInterview(response: InterviewWire): StoryInterviewResponse {
       protagonistName: response.draft.protagonist_name,
       protagonistRole: response.draft.protagonist_role,
       tone: response.draft.tone,
+      styleProfileId: response.draft.style_profile_id ?? undefined,
       openingMode: response.draft.opening_mode,
       openingText: response.draft.opening_text,
       customPrompt: response.draft.custom_prompt,

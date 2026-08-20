@@ -107,6 +107,7 @@ def classify_rate_limit(request: Request, settings: Settings) -> RateLimitRule |
         f"{prefix}/workspace/story-draft",
         f"{prefix}/workspace/story-interview",
         f"{prefix}/workspace/story-interview/stream",
+        f"{prefix}/workspace/style-profiles",
     }
     if method == "POST" and (
         path in generation_paths or path.endswith("/summaries")

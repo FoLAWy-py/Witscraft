@@ -14,6 +14,7 @@ from app.llm.audit import CallAuditor, TurnCallBudgetExceededError
 from app.llm.router import LLMGateway, PurposeInputBudgetExceededError
 from app.schemas.chat import ChatRequest, ChatResponse
 from app.services.story_engine import StoryEngine
+from app.services.style_profiles import StyleReproductionError
 from app.services.quota_service import QuotaExceededError
 from app.services.model_route_service import load_user_purpose_routes
 
@@ -64,6 +65,9 @@ async def send_chat(
     except PurposeInputBudgetExceededError as error:
         await engine.fail_active_generation(error)
         raise HTTPException(status_code=413, detail=str(error)) from error
+    except StyleReproductionError as error:
+        await engine.fail_active_generation(error)
+        raise HTTPException(status_code=422, detail=str(error)) from error
     except Exception as error:
         await engine.fail_active_generation(error)
         raise
@@ -115,6 +119,10 @@ async def stream_chat(
                 "detail": "Per-turn external model call limit reached",
                 "limit": error.limit,
             }
+            yield f"event: error\ndata: {json.dumps(event)}\n\n"
+        except StyleReproductionError as error:
+            await engine.fail_active_generation(error)
+            event = {"type": "error", "status": 422, "detail": str(error)}
             yield f"event: error\ndata: {json.dumps(event)}\n\n"
         except Exception as error:
             await engine.fail_active_generation(error)

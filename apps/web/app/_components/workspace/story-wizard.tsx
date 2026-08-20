@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   CircleDashed,
   Feather,
+  FileUp,
   FileText,
   ListChecks,
   LogOut,
@@ -18,8 +19,8 @@ import {
   X
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { ApiError, streamStoryInterview } from "@/lib/api";
-import type { CreateStoryInput, StoryInterviewMessage } from "@/lib/types";
+import { analyzeStyleProfile, ApiError, streamStoryInterview } from "@/lib/api";
+import type { CreateStoryInput, StoryInterviewMessage, StyleProfile } from "@/lib/types";
 import { uiText } from "./workspace-ui";
 
 type UiLanguage = "zh-CN" | "en";
@@ -77,6 +78,14 @@ export function StoryWizard({
   const [mobileWizardView, setMobileWizardView] = useState<"chat" | "card">("chat");
   const [customInterviewAnswerActive, setCustomInterviewAnswerActive] = useState(false);
   const [wizardHydrated, setWizardHydrated] = useState(false);
+  const [referenceText, setReferenceText] = useState("");
+  const [referenceName, setReferenceName] = useState("");
+  const [referenceSourceType, setReferenceSourceType] = useState<"user_owned" | "licensed" | "public_domain">("user_owned");
+  const [referenceSourceLabel, setReferenceSourceLabel] = useState("");
+  const [referenceRightsAttested, setReferenceRightsAttested] = useState(false);
+  const [styleProfile, setStyleProfile] = useState<StyleProfile | null>(null);
+  const [stylePending, setStylePending] = useState(false);
+  const [styleError, setStyleError] = useState<string | null>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const [interviewMessages, setInterviewMessages] = useState<StoryInterviewMessage[]>(initialStoryInterviewMessages);
@@ -137,6 +146,53 @@ export function StoryWizard({
   }, [interviewMessages, streamedAssistant, interviewPending]);
 
   const updateDraft = (next: Partial<CreateStoryInput>) => setDraft((current) => ({ ...current, ...next }));
+  const resetStyleSelection = () => {
+    setStyleProfile(null);
+    updateDraft({ styleProfileId: undefined });
+  };
+  const handleReferenceFile = async (file?: File) => {
+    if (!file) return;
+    if (!/\.(txt|md)$/i.test(file.name) || file.size > 120_000) {
+      setStyleError(uiText(uiLanguage, "仅支持不超过 120 KB 的 UTF-8 .txt 或 .md 文件。", "Use a UTF-8 .txt or .md file no larger than 120 KB."));
+      return;
+    }
+    const text = await file.text();
+    if (text.includes("\uFFFD")) {
+      setStyleError(uiText(uiLanguage, "文件不是有效的 UTF-8 文本。", "The file is not valid UTF-8 text."));
+      return;
+    }
+    if (text.length > 30_000) {
+      setStyleError(uiText(uiLanguage, "参考文本最多 30,000 个字符。", "Reference text is limited to 30,000 characters."));
+      return;
+    }
+    setReferenceText(text);
+    if (!referenceName) setReferenceName(file.name.replace(/\.(txt|md)$/i, ""));
+    resetStyleSelection();
+    setStyleError(null);
+  };
+  const handleAnalyzeStyle = async () => {
+    if (stylePending || !referenceRightsAttested || !referenceName.trim()) return;
+    setStylePending(true);
+    setStyleError(null);
+    try {
+      const profile = await analyzeStyleProfile({
+        name: referenceName.trim(),
+        sourceType: referenceSourceType,
+        sourceLabel: referenceSourceLabel.trim(),
+        language: draft.proseLanguage,
+        rawText: referenceText,
+        rightsAttested: true
+      });
+      setStyleProfile(profile);
+      updateDraft({ styleProfileId: profile.id });
+      setReferenceText("");
+      setReferenceRightsAttested(false);
+    } catch (caught) {
+      setStyleError(caught instanceof ApiError ? caught.message : uiText(uiLanguage, "文风画像生成失败。", "Style profiling failed."));
+    } finally {
+      setStylePending(false);
+    }
+  };
   const sendInterviewMessage = async (answer?: string) => {
     const message = (answer ?? interviewText).trim();
     if (!message || interviewPending || creating) return;
@@ -331,6 +387,23 @@ export function StoryWizard({
                 </label>
               </div>
               {!chapterSettingsValid && <p className="fieldError">{uiText(uiLanguage, "章节数需为 3–120，每章长度需为 500–5,000。", "Use 3–120 chapters and a per-chapter length of 500–5,000.")}</p>}
+              <div className="draftPromptField">
+                <span className="draftPromptHeader"><span>{uiText(uiLanguage, "可选参考文风", "Optional style reference")}</span></span>
+                <small>{uiText(uiLanguage, "原文仅用于本地抽象画像和非复现指纹；不会保存、生成 embedding 或作为作者模仿指令。", "Raw text is used only for local abstract profiling and a non-reproduction fingerprint; it is not retained, embedded, or turned into author-imitation instructions.")}</small>
+                <div className="wizardFieldGrid">
+                  <label><span>{uiText(uiLanguage, "画像名称", "Profile name")}</span><input value={referenceName} onChange={(event) => { setReferenceName(event.target.value); resetStyleSelection(); }} maxLength={180} placeholder={uiText(uiLanguage, "例如：克制的海港叙事", "For example: restrained harbor prose")} /></label>
+                  <label><span>{uiText(uiLanguage, "权利来源", "Rights basis")}</span><select value={referenceSourceType} onChange={(event) => { setReferenceSourceType(event.target.value as typeof referenceSourceType); resetStyleSelection(); }}><option value="user_owned">{uiText(uiLanguage, "我拥有此文本", "I own this text")}</option><option value="licensed">{uiText(uiLanguage, "我已获许可", "I have permission")}</option><option value="public_domain">{uiText(uiLanguage, "公版文本", "Public domain")}</option></select></label>
+                </div>
+                <label><span>{uiText(uiLanguage, "来源说明（不填作者模仿指令）", "Source note (not an author-imitation instruction)")}</span><input value={referenceSourceLabel} onChange={(event) => { setReferenceSourceLabel(event.target.value); resetStyleSelection(); }} maxLength={220} placeholder={uiText(uiLanguage, "作品、版本或授权说明", "Work, edition, or permission note")} /></label>
+                <label><span>{uiText(uiLanguage, "粘贴参考文本（500–30,000 字符）", "Paste reference text (500–30,000 characters)")}</span><textarea value={referenceText} onChange={(event) => { setReferenceText(event.target.value); resetStyleSelection(); }} maxLength={30000} rows={5} /></label>
+                <label className="fileInputLabel"><span><FileUp size={13} />{uiText(uiLanguage, "或导入 UTF-8 .txt / .md", "Or import UTF-8 .txt / .md")}</span><input type="file" accept=".txt,.md,text/plain,text/markdown" onChange={(event) => void handleReferenceFile(event.target.files?.[0])} /></label>
+                <label className="inlineCheck"><input type="checkbox" checked={referenceRightsAttested} onChange={(event) => setReferenceRightsAttested(event.target.checked)} /><span>{uiText(uiLanguage, "我确认拥有该文本、已获许可，或其属于公版。", "I confirm that I own this text, have permission, or it is public domain.")}</span></label>
+                {styleError && <p className="fieldError" role="alert">{styleError}</p>}
+                {(styleProfile || draft.styleProfileId) && <p className="wizardReady"><CheckCircle2 size={13} />{styleProfile ? uiText(uiLanguage, `${styleProfile.name} 已绑定${styleProfile.reused ? "（复用缓存）" : ""}`, `${styleProfile.name} attached${styleProfile.reused ? " (cached)" : ""}`) : uiText(uiLanguage, "已绑定缓存文风画像", "Cached style profile attached")}</p>}
+                <button className="cmdButton" type="button" onClick={() => void handleAnalyzeStyle()} disabled={stylePending || referenceText.replace(/\s/g, "").length < 500 || !referenceName.trim() || !referenceRightsAttested || (referenceSourceType !== "user_owned" && !referenceSourceLabel.trim())}>
+                  {stylePending ? <RefreshCw size={13} className="spinIcon" /> : <Sparkles size={13} />}{stylePending ? uiText(uiLanguage, "正在提取画像", "Profiling") : uiText(uiLanguage, "提取并绑定抽象画像", "Profile and attach")}
+                </button>
+              </div>
               <label><span>{uiText(uiLanguage, "世界名称", "World name")}</span><input value={draft.worldName} onChange={(event) => updateDraft({ worldName: event.target.value })} maxLength={180} /></label>
               <label><span>{uiText(uiLanguage, "故事前提", "Premise")}</span><textarea value={draft.premise} onChange={(event) => updateDraft({ premise: event.target.value })} maxLength={4000} rows={4} /></label>
               <div className="wizardFieldGrid">

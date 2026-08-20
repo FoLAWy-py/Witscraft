@@ -56,6 +56,7 @@ class CreateStoryRequest(BaseModel):
     protagonist_name: str = Field(min_length=1, max_length=180)
     protagonist_role: str = Field(min_length=1, max_length=2000)
     tone: str = Field(min_length=1, max_length=500)
+    style_profile_id: str | None = None
     opening_mode: Literal["blank", "custom"] = "blank"
     opening_text: str = Field(default="", max_length=12000)
     custom_prompt: str = Field(default="", max_length=12000)
@@ -98,6 +99,7 @@ class GenerateStoryDraftRequest(BaseModel):
 
 
 class StoryInterviewDraft(GenerateStoryDraftRequest):
+    style_profile_id: str | None = None
     opening_mode: Literal["blank", "custom"] = "blank"
     custom_prompt: str = Field(default="", max_length=12000)
     interaction_mode: Literal["choices", "open"] = "choices"
@@ -105,6 +107,37 @@ class StoryInterviewDraft(GenerateStoryDraftRequest):
     target_chapter_length: int = Field(default=1800, ge=500, le=5000)
     chapter_length_unit: Literal["characters", "words"] = "characters"
     prose_language: str = Field(default="zh-CN", min_length=2, max_length=35)
+
+
+class AnalyzeStyleProfileRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=180)
+    source_type: Literal["user_owned", "licensed", "public_domain"]
+    source_label: str = Field(default="", max_length=220)
+    language: str = Field(default="zh-CN", min_length=2, max_length=35)
+    raw_text: str = Field(min_length=500, max_length=30_000)
+    rights_attested: Literal[True]
+
+    @model_validator(mode="after")
+    def validate_reference(self) -> Self:
+        if not self.name.strip():
+            raise ValueError("name cannot be blank")
+        if len("".join(self.raw_text.split())) < 500:
+            raise ValueError("reference text must contain at least 500 non-whitespace characters")
+        if self.source_type in {"licensed", "public_domain"} and not self.source_label.strip():
+            raise ValueError("source_label is required for licensed or public-domain text")
+        return self
+
+
+class StyleProfileResponse(BaseModel):
+    id: str
+    name: str
+    source_type: str
+    source_label: str | None = None
+    content_hash: str
+    analysis_version: str
+    language: str
+    features: dict
+    reused: bool
 
 
 class StoryInterviewMessage(BaseModel):

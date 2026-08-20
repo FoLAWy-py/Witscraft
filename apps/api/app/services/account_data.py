@@ -29,6 +29,7 @@ from app.db.models import (
     UserPreference,
     World,
 )
+from app.services.style_profiles import public_style_features
 
 
 async def build_account_export_payload(session: AsyncSession, user: User) -> dict[str, Any]:
@@ -60,7 +61,10 @@ async def build_account_export_payload(session: AsyncSession, user: User) -> dic
             for row in await _rows(session, Character, Character.user_id == user.id)
         ],
         "style_profiles": [
-            _serialize(row, exclude={"user_id"})
+            {
+                **_serialize(row, exclude={"user_id", "features"}),
+                "features": public_style_features(row.features),
+            }
             for row in await _rows(session, StyleProfile, StyleProfile.user_id == user.id)
         ],
         "stories": [_serialize(row, exclude={"user_id"}) for row in stories],

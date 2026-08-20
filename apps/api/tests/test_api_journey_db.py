@@ -7,21 +7,25 @@ from uuid import UUID, uuid4
 
 import httpx
 import pytest
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 
 from app.config import Settings, get_settings
 from app.db.models import (
     AuthCredential,
     GenerationRequest,
     Message,
+    MemoryEmbeddingTask,
+    ModelCall,
     Story,
     StoryChapter,
+    StyleProfile,
     User,
     UserModelRoute,
     World,
 )
 from app.db.session import AsyncSessionLocal, engine
 from app.llm.router import LLMGateway
+from app.schemas.llm import LLMResponse
 from app.main import create_app
 from app.services.auth_service import hash_password
 
@@ -83,6 +87,50 @@ def test_authenticated_interactive_novel_api_journey(monkeypatch) -> None:
                 assert login.status_code == 200, login.text
                 assert login.json()["user"]["email_verified"] is True
                 assert "witscraft_session" in client.cookies
+
+                reference_text = "\n".join(
+                    f"段落{index}描写潮汐、石阶与灯影，句式各有停顿，但不替主角决定行动。"
+                    for index in range(1, 55)
+                )
+                profiled = await client.post(
+                    "/api/workspace/style-profiles",
+                    json={
+                        "name": "Journey abstract profile",
+                        "source_type": "user_owned",
+                        "source_label": "Integration fixture",
+                        "language": "zh-CN",
+                        "raw_text": reference_text,
+                        "rights_attested": True,
+                    },
+                )
+                assert profiled.status_code == 200, profiled.text
+                profile_payload = profiled.json()
+                assert profile_payload["reused"] is False
+                assert profile_payload["features"]["analysis_method"] == "deterministic"
+                assert "_safety" not in profile_payload["features"]
+                reused_profile = await client.post(
+                    "/api/workspace/style-profiles",
+                    json={
+                        "name": "Different display name",
+                        "source_type": "user_owned",
+                        "source_label": "Integration fixture",
+                        "language": "zh-CN",
+                        "raw_text": reference_text,
+                        "rights_attested": True,
+                    },
+                )
+                assert reused_profile.status_code == 200
+                assert reused_profile.json()["id"] == profile_payload["id"]
+                assert reused_profile.json()["reused"] is True
+                async with AsyncSessionLocal() as verification:
+                    assert await verification.scalar(
+                        select(func.count()).select_from(ModelCall).where(ModelCall.user_id == user_id)
+                    ) == 0
+                    assert await verification.scalar(
+                        select(func.count())
+                        .select_from(MemoryEmbeddingTask)
+                        .where(MemoryEmbeddingTask.user_id == user_id)
+                    ) == 0
 
                 provider_catalog = await client.get("/api/providers")
                 assert provider_catalog.status_code == 200, provider_catalog.text
@@ -171,6 +219,7 @@ def test_authenticated_interactive_novel_api_journey(monkeypatch) -> None:
                         "protagonist_name": "Mira",
                         "protagonist_role": "archive investigator",
                         "tone": "tense and concise",
+                        "style_profile_id": profile_payload["id"],
                         "opening_mode": "custom",
                         "opening_text": "The archive clock stops as Mira touches the key.",
                         "interaction_mode": "open",
@@ -196,6 +245,13 @@ def test_authenticated_interactive_novel_api_journey(monkeypatch) -> None:
                 async with AsyncSessionLocal() as verification:
                     story_row = await verification.get(Story, UUID(story_id))
                     assert story_row is not None
+                    assert story_row.style_profile_id == UUID(profile_payload["id"])
+                    stored_profile = await verification.get(
+                        StyleProfile, UUID(profile_payload["id"])
+                    )
+                    assert stored_profile is not None
+                    assert "_safety" in stored_profile.features
+                    assert reference_text[:80] not in str(stored_profile.features)
                     world_row = await verification.get(World, story_row.world_id)
                     assert world_row is not None
                     world_row.rules = {
@@ -273,6 +329,50 @@ def test_authenticated_interactive_novel_api_journey(monkeypatch) -> None:
                     world_row.rules = {}
                     await verification.commit()
 
+                original_generate = LLMGateway.generate
+
+                async def copied_reference(_gateway, request):
+                    return LLMResponse(
+                        provider=request.provider,
+                        model=request.model,
+                        text=reference_text,
+                        raw={"dry_run": True},
+                    )
+
+                monkeypatch.setattr(LLMGateway, "generate", copied_reference)
+                overlap_key = f"journey-{marker}-overlap"
+                overlap = await client.post(
+                    "/api/chat/send",
+                    headers={"Idempotency-Key": overlap_key},
+                    json={
+                        "message": "I inspect the archive without deciding what to take.",
+                        "story_id": story_id,
+                        "branch_id": main_branch_id,
+                        "branch_version": 0,
+                        "idempotency_key": overlap_key,
+                    },
+                )
+                assert overlap.status_code == 422
+                assert "overlapped the reference" in overlap.json()["detail"]
+                monkeypatch.setattr(LLMGateway, "generate", original_generate)
+                async with AsyncSessionLocal() as verification:
+                    copied_assistant = await verification.scalar(
+                        select(Message).where(
+                            Message.story_id == UUID(story_id),
+                            Message.role == "assistant",
+                            Message.content == reference_text,
+                        )
+                    )
+                    assert copied_assistant is None
+                    blocked_generation = await verification.scalar(
+                        select(GenerationRequest).where(
+                            GenerationRequest.user_id == user_id,
+                            GenerationRequest.idempotency_key == overlap_key,
+                        )
+                    )
+                    assert blocked_generation is not None
+                    assert blocked_generation.status == "failed"
+
                 stale_route = await client.post(
                     "/api/chat/send",
                     headers={"Idempotency-Key": f"journey-{marker}-stale-route"},
@@ -292,7 +392,7 @@ def test_authenticated_interactive_novel_api_journey(monkeypatch) -> None:
                     params={"story_id": story_id, "branch_id": main_branch_id},
                 )
                 assert unchanged_workspace.status_code == 200
-                assert len(unchanged_workspace.json()["messages"]) == len(workspace["messages"])
+                assert len(unchanged_workspace.json()["messages"]) == len(workspace["messages"]) + 1
 
                 preview = await client.post(
                     "/api/chat/context-preview",
@@ -416,7 +516,7 @@ def test_authenticated_interactive_novel_api_journey(monkeypatch) -> None:
                     )
                     assert cancelled_generation is not None
                     assert cancelled_generation.status == "cancelled"
-                    partial = await verification.scalar(
+                    latest_assistant = await verification.scalar(
                         select(Message)
                         .where(
                             Message.story_id == story_id,
@@ -425,10 +525,9 @@ def test_authenticated_interactive_novel_api_journey(monkeypatch) -> None:
                         )
                         .order_by(Message.created_at.desc(), Message.id.desc())
                     )
-                    assert partial is not None
-                    assert partial.meta["partial"] is True
-                    assert partial.content
-                    assert "A stable checkpoint.".startswith(partial.content)
+                    assert latest_assistant is not None
+                    assert latest_assistant.meta.get("partial") is not True
+                    assert "A stable checkpoint." not in latest_assistant.content
 
                 branched = await client.post(
                     f"/api/workspace/stories/{story_id}/branches",

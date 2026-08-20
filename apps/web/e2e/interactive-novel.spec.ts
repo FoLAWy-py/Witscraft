@@ -21,6 +21,7 @@ const model = {
   reasoning_effort: null,
   notes: "Deterministic browser fixture"
 };
+const styleProfileId = "00000000-0000-0000-0000-000000000777";
 
 const purposes = [
   "critical_story_generation",
@@ -211,12 +212,30 @@ async function installApiFixture(page: Page) {
     if (path.endsWith("/api/workspace")) {
       return json(route, workspace());
     }
+    if (path.endsWith("/api/workspace/style-profiles") && request.method() === "POST") {
+      const payload = request.postDataJSON();
+      expect(payload.rights_attested).toBe(true);
+      expect(payload.source_type).toBe("public_domain");
+      expect(payload.raw_text.replace(/\s/g, "").length).toBeGreaterThanOrEqual(500);
+      return json(route, {
+        id: styleProfileId,
+        name: payload.name,
+        source_type: payload.source_type,
+        source_label: payload.source_label,
+        content_hash: "a".repeat(64),
+        analysis_version: "style-profile-v1",
+        language: payload.language,
+        features: { pacing: "moderate", viewpoint: "third" },
+        reused: false
+      });
+    }
     if (path.endsWith("/api/workspace/stories") && request.method() === "POST") {
       const payload = request.postDataJSON();
       expect(payload.planned_chapter_count).toBe(24);
       expect(payload.target_chapter_length).toBe(2400);
       expect(payload.chapter_length_unit).toBe("words");
       expect(payload.prose_language).toBe("en");
+      expect(payload.style_profile_id).toBe(styleProfileId);
       return json(route, workspace());
     }
     if (path.endsWith("/api/chat/stream")) {
@@ -319,6 +338,16 @@ test("player configures chapter count and chapter length during story creation",
   await page.getByLabel("主角姓名").fill("Mira");
   await page.getByLabel("主角身份与目标").fill("An archivist searching for a missing record.");
   await page.getByLabel("小说专属 Prompt").fill("Preserve player agency and build clues fairly.");
+  await page.getByLabel("画像名称").fill("Public-domain harbor profile");
+  await page.getByLabel("权利来源").selectOption("public_domain");
+  await page.getByLabel("来源说明（不填作者模仿指令）").fill("Reviewed public-domain fixture");
+  await page.getByLabel("粘贴参考文本（500–30,000 字符）").fill(
+    Array.from({ length: 45 }, (_, index) => `Paragraph ${index + 1} observes the harbor light and tide without choosing for the traveler.`).join("\n")
+  );
+  await page.getByLabel("我确认拥有该文本、已获许可，或其属于公版。").check();
+  await page.getByRole("button", { name: "提取并绑定抽象画像" }).click();
+  await expect(page.getByText("Public-domain harbor profile 已绑定")).toBeVisible();
+  await expect(page.getByLabel("粘贴参考文本（500–30,000 字符）")).toHaveValue("");
   await page.getByRole("button", { name: "确认并创建小说" }).click();
 
   await expect(page.getByText("The Clockwork Key", { exact: true }).first()).toBeVisible();

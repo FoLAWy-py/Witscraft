@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 from sqlalchemy import case, delete, desc, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError
 
 from app.auth import get_verified_user_id
 from app.config import Settings, get_settings
@@ -23,6 +24,7 @@ from app.db.models import (
     StoryChapter,
     StorySummary,
     StoryStateSnapshot,
+    StyleProfile,
     UserPreference,
     World,
 )
@@ -30,6 +32,7 @@ from app.db.session import get_session
 from app.llm.audit import CallAuditor
 from app.llm.router import LLMGateway
 from app.schemas.chat import (
+    AnalyzeStyleProfileRequest,
     CreateBranchRequest,
     CreateStoryRequest,
     GenerateSummaryRequest,
@@ -40,6 +43,7 @@ from app.schemas.chat import (
     StoryInterviewRequest,
     StoryInterviewResponse,
     StoryState,
+    StyleProfileResponse,
     UpdateBranchRequest,
     UpdateCanonFactRequest,
     UpdateCharacterRequest,
@@ -66,6 +70,13 @@ from app.services.story_exporter import (
     render_story_markdown,
 )
 from app.services.story_roadmap import plan_initial_roadmap
+from app.services.style_profiles import (
+    STYLE_ANALYSIS_VERSION,
+    analyze_style_features,
+    normalize_reference_text,
+    public_style_features,
+    reference_content_hash,
+)
 
 router = APIRouter(prefix="/workspace", tags=["workspace"])
 
@@ -378,6 +389,13 @@ async def create_story(
         raise HTTPException(status_code=422, detail="Custom opening text is required")
 
     existing_world_id = None
+    style_profile_id = None
+    if request.style_profile_id:
+        requested_profile_id = _parse_uuid_or_none(request.style_profile_id)
+        profile = await session.get(StyleProfile, requested_profile_id) if requested_profile_id else None
+        if profile is None or profile.user_id != user_id:
+            raise HTTPException(status_code=404, detail="Style profile not found")
+        style_profile_id = profile.id
     if request.world_id:
         requested_world_id = _parse_uuid_or_none(request.world_id)
         if requested_world_id is None:
@@ -434,6 +452,7 @@ async def create_story(
         world_id=world.id,
         title=title,
         main_character_id=character.id,
+        style_profile_id=style_profile_id,
         current_branch_id=branch_id,
         status="active",
         custom_prompt=custom_prompt or None,
@@ -513,6 +532,66 @@ async def create_story(
     await session.commit()
 
     return await workspace(story_id=str(story_id), session=session, user_id=user_id)
+
+
+def _style_profile_response(profile: StyleProfile, *, reused: bool) -> StyleProfileResponse:
+    return StyleProfileResponse(
+        id=str(profile.id),
+        name=profile.name,
+        source_type=profile.source_type,
+        source_label=profile.source_label,
+        content_hash=profile.content_hash,
+        analysis_version=profile.analysis_version,
+        language=profile.language,
+        features=public_style_features(profile.features),
+        reused=reused,
+    )
+
+
+@router.post("/style-profiles", response_model=StyleProfileResponse)
+async def analyze_style_profile(
+    request: AnalyzeStyleProfileRequest,
+    session: AsyncSession = Depends(get_session),
+    user_id: UUID = Depends(get_verified_user_id),
+) -> StyleProfileResponse:
+    normalized = normalize_reference_text(request.raw_text)
+    content_hash = reference_content_hash(normalized)
+    existing = await session.scalar(
+        select(StyleProfile).where(
+            StyleProfile.user_id == user_id,
+            StyleProfile.content_hash == content_hash,
+            StyleProfile.analysis_version == STYLE_ANALYSIS_VERSION,
+        )
+    )
+    if existing is not None:
+        return _style_profile_response(existing, reused=True)
+    profile = StyleProfile(
+        user_id=user_id,
+        name=request.name.strip(),
+        source_type=request.source_type,
+        source_label=request.source_label.strip() or None,
+        content_hash=content_hash,
+        analysis_version=STYLE_ANALYSIS_VERSION,
+        language=request.language.strip(),
+        features=analyze_style_features(normalized, request.language, content_hash),
+    )
+    session.add(profile)
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        concurrent = await session.scalar(
+            select(StyleProfile).where(
+                StyleProfile.user_id == user_id,
+                StyleProfile.content_hash == content_hash,
+                StyleProfile.analysis_version == STYLE_ANALYSIS_VERSION,
+            )
+        )
+        if concurrent is None:
+            raise
+        return _style_profile_response(concurrent, reused=True)
+    await session.refresh(profile)
+    return _style_profile_response(profile, reused=False)
 
 
 @router.post("/story-draft", response_model=StoryDraftResponse)
@@ -664,7 +743,10 @@ async def _generate_story_interview(
         result = result.model_copy(
             update={
                 "draft": result.draft.model_copy(
-                    update={"interaction_mode": request.draft.interaction_mode}
+                    update={
+                        "interaction_mode": request.draft.interaction_mode,
+                        "style_profile_id": request.draft.style_profile_id,
+                    }
                 )
             }
         )
@@ -731,7 +813,10 @@ async def stream_story_interview(
             parsed_result = parsed_result.model_copy(
                 update={
                     "draft": parsed_result.draft.model_copy(
-                        update={"interaction_mode": request.draft.interaction_mode}
+                        update={
+                            "interaction_mode": request.draft.interaction_mode,
+                            "style_profile_id": request.draft.style_profile_id,
+                        }
                     )
                 }
             )

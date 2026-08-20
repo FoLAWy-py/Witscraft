@@ -352,6 +352,7 @@ export type CreateStoryInput = {
   protagonistName: string;
   protagonistRole: string;
   tone: string;
+  styleProfileId?: string;
   openingMode: "blank" | "custom";
   openingText: string;
   customPrompt: string;
@@ -362,7 +363,28 @@ export type CreateStoryInput = {
   proseLanguage: string;
 };
 
-export type StoryDraftSuggestion = Omit<CreateStoryInput, "worldId" | "openingMode" | "customPrompt" | "interactionMode" | "plannedChapterCount" | "targetChapterLength" | "chapterLengthUnit" | "proseLanguage">;
+export type StoryDraftSuggestion = Omit<CreateStoryInput, "worldId" | "styleProfileId" | "openingMode" | "customPrompt" | "interactionMode" | "plannedChapterCount" | "targetChapterLength" | "chapterLengthUnit" | "proseLanguage">;
+
+export type StyleProfile = {
+  id: string;
+  name: string;
+  sourceType: "user_owned" | "licensed" | "public_domain";
+  sourceLabel?: string | null;
+  contentHash: string;
+  analysisVersion: string;
+  language: string;
+  features: Record<string, string | number>;
+  reused: boolean;
+};
+
+export type AnalyzeStyleProfileInput = {
+  name: string;
+  sourceType: StyleProfile["sourceType"];
+  sourceLabel: string;
+  language: string;
+  rawText: string;
+  rightsAttested: true;
+};
 
 export type StoryInterviewMessage = {
   role: "user" | "assistant";
