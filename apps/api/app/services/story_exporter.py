@@ -89,6 +89,7 @@ async def build_story_export_payload(
             "name": branch.name,
             "parent_branch_id": str(branch.parent_branch_id) if branch.parent_branch_id else None,
             "roadmap_version": branch.roadmap_version,
+            "roadmap_source": branch.roadmap_source,
             "ending_title": branch.ending_title,
             "created_at": _iso(branch.created_at),
         },

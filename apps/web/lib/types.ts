@@ -279,6 +279,9 @@ export type WorkspaceResponse = {
     created_at: string;
     active: boolean;
     version: number;
+    roadmap_version: number;
+    roadmap_source: "provider" | "deterministic_fallback" | "legacy";
+    ending_title: string;
   }>;
   stories: Array<{
     id: string;
@@ -321,6 +324,23 @@ export type WorkspaceResponse = {
   story_prompt: string;
   interaction_mode: "choices" | "open";
   consistency_mode: "manual" | "auto" | "off";
+  planned_chapter_count: number;
+  target_chapter_length: number;
+  chapter_length_unit: "characters" | "words";
+  prose_language: string;
+  roadmap_version: number;
+  roadmap_source: "provider" | "deterministic_fallback" | "legacy";
+  ending_title: string;
+  chapters: Array<{
+    id: string;
+    number: number;
+    title: string;
+    objective: string;
+    status: "planned" | "active" | "completed";
+    roadmap_version: number;
+    message_id?: string | null;
+    completed_at?: string | null;
+  }>;
 };
 
 export type CreateStoryInput = {
@@ -336,9 +356,13 @@ export type CreateStoryInput = {
   openingText: string;
   customPrompt: string;
   interactionMode: "choices" | "open";
+  plannedChapterCount: number;
+  targetChapterLength: number;
+  chapterLengthUnit: "characters" | "words";
+  proseLanguage: string;
 };
 
-export type StoryDraftSuggestion = Omit<CreateStoryInput, "worldId" | "openingMode" | "customPrompt" | "interactionMode">;
+export type StoryDraftSuggestion = Omit<CreateStoryInput, "worldId" | "openingMode" | "customPrompt" | "interactionMode" | "plannedChapterCount" | "targetChapterLength" | "chapterLengthUnit" | "proseLanguage">;
 
 export type StoryInterviewMessage = {
   role: "user" | "assistant";

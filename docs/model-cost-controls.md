@@ -79,6 +79,8 @@ Every story and story-independent auxiliary call consumes the same account-wide 
 
 The auditor resets the counter when it begins a new turn. Exhaustion stops the chain before another provider request and returns an explicit HTTP or SSE `429` response. This ceiling bounds pathological retry or orchestration behavior independently of token estimates and the weekly allowance.
 
+Story creation makes one logical `normal_chat` request to plan the requested 3–120 chapter roadmap. Output is capped at the smaller of 8,192 tokens or the planner's count-scaled budget, and the request remains subject to the shared weekly quota, route budget, retry/fallback policy, and external-call ceiling. Quota exhaustion is reported instead of silently downgrading. Other provider failures or invalid structured output use a deterministic local roadmap so story creation remains available, and `roadmap_source` preserves whether the accepted plan was provider-generated or fallback-generated. The planner does not create embeddings.
+
 ## Summary generation
 
 Session summaries are user-triggered and are not generated on every narrative turn. The summarizer sends the previous cumulative branch summary together with only messages after its coverage boundary, then persists a complete replacement summary. A request with no newly uncovered message returns HTTP `409` before quota preflight or provider execution, preventing repeated charges for the same range.

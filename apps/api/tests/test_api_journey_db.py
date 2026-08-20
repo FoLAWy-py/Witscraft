@@ -172,6 +172,17 @@ def test_authenticated_interactive_novel_api_journey(monkeypatch) -> None:
                 story_id = workspace["story_id"]
                 main_branch_id = workspace["branch_id"]
                 assert workspace["messages"][-1]["content"].startswith("The archive clock")
+                assert workspace["planned_chapter_count"] == 12
+                assert workspace["target_chapter_length"] == 1800
+                assert workspace["chapter_length_unit"] == "characters"
+                assert workspace["roadmap_version"] == 1
+                assert workspace["roadmap_source"] == "deterministic_fallback"
+                assert len(workspace["chapters"]) == 12
+                assert workspace["chapters"][0]["status"] == "completed"
+                assert workspace["chapters"][1]["status"] == "active"
+                assert all(
+                    chapter["status"] == "planned" for chapter in workspace["chapters"][2:]
+                )
 
                 stale_route = await client.post(
                     "/api/chat/send",
@@ -317,6 +328,12 @@ def test_authenticated_interactive_novel_api_journey(monkeypatch) -> None:
                 new_branch_id = branch_workspace["branch_id"]
                 assert new_branch_id != main_branch_id
                 assert len(branch_workspace["branches"]) == 2
+                assert len(branch_workspace["chapters"]) == 12
+                assert branch_workspace["chapters"][0]["status"] == "completed"
+                assert branch_workspace["chapters"][0]["message_id"] != (
+                    workspace["chapters"][0]["message_id"]
+                )
+                assert branch_workspace["ending_title"] == workspace["ending_title"]
 
                 switched = await client.patch(
                     f"/api/workspace/stories/{story_id}/branches/{main_branch_id}/activate"

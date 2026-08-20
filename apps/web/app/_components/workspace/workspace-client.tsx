@@ -86,6 +86,7 @@ type UiLanguage = "zh-CN" | "en";
 type Message = { id?: string; role: "assistant" | "user" | "beat"; content: string; author?: string; time?: string; choices?: string[]; consistencyCheck?: ConsistencyCheck | null };
 type StorySummary = WorkspaceResponse["stories"][number];
 type BranchSummary = WorkspaceResponse["branches"][number];
+type StoryChapterSummary = WorkspaceResponse["chapters"][number];
 type CharacterSummary = WorkspaceResponse["characters"][number];
 type WorldSummary = WorkspaceResponse["worlds"][number];
 type RelationshipSummary = WorkspaceResponse["relationships"][number];
@@ -313,6 +314,11 @@ export default function WorkspaceClient() {
   const [savingConsistencyMode, setSavingConsistencyMode] = useState(false);
   const [selectedModel, setSelectedModel] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
+  const [chapters, setChapters] = useState<StoryChapterSummary[]>([]);
+  const [plannedChapterCount, setPlannedChapterCount] = useState(12);
+  const [targetChapterLength, setTargetChapterLength] = useState(1800);
+  const [chapterLengthUnit, setChapterLengthUnit] = useState<"characters" | "words">("characters");
+  const [endingTitle, setEndingTitle] = useState("");
 
   useEffect(() => {
     const stored = window.localStorage.getItem(UI_LANGUAGE_KEY);
@@ -400,6 +406,11 @@ export default function WorkspaceClient() {
         consistencyCheck: message.consistency_check ?? null
       }))
     );
+    setChapters(data.chapters ?? []);
+    setPlannedChapterCount(data.planned_chapter_count ?? 12);
+    setTargetChapterLength(data.target_chapter_length ?? 1800);
+    setChapterLengthUnit(data.chapter_length_unit ?? "characters");
+    setEndingTitle(data.ending_title ?? "");
     setState(data.story_state ?? emptyStoryState);
     setRelationshipList(data.relationships.length ? data.relationships : []);
     setMemoryItems(
@@ -431,6 +442,11 @@ export default function WorkspaceClient() {
     setCharacterList([]);
     setRelationshipList([]);
     setMessages([]);
+    setChapters([]);
+    setPlannedChapterCount(12);
+    setTargetChapterLength(1800);
+    setChapterLengthUnit("characters");
+    setEndingTitle("");
     setState(emptyStoryState);
     setMemoryItems([]);
     setCanonFactItems([]);
@@ -1841,6 +1857,11 @@ export default function WorkspaceClient() {
               state={state}
               storyTitle={activeStoryTitle}
               branchName={activeBranchName}
+              chapters={chapters}
+              plannedChapterCount={plannedChapterCount}
+              targetChapterLength={targetChapterLength}
+              chapterLengthUnit={chapterLengthUnit}
+              endingTitle={endingTitle}
               draft={draft}
               setDraft={setDraft}
               pending={pending}

@@ -12,6 +12,7 @@ from app.db.models import (
     PlotEvent,
     Story,
     StoryBranch,
+    StoryChapter,
     StoryStateSnapshot,
     StorySummary,
 )
@@ -44,6 +45,9 @@ async def clone_story_branch(
         parent_branch_id=source_branch.id,
         name=name,
         created_from_message_id=source_messages[-1].id if source_messages else None,
+        roadmap_version=source_branch.roadmap_version,
+        roadmap_source=source_branch.roadmap_source,
+        ending_title=source_branch.ending_title,
     )
     session.add(branch)
     await session.flush()
@@ -59,6 +63,28 @@ async def clone_story_branch(
                 token_count=message.token_count,
                 meta=deepcopy(message.meta or {}),
                 created_at=message.created_at,
+            )
+        )
+
+    chapter_result = await session.execute(
+        select(StoryChapter)
+        .where(StoryChapter.story_id == story.id, StoryChapter.branch_id == source_branch.id)
+        .order_by(StoryChapter.chapter_number.asc())
+    )
+    for chapter in chapter_result.scalars().all():
+        session.add(
+            StoryChapter(
+                story_id=story.id,
+                branch_id=branch.id,
+                chapter_number=chapter.chapter_number,
+                title=chapter.title,
+                objective=chapter.objective,
+                status=chapter.status,
+                roadmap_version=chapter.roadmap_version,
+                message_id=_mapped_message_id(chapter.message_id, message_ids),
+                completed_at=chapter.completed_at,
+                created_at=chapter.created_at,
+                updated_at=chapter.updated_at,
             )
         )
 

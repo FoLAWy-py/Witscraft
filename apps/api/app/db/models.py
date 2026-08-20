@@ -231,6 +231,10 @@ class StoryBranch(Base):
     __tablename__ = "story_branches"
     __table_args__ = (
         CheckConstraint("roadmap_version >= 0", name="ck_story_branches_roadmap_version"),
+        CheckConstraint(
+            "roadmap_source IN ('provider', 'deterministic_fallback', 'legacy')",
+            name="ck_story_branches_roadmap_source",
+        ),
         UniqueConstraint("story_id", "id", name="uq_story_branches_story_id"),
         Index("ix_story_branches_story_created", "story_id", "created_at", "id"),
         Index("ix_story_branches_parent", "parent_branch_id"),
@@ -246,6 +250,9 @@ class StoryBranch(Base):
         Integer, default=0, server_default="0", nullable=False
     )
     ending_title: Mapped[str | None] = mapped_column(String(220))
+    roadmap_source: Mapped[str] = mapped_column(
+        String(30), default="legacy", server_default="legacy", nullable=False
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     story: Mapped[Story] = relationship(back_populates="branches")

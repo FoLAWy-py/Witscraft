@@ -20,7 +20,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { ConsistencyCheck, StoryState } from "@/lib/types";
+import type { ConsistencyCheck, StoryState, WorkspaceResponse } from "@/lib/types";
 import { CommandButton, EmptyState, SelectMenu, uiText } from "./workspace-ui";
 
 type UiLanguage = "zh-CN" | "en";
@@ -43,6 +43,11 @@ export function Transcript({
   state,
   storyTitle,
   branchName,
+  chapters,
+  plannedChapterCount,
+  targetChapterLength,
+  chapterLengthUnit,
+  endingTitle,
   draft,
   setDraft,
   pending,
@@ -75,6 +80,11 @@ export function Transcript({
   state: StoryState;
   storyTitle: string;
   branchName: string;
+  chapters: WorkspaceResponse["chapters"];
+  plannedChapterCount: number;
+  targetChapterLength: number;
+  chapterLengthUnit: "characters" | "words";
+  endingTitle: string;
   draft: string;
   setDraft: (value: string) => void;
   pending: boolean;
@@ -109,6 +119,9 @@ export function Transcript({
   const [promptOpen, setPromptOpen] = useState(false);
   const hasStreamingAssistant = pending && messages[messages.length - 1]?.role === "assistant";
   const lastAssistantIndex = messages.reduce((last, message, index) => message.role === "assistant" ? index : last, -1);
+  const currentChapter = chapters.find((chapter) => chapter.status === "active")
+    ?? [...chapters].reverse().find((chapter) => chapter.status === "completed")
+    ?? chapters[0];
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
@@ -143,6 +156,40 @@ export function Transcript({
           </button>
         </span>
       </div>
+
+      {chapters.length > 0 && (
+        <details className="roadmapDisclosure">
+          <summary>
+            <span>
+              <ListChecks size={14} />
+              {uiText(uiLanguage, "章节路线图", "Chapter roadmap")}
+            </span>
+            <strong>
+              {uiText(uiLanguage, "第", "Chapter")} {currentChapter?.number ?? 1} / {plannedChapterCount}
+              {currentChapter?.title ? ` · ${currentChapter.title}` : ""}
+            </strong>
+            <small>
+              {targetChapterLength.toLocaleString()} {uiText(
+                uiLanguage,
+                chapterLengthUnit === "characters" ? "字/章" : "词/章",
+                chapterLengthUnit === "characters" ? "characters/chapter" : "words/chapter"
+              )}
+            </small>
+          </summary>
+          <div className="roadmapSpoilers">
+            <p>{uiText(uiLanguage, "以下内容包含未来章节与结局标题。路线图会随玩家选择动态调整。", "The following contains future chapter and ending titles. The roadmap adapts to player choices.")}</p>
+            <ol>
+              {chapters.map((chapter) => (
+                <li key={chapter.id} className={chapter.status}>
+                  <span>{chapter.number}</span>
+                  <div><strong>{chapter.title}</strong><small>{chapter.objective}</small></div>
+                </li>
+              ))}
+            </ol>
+            {endingTitle && <p className="roadmapEnding"><Sparkles size={14} />{uiText(uiLanguage, "当前结局：", "Current ending: ")}<strong>{endingTitle}</strong></p>}
+          </div>
+        </details>
+      )}
 
       {promptOpen && (
         <div className="promptDialogScrim" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setPromptOpen(false); }}>

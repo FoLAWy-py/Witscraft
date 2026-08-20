@@ -59,6 +59,10 @@ class CreateStoryRequest(BaseModel):
     opening_text: str = Field(default="", max_length=12000)
     custom_prompt: str = Field(default="", max_length=12000)
     interaction_mode: Literal["choices", "open"] = "choices"
+    planned_chapter_count: int = Field(default=12, ge=3, le=120)
+    target_chapter_length: int = Field(default=1800, ge=500, le=5000)
+    chapter_length_unit: Literal["characters", "words"] = "characters"
+    prose_language: str = Field(default="zh-CN", min_length=2, max_length=35)
 
     @model_validator(mode="after")
     def validate_story_setup(self) -> Self:
@@ -76,6 +80,8 @@ class CreateStoryRequest(BaseModel):
                 raise ValueError(f"{field_name} cannot be blank")
         if self.opening_mode == "custom" and not self.opening_text.strip():
             raise ValueError("opening_text is required for a custom opening")
+        if not self.prose_language.strip():
+            raise ValueError("prose_language cannot be blank")
         return self
 
 
@@ -94,6 +100,10 @@ class StoryInterviewDraft(GenerateStoryDraftRequest):
     opening_mode: Literal["blank", "custom"] = "blank"
     custom_prompt: str = Field(default="", max_length=12000)
     interaction_mode: Literal["choices", "open"] = "choices"
+    planned_chapter_count: int = Field(default=12, ge=3, le=120)
+    target_chapter_length: int = Field(default=1800, ge=500, le=5000)
+    chapter_length_unit: Literal["characters", "words"] = "characters"
+    prose_language: str = Field(default="zh-CN", min_length=2, max_length=35)
 
 
 class StoryInterviewMessage(BaseModel):
@@ -125,6 +135,17 @@ class StoryDraftResponse(BaseModel):
     protagonist_role: str = Field(min_length=1, max_length=2000)
     tone: str = Field(min_length=1, max_length=500)
     opening_text: str = Field(min_length=1, max_length=12000)
+
+
+class StoryRoadmapChapterDraft(BaseModel):
+    chapter_number: int = Field(ge=1, le=120)
+    title: str = Field(min_length=1, max_length=220)
+    objective: str = Field(min_length=1, max_length=1000)
+
+
+class StoryRoadmapDraft(BaseModel):
+    ending_title: str = Field(min_length=1, max_length=220)
+    chapters: list[StoryRoadmapChapterDraft] = Field(min_length=3, max_length=120)
 
 
 class CreateBranchRequest(BaseModel):
@@ -246,3 +267,11 @@ class WorkspaceResponse(BaseModel):
     story_prompt: str = ""
     interaction_mode: Literal["choices", "open"] = "choices"
     consistency_mode: Literal["manual", "auto", "off"] = "auto"
+    planned_chapter_count: int = 12
+    target_chapter_length: int = 1800
+    chapter_length_unit: Literal["characters", "words"] = "characters"
+    prose_language: str = "zh-CN"
+    roadmap_version: int = 0
+    roadmap_source: Literal["provider", "deterministic_fallback", "legacy"] = "legacy"
+    ending_title: str = ""
+    chapters: list[dict] = Field(default_factory=list)

@@ -39,7 +39,11 @@ export async function createStory(input: CreateStoryInput): Promise<WorkspaceRes
       opening_mode: input.openingMode,
       opening_text: input.openingText,
       custom_prompt: input.customPrompt,
-      interaction_mode: input.interactionMode
+      interaction_mode: input.interactionMode,
+      planned_chapter_count: input.plannedChapterCount,
+      target_chapter_length: input.targetChapterLength,
+      chapter_length_unit: input.chapterLengthUnit,
+      prose_language: input.proseLanguage
     })
   });
 }
@@ -96,6 +100,10 @@ type InterviewWire = {
     opening_text: string;
     custom_prompt: string;
     interaction_mode: "choices" | "open";
+    planned_chapter_count: number;
+    target_chapter_length: number;
+    chapter_length_unit: "characters" | "words";
+    prose_language: string;
   };
   missing_fields: string[];
   ready_for_confirmation: boolean;
@@ -120,7 +128,11 @@ function serializeStoryInterview(input: {
       opening_mode: input.draft.openingMode,
       opening_text: input.draft.openingText,
       custom_prompt: input.draft.customPrompt,
-      interaction_mode: input.draft.interactionMode
+      interaction_mode: input.draft.interactionMode,
+      planned_chapter_count: input.draft.plannedChapterCount,
+      target_chapter_length: input.draft.targetChapterLength,
+      chapter_length_unit: input.draft.chapterLengthUnit,
+      prose_language: input.draft.proseLanguage
     }
   });
 }
@@ -142,7 +154,11 @@ function mapStoryInterview(response: InterviewWire): StoryInterviewResponse {
       openingMode: response.draft.opening_mode,
       openingText: response.draft.opening_text,
       customPrompt: response.draft.custom_prompt,
-      interactionMode: response.draft.interaction_mode
+      interactionMode: response.draft.interaction_mode,
+      plannedChapterCount: response.draft.planned_chapter_count,
+      targetChapterLength: response.draft.target_chapter_length,
+      chapterLengthUnit: response.draft.chapter_length_unit,
+      proseLanguage: response.draft.prose_language
     }
   };
 }

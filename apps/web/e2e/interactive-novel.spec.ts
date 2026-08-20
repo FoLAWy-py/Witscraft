@@ -58,7 +58,10 @@ async function installApiFixture(page: Page) {
       parent_branch_id: null,
       created_at: "2026-08-17T00:00:00Z",
       active: true,
-      version: branchVersion
+      version: branchVersion,
+      roadmap_version: 1,
+      roadmap_source: "provider",
+      ending_title: "The Last Archive"
     }],
     stories: [{
       id: "00000000-0000-0000-0000-000000000301",
@@ -83,7 +86,24 @@ async function installApiFixture(page: Page) {
     onboarding_required: false,
     story_prompt: "",
     interaction_mode: "open",
-    consistency_mode: "auto"
+    consistency_mode: "auto",
+    planned_chapter_count: 12,
+    target_chapter_length: 1800,
+    chapter_length_unit: "words",
+    prose_language: "en",
+    roadmap_version: 1,
+    roadmap_source: "provider",
+    ending_title: "The Last Archive",
+    chapters: Array.from({ length: 12 }, (_, index) => ({
+      id: `00000000-0000-0000-0000-${String(600 + index).padStart(12, "0")}`,
+      number: index + 1,
+      title: `Chapter ${index + 1}`,
+      objective: `Objective ${index + 1}`,
+      status: index === 0 ? "active" : "planned",
+      roadmap_version: 1,
+      message_id: null,
+      completed_at: null
+    }))
   });
 
   await page.route("**/api/**", async (route) => {
@@ -191,6 +211,14 @@ async function installApiFixture(page: Page) {
     if (path.endsWith("/api/workspace")) {
       return json(route, workspace());
     }
+    if (path.endsWith("/api/workspace/stories") && request.method() === "POST") {
+      const payload = request.postDataJSON();
+      expect(payload.planned_chapter_count).toBe(24);
+      expect(payload.target_chapter_length).toBe(2400);
+      expect(payload.chapter_length_unit).toBe("words");
+      expect(payload.prose_language).toBe("en");
+      return json(route, workspace());
+    }
     if (path.endsWith("/api/chat/stream")) {
       const payload = request.postDataJSON();
       expect(payload).not.toHaveProperty("provider");
@@ -236,6 +264,12 @@ test("player signs in and directs the next scene", async ({ page }) => {
 
   await expect(page.getByText("The Clockwork Key", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("The clockwork archive waits for your decision.")).toBeVisible();
+  const roadmap = page.getByText("章节路线图", { exact: true });
+  await expect(roadmap).toBeVisible();
+  await expect(page.getByText("当前结局：", { exact: false })).toBeHidden();
+  await roadmap.click();
+  await expect(page.getByText("当前结局：", { exact: false })).toBeVisible();
+  await expect(page.getByText("The Last Archive", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "设置", exact: true }).click();
   await expect(page.getByText("12.5%", { exact: true }).first()).toBeVisible();
@@ -256,4 +290,28 @@ test("player signs in and directs the next scene", async ({ page }) => {
   await expect(page.getByText("I turn the key and enter the sealed room.")).toBeVisible();
   await expect(page.getByText("Mira turns the key, and the sealed archive answers.")).toBeVisible();
   await expect(page.getByText("Sealed archive", { exact: true }).first()).toBeVisible();
+});
+
+test("player configures chapter count and chapter length during story creation", async ({ page }) => {
+  await installApiFixture(page);
+  await page.goto("/witscraft/");
+  await page.getByLabel("邮箱").fill(user.email);
+  await page.getByLabel("密码").fill("browser-fixture-passphrase");
+  await page.getByRole("button", { name: "进入小说" }).click();
+
+  await page.getByRole("button", { name: "新建小说" }).click();
+  await page.getByLabel("书名").fill("The Tidal Archive");
+  await page.getByLabel("类型").fill("Mystery");
+  await page.getByLabel("叙事风格").fill("Restrained and tense");
+  await page.getByLabel("计划章节数").fill("24");
+  await page.getByLabel("正文语言").selectOption("en");
+  await page.getByLabel("自定义长度").fill("2400");
+  await page.getByLabel("世界名称").fill("The Tidal City");
+  await page.getByLabel("故事前提").fill("A sealed archive opens only when the tide is lowest.");
+  await page.getByLabel("主角姓名").fill("Mira");
+  await page.getByLabel("主角身份与目标").fill("An archivist searching for a missing record.");
+  await page.getByLabel("小说专属 Prompt").fill("Preserve player agency and build clues fairly.");
+  await page.getByRole("button", { name: "确认并创建小说" }).click();
+
+  await expect(page.getByText("The Clockwork Key", { exact: true }).first()).toBeVisible();
 });

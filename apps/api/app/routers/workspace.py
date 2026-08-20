@@ -1,6 +1,7 @@
 import asyncio
 import json
 import re
+from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -19,6 +20,7 @@ from app.db.models import (
     ModelCall,
     Story,
     StoryBranch,
+    StoryChapter,
     StorySummary,
     StoryStateSnapshot,
     UserPreference,
@@ -63,6 +65,7 @@ from app.services.story_exporter import (
     render_story_json,
     render_story_markdown,
 )
+from app.services.story_roadmap import plan_initial_roadmap
 
 router = APIRouter(prefix="/workspace", tags=["workspace"])
 
@@ -319,6 +322,8 @@ async def workspace(
     canon_fact_items = await _load_canon_fact_items(session, story.id, active_branch_id)
     summaries = await _load_summaries(session, story.id, active_branch_id)
     model_call = await _load_model_call(session, story.id)
+    active_branch = await session.get(StoryBranch, active_branch_id)
+    chapters = await _load_chapters(session, story.id, active_branch_id)
 
     return WorkspaceResponse(
         story_id=str(story.id),
@@ -341,12 +346,22 @@ async def workspace(
         story_prompt=story.custom_prompt or "",
         interaction_mode=story.interaction_mode or "choices",
         consistency_mode=story.consistency_mode or "auto",
+        planned_chapter_count=story.planned_chapter_count,
+        target_chapter_length=story.target_chapter_length,
+        chapter_length_unit=story.chapter_length_unit,
+        prose_language=story.prose_language,
+        roadmap_version=active_branch.roadmap_version if active_branch else 0,
+        roadmap_source=active_branch.roadmap_source if active_branch else "legacy",
+        ending_title=active_branch.ending_title or "" if active_branch else "",
+        chapters=chapters,
     )
 
 
 @router.post("/stories", response_model=WorkspaceResponse)
 async def create_story(
     request: CreateStoryRequest,
+    http_request: Request,
+    settings: Settings = Depends(get_settings),
     session: AsyncSession = Depends(get_session),
     user_id: UUID = Depends(get_verified_user_id),
 ) -> WorkspaceResponse:
@@ -362,12 +377,29 @@ async def create_story(
     if request.opening_mode == "custom" and not opening_text:
         raise HTTPException(status_code=422, detail="Custom opening text is required")
 
-    world = None
+    existing_world_id = None
     if request.world_id:
         requested_world_id = _parse_uuid_or_none(request.world_id)
         if requested_world_id is None:
             raise HTTPException(status_code=404, detail="World not found")
-        world = await session.get(World, requested_world_id)
+        existing_world = await session.get(World, requested_world_id)
+        if existing_world is None or existing_world.user_id != user_id:
+            raise HTTPException(status_code=404, detail="World not found")
+        existing_world_id = existing_world.id
+
+    purpose_routes = await load_user_purpose_routes(session, user_id)
+    await session.rollback()
+    planned_roadmap = await plan_initial_roadmap(
+        request,
+        settings=settings,
+        user_id=user_id,
+        request_id=getattr(http_request.state, "request_id", None),
+        purpose_routes=purpose_routes,
+    )
+
+    world = None
+    if existing_world_id is not None:
+        world = await session.get(World, existing_world_id)
         if world is None or world.user_id != user_id:
             raise HTTPException(status_code=404, detail="World not found")
     if world is None:
@@ -406,11 +438,18 @@ async def create_story(
         status="active",
         custom_prompt=custom_prompt or None,
         interaction_mode=request.interaction_mode,
+        planned_chapter_count=request.planned_chapter_count,
+        target_chapter_length=request.target_chapter_length,
+        chapter_length_unit=request.chapter_length_unit,
+        prose_language=request.prose_language.strip(),
     )
     branch = StoryBranch(
         id=branch_id,
         story_id=story_id,
         name="main",
+        roadmap_version=1,
+        roadmap_source=planned_roadmap.source,
+        ending_title=planned_roadmap.draft.ending_title,
     )
     state = StoryState(mood=tone, objective=premise)
     session.add_all([character, story, branch])
@@ -430,16 +469,47 @@ async def create_story(
         },
     )
     session.add(snapshot)
+    opening_message_id = None
+    chapter_completed_at = None
     if request.opening_mode == "custom":
+        opening_message_id = uuid4()
+        chapter_completed_at = datetime.now(timezone.utc)
         session.add(
             Message(
+                id=opening_message_id,
                 story_id=story_id,
                 branch_id=branch_id,
                 role="assistant",
                 content=opening_text,
-                meta={"author": protagonist_name},
+                meta={
+                    "chapter_number": 1,
+                    "chapter_title": planned_roadmap.draft.chapters[0].title,
+                },
             )
         )
+    session.add_all(
+        [
+            StoryChapter(
+                story_id=story_id,
+                branch_id=branch_id,
+                chapter_number=chapter.chapter_number,
+                title=chapter.title,
+                objective=chapter.objective,
+                status=(
+                    "completed"
+                    if chapter.chapter_number == 1 and opening_message_id is not None
+                    else "active"
+                    if chapter.chapter_number
+                    == (2 if opening_message_id is not None else 1)
+                    else "planned"
+                ),
+                roadmap_version=1,
+                message_id=(opening_message_id if chapter.chapter_number == 1 else None),
+                completed_at=(chapter_completed_at if chapter.chapter_number == 1 else None),
+            )
+            for chapter in planned_roadmap.draft.chapters
+        ]
+    )
     await session.commit()
 
     return await workspace(story_id=str(story_id), session=session, user_id=user_id)
@@ -541,8 +611,11 @@ async def _build_story_interview_request(
                 "只返回 JSON，字段顺序必须是 assistant_message、options、question_focus、draft；assistant_message 必须是第一个字段。"
                 "question_focus 必须填写本轮唯一问题对应的 draft 字段名；如果已经完整则为 null。"
                 "draft 必须包含 title、genre、world_name、"
-                "premise、protagonist_name、protagonist_role、tone、opening_mode、opening_text、custom_prompt、interaction_mode。"
+                "premise、protagonist_name、protagonist_role、tone、opening_mode、opening_text、custom_prompt、interaction_mode、"
+                "planned_chapter_count、target_chapter_length、chapter_length_unit、prose_language。"
                 "opening_mode 只能是 blank 或 custom。没有可靠信息的字段保持空字符串。"
+                "planned_chapter_count 必须为 3 到 120，target_chapter_length 必须为 500 到 5000；"
+                "除非用户明确要求改变篇幅，否则保留当前数值和语言单位。"
                 "custom_prompt 是必须收集的创建信息，但不要要求用户从零撰写：当类型、故事前提、主角和风格足够明确时，"
                 "主动生成一份针对该小说类型的专业、具体、可执行 Prompt，覆盖叙事视角、语言质感、节奏、人物弧光、"
                 "伏笔与连续性约束、应避免的问题，并保留给用户编辑。"
@@ -1459,6 +1532,9 @@ async def _load_branches(session: AsyncSession, story_id: UUID, active_branch_id
             "created_at": branch.created_at.isoformat() if branch.created_at else "",
             "active": branch.id == active_branch_id,
             "version": branch.version,
+            "roadmap_version": branch.roadmap_version,
+            "roadmap_source": branch.roadmap_source,
+            "ending_title": branch.ending_title or "",
         }
         for branch in result.scalars().all()
     ]
@@ -1530,6 +1606,31 @@ async def _load_messages(
             consistency_check=message.meta.get("consistency_check") if message.meta else None,
         )
         for message in result.scalars().all()
+    ]
+
+
+async def _load_chapters(
+    session: AsyncSession,
+    story_id: UUID,
+    branch_id: UUID,
+) -> list[dict]:
+    result = await session.execute(
+        select(StoryChapter)
+        .where(StoryChapter.story_id == story_id, StoryChapter.branch_id == branch_id)
+        .order_by(StoryChapter.chapter_number.asc())
+    )
+    return [
+        {
+            "id": str(chapter.id),
+            "number": chapter.chapter_number,
+            "title": chapter.title,
+            "objective": chapter.objective or "",
+            "status": chapter.status,
+            "roadmap_version": chapter.roadmap_version,
+            "message_id": str(chapter.message_id) if chapter.message_id else None,
+            "completed_at": chapter.completed_at.isoformat() if chapter.completed_at else None,
+        }
+        for chapter in result.scalars().all()
     ]
 
 

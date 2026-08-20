@@ -1971,8 +1971,123 @@ html.theme-transition textarea {
   height: 100%;
   min-height: 0;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
   background: var(--paper);
+}
+
+.roadmapDisclosure {
+  position: relative;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--paper-raised) 88%, var(--teal-soft));
+}
+
+.roadmapDisclosure > summary {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 12px;
+  list-style-position: inside;
+}
+
+.roadmapDisclosure > summary > span,
+.roadmapDisclosure > summary > strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.roadmapDisclosure > summary > strong {
+  min-width: 0;
+  flex: 1;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.roadmapDisclosure > summary > small {
+  white-space: nowrap;
+}
+
+.roadmapSpoilers {
+  max-height: min(52dvh, 520px);
+  overflow: auto;
+  padding: 4px 20px 18px 42px;
+}
+
+.roadmapSpoilers > p {
+  margin: 6px 0 14px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.roadmapSpoilers ol {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.roadmapSpoilers li {
+  display: flex;
+  gap: 9px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper-raised);
+  padding: 9px;
+}
+
+.roadmapSpoilers li > span {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--paper-sunken);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.roadmapSpoilers li.active {
+  border-color: color-mix(in srgb, var(--teal) 48%, var(--line));
+}
+
+.roadmapSpoilers li.active > span,
+.roadmapSpoilers li.completed > span {
+  background: var(--teal-soft);
+  color: var(--teal);
+}
+
+.roadmapSpoilers li > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.roadmapSpoilers li strong,
+.roadmapSpoilers li small {
+  overflow-wrap: anywhere;
+}
+
+.roadmapSpoilers li small {
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.roadmapEnding {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
 }
 
 .sceneRibbon {

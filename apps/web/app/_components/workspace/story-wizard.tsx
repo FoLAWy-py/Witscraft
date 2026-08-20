@@ -31,7 +31,7 @@ function initialStoryInterviewMessages(): StoryInterviewMessage[] {
     options: ["先说一个故事灵感", "先确定主角", "先搭建世界"]
   }];
 }
-function initialStoryDraft(): CreateStoryInput {
+function initialStoryDraft(uiLanguage: UiLanguage = "zh-CN"): CreateStoryInput {
   return {
     title: "",
     genre: "",
@@ -43,7 +43,11 @@ function initialStoryDraft(): CreateStoryInput {
     openingMode: "blank",
     openingText: "",
     customPrompt: "",
-    interactionMode: "choices"
+    interactionMode: "choices",
+    plannedChapterCount: 12,
+    targetChapterLength: 1800,
+    chapterLengthUnit: uiLanguage === "zh-CN" ? "characters" : "words",
+    proseLanguage: uiLanguage
   };
 }
 
@@ -76,7 +80,7 @@ export function StoryWizard({
   const transcriptRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const [interviewMessages, setInterviewMessages] = useState<StoryInterviewMessage[]>(initialStoryInterviewMessages);
-  const [draft, setDraft] = useState<CreateStoryInput>(initialStoryDraft);
+  const [draft, setDraft] = useState<CreateStoryInput>(() => initialStoryDraft(uiLanguage));
   const requiredFields = [
     ["title", uiText(uiLanguage, "书名", "Title"), draft.title],
     ["genre", uiText(uiLanguage, "类型", "Genre"), draft.genre],
@@ -93,7 +97,11 @@ export function StoryWizard({
   if (draft.openingMode === "custom" && !draft.openingText.trim()) {
     missingFields.push({ id: "opening_text", label: uiText(uiLanguage, "开场正文", "Opening prose") });
   }
-  const readyToCreate = missingFields.length === 0;
+  const chapterSettingsValid = draft.plannedChapterCount >= 3
+    && draft.plannedChapterCount <= 120
+    && draft.targetChapterLength >= 500
+    && draft.targetChapterLength <= 5000;
+  const readyToCreate = missingFields.length === 0 && chapterSettingsValid;
 
   useEffect(() => {
     try {
@@ -104,7 +112,7 @@ export function StoryWizard({
           setInterviewMessages(parsed.messages.slice(-40));
         }
         if (parsed.draft && typeof parsed.draft === "object") {
-          setDraft({ ...initialStoryDraft(), ...parsed.draft });
+          setDraft((current) => ({ ...current, ...parsed.draft }));
         }
       }
     } catch {
@@ -292,6 +300,37 @@ export function StoryWizard({
                 <label><span>{uiText(uiLanguage, "类型", "Genre")}</span><input value={draft.genre} onChange={(event) => updateDraft({ genre: event.target.value })} maxLength={120} /></label>
                 <label><span>{uiText(uiLanguage, "叙事风格", "Narrative style")}</span><input value={draft.tone} onChange={(event) => updateDraft({ tone: event.target.value })} maxLength={500} /></label>
               </div>
+              <div className="wizardFieldGrid">
+                <label>
+                  <span>{uiText(uiLanguage, "计划章节数", "Planned chapters")}</span>
+                  <input type="number" min={3} max={120} value={draft.plannedChapterCount} onChange={(event) => updateDraft({ plannedChapterCount: Number(event.target.value) })} />
+                  <small>{uiText(uiLanguage, "可选 3–120 章，未来标题会随你的选择调整。", "Choose 3–120 chapters; future titles adapt to your choices.")}</small>
+                </label>
+                <label>
+                  <span>{uiText(uiLanguage, "正文语言", "Prose language")}</span>
+                  <select value={draft.proseLanguage} onChange={(event) => updateDraft({ proseLanguage: event.target.value, chapterLengthUnit: event.target.value.startsWith("zh") ? "characters" : "words" })}>
+                    <option value="zh-CN">中文</option>
+                    <option value="en">English</option>
+                  </select>
+                </label>
+              </div>
+              <div className="wizardFieldGrid">
+                <label>
+                  <span>{uiText(uiLanguage, "每章目标长度", "Target length per chapter")}</span>
+                  <select value={[800, 1800, 3000].includes(draft.targetChapterLength) ? String(draft.targetChapterLength) : "custom"} onChange={(event) => { if (event.target.value !== "custom") updateDraft({ targetChapterLength: Number(event.target.value) }); }}>
+                    <option value="800">{uiText(uiLanguage, "精简 · 800", "Concise · 800")}</option>
+                    <option value="1800">{uiText(uiLanguage, "标准 · 1,800", "Standard · 1,800")}</option>
+                    <option value="3000">{uiText(uiLanguage, "细致 · 3,000", "Detailed · 3,000")}</option>
+                    <option value="custom">{uiText(uiLanguage, "自定义", "Custom")}</option>
+                  </select>
+                </label>
+                <label>
+                  <span>{uiText(uiLanguage, "自定义长度", "Custom length")}</span>
+                  <input type="number" min={500} max={5000} step={100} value={draft.targetChapterLength} onChange={(event) => updateDraft({ targetChapterLength: Number(event.target.value) })} />
+                  <small>{draft.chapterLengthUnit === "characters" ? uiText(uiLanguage, "按可见字符估算，允许约 ±15%。", "Measured in visible characters, approximately ±15%.") : uiText(uiLanguage, "按英文单词估算，允许约 ±15%。", "Measured in words, approximately ±15%.")}</small>
+                </label>
+              </div>
+              {!chapterSettingsValid && <p className="fieldError">{uiText(uiLanguage, "章节数需为 3–120，每章长度需为 500–5,000。", "Use 3–120 chapters and a per-chapter length of 500–5,000.")}</p>}
               <label><span>{uiText(uiLanguage, "世界名称", "World name")}</span><input value={draft.worldName} onChange={(event) => updateDraft({ worldName: event.target.value })} maxLength={180} /></label>
               <label><span>{uiText(uiLanguage, "故事前提", "Premise")}</span><textarea value={draft.premise} onChange={(event) => updateDraft({ premise: event.target.value })} maxLength={4000} rows={4} /></label>
               <div className="wizardFieldGrid">
