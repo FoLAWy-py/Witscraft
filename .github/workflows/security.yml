@@ -76,7 +76,7 @@ jobs:
       - name: Audit installed dependencies
         run: uv run --with pip-audit==2.10.1 pip-audit --local
       - name: Lint backend
-        run: uv run ruff check app tests migrations ../../scripts/capture-structured-extraction.py ../../scripts/check-pgvector-migration.py ../../scripts/create-release-manifest.py ../../scripts/evaluate-memory-retrieval.py ../../scripts/evaluate-structured-extraction.py ../../scripts/run-memory-embedding-worker.py ../../scripts/smoke-release.py
+        run: uv run ruff check app tests migrations scripts ../../scripts/capture-structured-extraction.py ../../scripts/check-pgvector-migration.py ../../scripts/create-release-manifest.py ../../scripts/evaluate-memory-retrieval.py ../../scripts/evaluate-structured-extraction.py ../../scripts/run-memory-embedding-worker.py ../../scripts/smoke-release.py
       - name: Run structured extraction evaluation gate
         run: uv run python ../../scripts/evaluate-structured-extraction.py
       - name: Verify pgvector migration upgrade and downgrade
