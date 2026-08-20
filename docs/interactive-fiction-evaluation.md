@@ -19,7 +19,8 @@ The canonical files are under `apps/api/evals/interactive_fiction/v1/`:
 - `reference.txt` is the normalized public-domain input;
 - `case.json` binds its hash, scenario, prompt versions, expected abstract profile, and provider routes;
 - `thresholds.json` defines the release minimums;
-- `provider-capture.json` is the current sanitized real-provider evidence; and
+- `provider-capture-v3.json` is the current sanitized real-provider evidence;
+- `provider-capture.json` preserves the preceding approved v2 evidence; and
 - `failed-provider-capture-overlength.json` preserves the preceding failed run that exposed the deterministic length-ceiling defect.
 
 ## Capture boundary
@@ -30,20 +31,20 @@ Live capture is sequential, requires both configured provider credentials, refus
 
 ## Approved evidence
 
-The current capture is bound to revision `9ee5b84bdca2235066e2c34c09241bc29db3119d` and passed all version 1 thresholds:
+The current capture is bound to revision `6de512e9c435247aeac1c0af7b8061bd806e47de` and passed all version 1 thresholds. The v3 agency editor explicitly retained the player's authorized question after a public v2 validation exposed that an over-conservative edit could omit it:
 
 | Measurement | Result |
 | --- | ---: |
-| Abstract-profile adherence | 74 |
+| Abstract-profile adherence | 72 |
 | Narrative quality | 86 |
-| Player agency | 94 |
+| Player agency | 96 |
 | World and canon | 88 |
-| Roadmap and length | 96 |
-| Overall | 86 |
-| Prose length | 574 words / 500 target |
-| Dialogue-ratio error | 0.154 |
+| Roadmap and length | 90 |
+| Overall | 85 |
+| Prose length | 551 words / 500 target |
+| Dialogue-ratio error | 0.152 |
 | Reference overlap | 0 blocked overlap |
-| Provider calls | 8 total / 8 maximum |
+| Provider calls | 7 total / 8 maximum |
 | Profiling calls | 0 |
 
 The score source is `provider_capture`. These figures describe one regression case and are release evidence, not a broad literary benchmark.

@@ -1,0 +1,80 @@
+{
+  "abstract_profile": {
+    "analysis_method": "deterministic",
+    "descriptive_density": 0.0,
+    "dialogue_ratio": 0.412,
+    "figurative_density": 0.0,
+    "pacing": "fast",
+    "paragraph_rhythm": "compact",
+    "sentence_length_mean": 44.7,
+    "sentence_length_variation": "high",
+    "tense": "mixed",
+    "viewpoint": "third"
+  },
+  "author": {
+    "model": "Qwen/Qwen3-Max",
+    "provider": "deepinfra"
+  },
+  "calls": {
+    "call_limit": 8,
+    "judge_calls": 1,
+    "lifecycle_calls": 6,
+    "lifecycle_routes": [
+      "deepinfra:Qwen/Qwen3-Max:normal_chat",
+      "deepinfra:Qwen/Qwen3-Max:normal_chat",
+      "deepinfra:Qwen/Qwen3-Max:normal_chat",
+      "openai:gpt-5.5:consistency_check",
+      "deepinfra:Qwen/Qwen3-Max:state_update",
+      "deepinfra:Qwen/Qwen3-Max:normal_chat"
+    ],
+    "profiling_calls": 0
+  },
+  "capture_base_url_class": "loopback_http",
+  "capture_method": "bounded_live_provider_end_to_end",
+  "captured_at": "2026-08-20T19:36:25.945032Z",
+  "case_sha256": "21290fd2b114fd588b7aa7e47d7e3684c3a00cdaa4f87e00b9923b13833a34df",
+  "deployment_revision": "6de512e9c435247aeac1c0af7b8061bd806e47de",
+  "evaluation_version": "interactive-fiction-style-v1",
+  "evidence_kind": "provider_capture",
+  "generated_chapter": "## 2. Tea and Tactical Silence\n\nRain held Ashcombe House in place. Water ticked along the gutters, and the drawing room carried the thin warmth of the fire, the smell of tea, and the damp trace of coats drying near the hall.\n\nEleanor remained by the window and asked the housekeeper whether any letters had arrived. No letter was opened or accepted by Eleanor.\n\nMrs. Poole entered fully with the silver tea tray held level before her. Cups chimed against saucers as she set it on the low table. Her apron was crisp; her hands were not steady.\n\n“None addressed to you, Miss Vale,” she said. “A few came for others this morning.”\n\nLady Ashcombe, seated near the hearth, lifted her cup and did not drink. “A few?”\n\nMrs. Poole kept her eyes on the teapot. “Yes, my lady.”\n\n“Name them.”\n\n“For Mr. Carrow, my lady. For Sir James. One circular for the estate office.”\n\nLady Ashcombe’s spoon touched porcelain. “You are forgetting the envelope on the breakfast tray.”\n\n“I am not forgetting it, my lady.”\n\n“Then you are improving the truth. That is usually a privilege of guests.”\n\nMrs. Poole’s mouth tightened. “It was misdirected.”\n\n“Misdirected,” Lady Ashcombe repeated. “This house has many faults, but the front door has never yet mistaken one resident for another.”\n\nThe fire gave a sharp crack. Mrs. Poole poured tea too quickly, dark and overdrawn.\n\nFrom the doorway, Mr. Carrow said, “If this is an inquiry, I should like notice of the charges.”\n\nHe came in with rain still on his overcoat and mud at one heel. He removed his spectacles, wiped them with a square of linen, and smiled without warmth.\n\nLady Ashcombe said, “Were you charged?”\n\n“Not yet. I prefer to arrive early.”\n\nMrs. Poole set down the pot. “Your letter was returned to you, sir.”\n\nMr. Carrow looked at her. “Was it?”\n\n“You told me so yourself,” she said.\n\n“I told you I had received what was mine. That is not quite the same claim.”\n\nLady Ashcombe leaned back. “How precise you become when paper is involved.”\n\n“Paper is safer than memory,” Carrow said. “It does not flatter its employers.”\n\nMrs. Poole’s face went pale. “I acted as instructed.”\n\n“By whom?” Lady Ashcombe asked.\n\nThe housekeeper’s answer came too late. “By the proper person.”\n\n“That is not a name.”\n\n“No, my lady.”\n\nCarrow moved toward the tea table but did not sit. “There was an unsealed envelope at breakfast. Anyone might have seen it. Anyone might have read it. Anyone might now pretend not to have done either.”\n\nLady Ashcombe placed her cup down untouched. “And anyone might have arranged for it to appear there.”\n\nThe clock on the mantel struck the quarter hour. Upstairs, a door closed hard enough to send a faint shiver through the ceiling. The sound ran through the room and left all three servants’ bells motionless on the wall.\n\nMrs. Poole whispered, “That will be Miss Harbury.”\n\nCarrow’s head turned. “She is not expected downstairs.”\n\n“She was not expected in the west passage either,” Lady Ashcombe said. “Yet Wilson saw her there before luncheon.”\n\nA measured tread crossed the corridor outside. It slowed near the drawing-room door.\n\nMrs. Poole folded her hands. Carrow’s fingers rested on the back of a chair. Lady Ashcombe watched the handle.\n\nThe tread stopped. The knob turned.",
+  "generated_chapter_sha256": "3040a255d27b8d7f18ffd0170ddf99f2fcdf1264b7f3d174230129f4e6bf8fe3",
+  "generated_features": {
+    "analysis_method": "deterministic",
+    "descriptive_density": 0.0,
+    "dialogue_ratio": 0.26,
+    "figurative_density": 0.0,
+    "pacing": "moderate",
+    "paragraph_rhythm": "compact",
+    "sentence_length_mean": 28.3,
+    "sentence_length_variation": "high",
+    "tense": "mixed",
+    "viewpoint": "third"
+  },
+  "judge": {
+    "input_tokens": 1192,
+    "latency_ms": 12060,
+    "model": "gpt-5.5",
+    "output_tokens": 534,
+    "prompt_version": "interactive-fiction-judge-v1",
+    "provider": "openai"
+  },
+  "profile_reused": true,
+  "reference_source_url": "https://www.gutenberg.org/ebooks/1342",
+  "schema_version": 1,
+  "scores": {
+    "narrative_quality": 86,
+    "overall": 85,
+    "player_agency": 96,
+    "profile_adherence": 72,
+    "reasons": [
+      "Third-person viewpoint, compact paragraphing, mixed tense feel, and low figurative/descriptive density align well with the profile.",
+      "Dialogue is sharp and functional, but the measured dialogue ratio is notably below target and pacing reads more moderate than fast.",
+      "Sentence length is substantially shorter than the target mean, though variation remains high.",
+      "The player action is respected without adding unrequested protagonist speech, thoughts, consent, or decisions.",
+      "Chapter builds clear social tension and ends on an effective hook, with coherent internal continuity.",
+      "Length is close to the 500-word target, slightly over but within an acceptable range."
+    ],
+    "roadmap_length": 90,
+    "world_canon": 88
+  }
+}
