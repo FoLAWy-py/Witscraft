@@ -6,7 +6,7 @@
 
 This operation deletes every story and its branch-scoped narrative data while retaining identity, authentication, reusable worlds and characters, non-story memories, user preferences, model routes, quota policy, and model-call audit history. It is intended for a deliberate development reset and is not an account-deletion or production-retention mechanism.
 
-Deleting a `stories` row uses database foreign-key actions to remove its branches, messages, generation requests, plot events, state snapshots, summaries, canon facts, story memories, and pending story-memory embedding tasks. A retained `model_calls.story_id` reference becomes `NULL`; the audit row and its usage accounting remain intact.
+Deleting a `stories` row uses database foreign-key actions to remove its branches, chapter roadmaps, messages, generation requests, plot events, state snapshots, summaries, canon facts, story memories, and pending story-memory embedding tasks. Reusable abstract style profiles remain account-owned. A retained `model_calls.story_id` reference becomes `NULL`; the audit row and its usage accounting remain intact.
 
 ## Safety Contract
 

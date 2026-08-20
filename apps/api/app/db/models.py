@@ -8,6 +8,7 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Identity,
     Integer,
@@ -141,11 +142,57 @@ class Character(Base, TimestampMixin):
     world: Mapped[World | None] = relationship(back_populates="characters")
 
 
+class StyleProfile(Base, TimestampMixin):
+    __tablename__ = "style_profiles"
+    __table_args__ = (
+        CheckConstraint(
+            "source_type IN ('user_owned', 'licensed', 'public_domain')",
+            name="ck_style_profiles_source_type",
+        ),
+        CheckConstraint(
+            "content_hash ~ '^[0-9a-f]{64}$'",
+            name="ck_style_profiles_content_hash",
+        ),
+        UniqueConstraint(
+            "user_id",
+            "content_hash",
+            "analysis_version",
+            name="uq_style_profiles_user_hash_version",
+        ),
+        Index("ix_style_profiles_user_updated", "user_id", text("updated_at DESC")),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(180), nullable=False)
+    source_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    source_label: Mapped[str | None] = mapped_column(String(220))
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    analysis_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    language: Mapped[str] = mapped_column(String(35), nullable=False)
+    features: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}", nullable=False)
+
+
 class Story(Base, TimestampMixin):
     __tablename__ = "stories"
     __table_args__ = (
+        CheckConstraint(
+            "planned_chapter_count BETWEEN 3 AND 120",
+            name="ck_stories_planned_chapter_count",
+        ),
+        CheckConstraint(
+            "target_chapter_length BETWEEN 500 AND 5000",
+            name="ck_stories_target_chapter_length",
+        ),
+        CheckConstraint(
+            "chapter_length_unit IN ('characters', 'words')",
+            name="ck_stories_chapter_length_unit",
+        ),
         Index("ix_stories_user_updated", "user_id", text("updated_at DESC")),
         Index("ix_stories_user_world", "user_id", "world_id"),
+        Index("ix_stories_style_profile", "style_profile_id"),
     )
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
@@ -153,11 +200,26 @@ class Story(Base, TimestampMixin):
     world_id: Mapped[UUID | None] = mapped_column(ForeignKey("worlds.id", ondelete="SET NULL"))
     title: Mapped[str] = mapped_column(String(220), nullable=False)
     main_character_id: Mapped[UUID | None] = mapped_column(ForeignKey("characters.id", ondelete="SET NULL"))
+    style_profile_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("style_profiles.id", ondelete="SET NULL")
+    )
     current_branch_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
     status: Mapped[str] = mapped_column(String(40), default="active")
     custom_prompt: Mapped[str | None] = mapped_column(Text)
     interaction_mode: Mapped[str] = mapped_column(String(20), default="choices", server_default="choices")
     consistency_mode: Mapped[str] = mapped_column(String(20), default="auto", server_default="auto")
+    planned_chapter_count: Mapped[int] = mapped_column(
+        Integer, default=12, server_default="12", nullable=False
+    )
+    target_chapter_length: Mapped[int] = mapped_column(
+        Integer, default=1800, server_default="1800", nullable=False
+    )
+    chapter_length_unit: Mapped[str] = mapped_column(
+        String(20), default="characters", server_default="characters", nullable=False
+    )
+    prose_language: Mapped[str] = mapped_column(
+        String(35), default="zh-CN", server_default="zh-CN", nullable=False
+    )
 
     user: Mapped[User] = relationship(back_populates="stories")
     world: Mapped[World | None] = relationship(back_populates="stories")
@@ -168,6 +230,8 @@ class Story(Base, TimestampMixin):
 class StoryBranch(Base):
     __tablename__ = "story_branches"
     __table_args__ = (
+        CheckConstraint("roadmap_version >= 0", name="ck_story_branches_roadmap_version"),
+        UniqueConstraint("story_id", "id", name="uq_story_branches_story_id"),
         Index("ix_story_branches_story_created", "story_id", "created_at", "id"),
         Index("ix_story_branches_parent", "parent_branch_id"),
     )
@@ -178,6 +242,10 @@ class StoryBranch(Base):
     name: Mapped[str] = mapped_column(String(120), default="main")
     created_from_message_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
     version: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+    roadmap_version: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False
+    )
+    ending_title: Mapped[str | None] = mapped_column(String(220))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     story: Mapped[Story] = relationship(back_populates="branches")
@@ -186,6 +254,12 @@ class StoryBranch(Base):
 class Message(Base):
     __tablename__ = "messages"
     __table_args__ = (
+        UniqueConstraint(
+            "story_id",
+            "branch_id",
+            "id",
+            name="uq_messages_story_branch_id",
+        ),
         Index(
             "ix_messages_story_branch_created",
             "story_id",
@@ -205,6 +279,75 @@ class Message(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     story: Mapped[Story] = relationship(back_populates="messages")
+
+
+class StoryChapter(Base, TimestampMixin):
+    __tablename__ = "story_chapters"
+    __table_args__ = (
+        CheckConstraint(
+            "chapter_number BETWEEN 1 AND 120",
+            name="ck_story_chapters_number",
+        ),
+        CheckConstraint(
+            "status IN ('planned', 'active', 'completed')",
+            name="ck_story_chapters_status",
+        ),
+        CheckConstraint(
+            "roadmap_version >= 1",
+            name="ck_story_chapters_roadmap_version",
+        ),
+        CheckConstraint(
+            "(status = 'completed' AND message_id IS NOT NULL AND completed_at IS NOT NULL) "
+            "OR (status IN ('planned', 'active') AND message_id IS NULL "
+            "AND completed_at IS NULL)",
+            name="ck_story_chapters_completion",
+        ),
+        UniqueConstraint(
+            "branch_id",
+            "chapter_number",
+            name="uq_story_chapters_branch_number",
+        ),
+        UniqueConstraint("message_id", name="uq_story_chapters_message"),
+        ForeignKeyConstraint(
+            ["story_id", "branch_id"],
+            ["story_branches.story_id", "story_branches.id"],
+            name="fk_story_chapters_story_branch",
+            ondelete="CASCADE",
+        ),
+        ForeignKeyConstraint(
+            ["story_id", "branch_id", "message_id"],
+            ["messages.story_id", "messages.branch_id", "messages.id"],
+            name="fk_story_chapters_message_scope",
+        ),
+        Index(
+            "ix_story_chapters_story_branch_status",
+            "story_id",
+            "branch_id",
+            "status",
+            "chapter_number",
+        ),
+        Index(
+            "uq_story_chapters_active_branch",
+            "branch_id",
+            unique=True,
+            postgresql_where=text("status = 'active'"),
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    story_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    branch_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    chapter_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    title: Mapped[str] = mapped_column(String(220), nullable=False)
+    objective: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(
+        String(20), default="planned", server_default="planned", nullable=False
+    )
+    roadmap_version: Mapped[int] = mapped_column(
+        Integer, default=1, server_default="1", nullable=False
+    )
+    message_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class GenerationRequest(Base, TimestampMixin):

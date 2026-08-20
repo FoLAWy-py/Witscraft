@@ -12,8 +12,10 @@ from app.db.models import (
     Message,
     Story,
     StoryBranch,
+    StoryChapter,
     StoryStateSnapshot,
     StorySummary,
+    StyleProfile,
     World,
 )
 from app.services.embeddings import stored_embedding
@@ -56,6 +58,14 @@ async def build_story_export_payload(
         .where(StorySummary.story_id == story.id, StorySummary.branch_id == branch.id)
         .order_by(StorySummary.created_at.asc())
     )
+    chapter_result = await session.execute(
+        select(StoryChapter)
+        .where(StoryChapter.story_id == story.id, StoryChapter.branch_id == branch.id)
+        .order_by(StoryChapter.chapter_number.asc())
+    )
+    style_profile = (
+        await session.get(StyleProfile, story.style_profile_id) if story.style_profile_id else None
+    )
 
     state_snapshot = state_result.scalar_one_or_none()
 
@@ -67,6 +77,10 @@ async def build_story_export_payload(
             "id": str(story.id),
             "title": story.title,
             "status": story.status,
+            "planned_chapter_count": story.planned_chapter_count,
+            "target_chapter_length": story.target_chapter_length,
+            "chapter_length_unit": story.chapter_length_unit,
+            "prose_language": story.prose_language,
             "created_at": _iso(story.created_at),
             "updated_at": _iso(story.updated_at),
         },
@@ -74,9 +88,13 @@ async def build_story_export_payload(
             "id": str(branch.id),
             "name": branch.name,
             "parent_branch_id": str(branch.parent_branch_id) if branch.parent_branch_id else None,
+            "roadmap_version": branch.roadmap_version,
+            "ending_title": branch.ending_title,
             "created_at": _iso(branch.created_at),
         },
         "world": _world_payload(world),
+        "style_profile": _style_profile_payload(style_profile),
+        "chapters": [_chapter_payload(chapter) for chapter in chapter_result.scalars().all()],
         "characters": [_character_payload(character) for character in character_result.scalars().all()],
         "state": state_snapshot.state if state_snapshot else {},
         "summaries": [_summary_payload(summary) for summary in summary_result.scalars().all()],
@@ -179,6 +197,34 @@ def _character_payload(character: Character) -> dict:
         "speaking_style": character.speaking_style,
         "relationship_to_user": character.relationship_to_user,
         "constraints": character.constraints,
+    }
+
+
+def _style_profile_payload(profile: StyleProfile | None) -> dict:
+    if profile is None:
+        return {}
+    return {
+        "id": str(profile.id),
+        "name": profile.name,
+        "source_type": profile.source_type,
+        "source_label": profile.source_label,
+        "content_hash": profile.content_hash,
+        "analysis_version": profile.analysis_version,
+        "language": profile.language,
+        "features": profile.features,
+    }
+
+
+def _chapter_payload(chapter: StoryChapter) -> dict:
+    return {
+        "id": str(chapter.id),
+        "number": chapter.chapter_number,
+        "title": chapter.title,
+        "objective": chapter.objective,
+        "status": chapter.status,
+        "roadmap_version": chapter.roadmap_version,
+        "message_id": str(chapter.message_id) if chapter.message_id else None,
+        "completed_at": _iso(chapter.completed_at),
     }
 
 

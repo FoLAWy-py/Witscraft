@@ -33,6 +33,7 @@ STORY_TABLES = (
     "plot_events",
     "story_state_snapshots",
     "story_summaries",
+    "story_chapters",
     "canon_facts",
 )
 PRESERVED_TABLES = (
@@ -41,6 +42,7 @@ PRESERVED_TABLES = (
     "auth_sessions",
     "worlds",
     "characters",
+    "style_profiles",
     "user_preferences",
     "user_model_routes",
     "user_model_route_changes",

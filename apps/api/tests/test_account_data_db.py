@@ -18,6 +18,8 @@ from app.db.models import (
     ModelCall,
     Story,
     StoryBranch,
+    StoryChapter,
+    StyleProfile,
     User,
     UserModelRoute,
     UserModelRouteChange,
@@ -83,13 +85,38 @@ def test_account_export_and_deletion_lifecycle() -> None:
                     relationship_to_user={},
                     constraints={},
                 )
-                story = Story(user_id=user.id, world_id=world.id, title="Private story")
-                session.add_all([character, story])
+                style_profile = StyleProfile(
+                    user_id=user.id,
+                    name="Private abstract style",
+                    source_type="user_owned",
+                    content_hash="b" * 64,
+                    analysis_version="style-profile-v1",
+                    language="en",
+                    features={"dialogue_ratio": 0.3},
+                )
+                session.add_all([character, style_profile])
+                await session.flush()
+                story = Story(
+                    user_id=user.id,
+                    world_id=world.id,
+                    title="Private story",
+                    style_profile_id=style_profile.id,
+                )
+                session.add(story)
                 await session.flush()
                 branch = StoryBranch(story_id=story.id, name="main")
                 session.add(branch)
                 await session.flush()
                 story.current_branch_id = branch.id
+                session.add(
+                    StoryChapter(
+                        story_id=story.id,
+                        branch_id=branch.id,
+                        chapter_number=1,
+                        title="Private chapter plan",
+                        status="active",
+                    )
+                )
                 session.add_all(
                     [
                         Message(
@@ -145,6 +172,9 @@ def test_account_export_and_deletion_lifecycle() -> None:
                 encoded = json.dumps(export)
                 assert export["account"]["email"] == user.email
                 assert export["stories"][0]["title"] == "Private story"
+                assert export["schema_version"] == 2
+                assert export["style_profiles"][0]["features"] == {"dialogue_ratio": 0.3}
+                assert export["chapters"][0]["title"] == "Private chapter plan"
                 assert export["messages"][0]["content"] == "Private story message"
                 assert export["memories"][0]["content"] == "Private memory"
                 assert export["model_route_changes"][0]["action"] == "update"
@@ -195,6 +225,7 @@ def test_account_export_and_deletion_lifecycle() -> None:
                     (AuthSession, AuthSession.user_id),
                     (World, World.user_id),
                     (Character, Character.user_id),
+                    (StyleProfile, StyleProfile.user_id),
                     (Story, Story.user_id),
                     (MemoryItem, MemoryItem.user_id),
                     (UserPreference, UserPreference.user_id),
@@ -206,6 +237,11 @@ def test_account_export_and_deletion_lifecycle() -> None:
                         select(func.count()).select_from(model).where(owner_column == user_id)
                     )
                     assert count == 0, model.__tablename__
+                assert await verification.scalar(
+                    select(func.count()).select_from(StoryChapter).where(
+                        StoryChapter.story_id == story.id
+                    )
+                ) == 0
         finally:
             if control_id is not None:
                 async with AsyncSessionLocal() as cleanup:

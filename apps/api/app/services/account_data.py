@@ -19,8 +19,10 @@ from app.db.models import (
     PlotEvent,
     Story,
     StoryBranch,
+    StoryChapter,
     StoryStateSnapshot,
     StorySummary,
+    StyleProfile,
     User,
     UserModelRoute,
     UserModelRouteChange,
@@ -35,7 +37,7 @@ async def build_account_export_payload(session: AsyncSession, user: User) -> dic
     branches = await _story_rows(session, StoryBranch, StoryBranch.story_id, story_ids)
 
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "exported_at": datetime.now(timezone.utc).isoformat(),
         "account": {
             "id": str(user.id),
@@ -57,8 +59,16 @@ async def build_account_export_payload(session: AsyncSession, user: User) -> dic
             _serialize(row, exclude={"user_id"})
             for row in await _rows(session, Character, Character.user_id == user.id)
         ],
+        "style_profiles": [
+            _serialize(row, exclude={"user_id"})
+            for row in await _rows(session, StyleProfile, StyleProfile.user_id == user.id)
+        ],
         "stories": [_serialize(row, exclude={"user_id"}) for row in stories],
         "branches": [_serialize(row) for row in branches],
+        "chapters": [
+            _serialize(row)
+            for row in await _story_rows(session, StoryChapter, StoryChapter.story_id, story_ids)
+        ],
         "messages": [
             _serialize(row)
             for row in await _story_rows(session, Message, Message.story_id, story_ids)

@@ -4,7 +4,7 @@ This document defines the production data boundary for Witscraft. It describes a
 
 ## Account export
 
-An authenticated user can download a JSON export from `GET /api/auth/export` or the Data and account section in Settings. The export contains the account profile, session metadata, worlds, characters, stories, branches, messages, generation records, plot events, state snapshots, summaries, canon facts, memories, preferences, model routes and their change history, and sanitized model-call metadata.
+An authenticated user can download a JSON export from `GET /api/auth/export` or the Data and account section in Settings. Export schema version 2 contains the account profile, session metadata, worlds, characters, abstract style profiles, stories, branches, chapter roadmaps, messages, generation records, plot events, state snapshots, summaries, canon facts, memories, preferences, model routes and their change history, and sanitized model-call metadata.
 
 Exports never contain password hashes, session token hashes, action-token hashes, provider API keys, SMTP credentials, or raw embedding vectors. Export files are generated on demand and are not retained by the application.
 
@@ -36,6 +36,8 @@ For generation requests, the selected OpenAI or DeepInfra-compatible provider re
 When semantic memory retrieval requires a remote embedding, OpenAI receives only the text being embedded. Small or empty memory sets bypass query embedding, and embeddings are not generated on every conversation turn.
 
 Witscraft does not send account email addresses, password hashes, session tokens, authentication action tokens, SMTP credentials, or provider API keys as model input. Provider credentials and provider infrastructure base URLs remain server-side. The browser receives only registered model metadata and the backend-resolved purpose route needed to explain which model will author or support the interaction.
+
+The chapter-planning schema stores chapter numbers, titles, objectives, completion links, roadmap versions, and branch ending titles. The optional style-profile schema stores provenance category, a normalized SHA-256 content hash, analysis version, language, and abstract numeric or categorical features. It has no column for imported reference prose. Future reference ingestion must keep raw text transient, exclude it from memory embeddings and model-call audit metadata, and delete it after profile extraction as required by `docs/interactive-fiction-contract.md`.
 
 Upstream retention, abuse monitoring, regional processing, and training controls are governed by the operator's provider account and contract. Before enabling a provider in production, the operator must verify its current retention and training settings, document the approved region and purpose, and disclose material changes to users.
 

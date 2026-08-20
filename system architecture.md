@@ -2,9 +2,9 @@
 
 **Document status:** Production baseline
 
-**Architecture version:** 3.20
+**Architecture version:** 3.21
 
-**Last updated:** 17 August 2026
+**Last updated:** 21 August 2026
 
 **System owner:** Witscraft Engineering
 
@@ -209,8 +209,10 @@ PostgreSQL is the authoritative store. The principal entity groups are:
 | --- | --- |
 | Identity and roles | `User`, `AuthCredential`, `AuthSession`, `AuthActionToken`, `AuthLoginThrottle` |
 | Narrative ownership | `World`, `Character`, `Story`, `StoryBranch` |
+| Chapter planning | `StoryChapter` and branch roadmap/ending fields |
 | Narrative history | `Message`, `PlotEvent`, `StoryStateSnapshot`, `StorySummary` |
 | Long-term context | `MemoryItem`, `CanonFact`, `UserPreference` |
+| Style adaptation | `StyleProfile` with abstract features and no reference prose |
 | Generation control | `GenerationRequest` and branch version fields |
 | Model operations | `UserModelRoute`, `ModelHealthCheck`, `ModelCall` |
 | Usage governance | `QuotaResetEvent` |
@@ -218,6 +220,10 @@ PostgreSQL is the authoritative store. The principal entity groups are:
 UUIDs are used for externally referenced entities. Foreign keys and database cascades enforce ownership lifecycles, while application-level checks enforce user authorization.
 
 Migration `0017` installs pgvector and adds fixed `vector(1024)` storage for current long-term-memory embeddings. Provider calls explicitly request 1,024 dimensions and reject count, dimension, or finite-value violations before persistence. Migration `0014` metadata continues to bind provider-qualified model, dimension, operator-controlled version, normalized content hash, and UTC generation time. Dimension-compatible JSONB values are moved to the vector column; incompatible legacy values remain in JSONB until controlled re-embedding. PostgreSQL computes exact cosine similarity only for authorized, active story/branch candidates with compatible metadata. Legacy memories remain eligible for structured ranking but are never compared across vector spaces.
+
+Migration `0020` adds the persistence foundation for configurable long-form stories. A story stores a planned chapter count from 3 through 120, a target chapter length from 500 through 5,000, a language-aware unit, and prose language. Branches own a roadmap version and provisional ending title. `StoryChapter` rows represent planned, active, or completed entries; database checks permit at most one active chapter per branch, require a completed chapter to reference its branch-scoped assistant message, and prevent cross-story or cross-branch bindings. The service and UI rollout is staged separately, so existing creation calls continue to receive server defaults until the chapter workflow becomes user-configurable.
+
+`StyleProfile` stores only an account owner, provenance category, normalized content hash, analysis version, language, and abstract feature JSON. The schema has no raw-reference column. Profiles can be reused by multiple stories for one account, are removed with that account, and are set to `NULL` on a story when the profile is deleted. Reference ingestion, transient raw-text handling, overlap rejection, and provider-backed scoring remain service-layer gates defined by `docs/interactive-fiction-contract.md`.
 
 ### 6.1 Query and Index Strategy
 
@@ -354,7 +360,7 @@ The current implementation uses structured application logs and PostgreSQL audit
 
 ## 12. Migration and Release Contract
 
-Alembic is the only production schema migration mechanism. Revision `0013` adds administrator roles, append-only quota reset events, and a user/time model-call index for weekly accounting. Revision `0014` adds versioned embedding compatibility metadata and a content-hash lookup index for long-term memories. Revision `0017` installs pgvector, adds fixed-dimension vector storage, and preserves a reversible legacy JSONB compatibility path. Revision `0018` adds durable memory embedding tasks, claim and stale-lease indexes, bounded attempt state, and cascading ownership references. Revision `0019` adds the append-only account quota policy ledger, deterministic sequence ordering, and retained administrator attribution.
+Alembic is the only production schema migration mechanism. Revision `0013` adds administrator roles, append-only quota reset events, and a user/time model-call index for weekly accounting. Revision `0014` adds versioned embedding compatibility metadata and a content-hash lookup index for long-term memories. Revision `0017` installs pgvector, adds fixed-dimension vector storage, and preserves a reversible legacy JSONB compatibility path. Revision `0018` adds durable memory embedding tasks, claim and stale-lease indexes, bounded attempt state, and cascading ownership references. Revision `0019` adds the append-only account quota policy ledger, deterministic sequence ordering, and retained administrator attribution. Revision `0020` adds constrained chapter planning, branch-local roadmap and ending metadata, scoped chapter/message integrity, and raw-text-free abstract style profiles.
 
 The release order is:
 
