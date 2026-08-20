@@ -112,22 +112,22 @@ def test_reviewed_real_provider_capture_passes_current_gate() -> None:
     report = evaluate_provider_capture(
         case,
         reference,
-        _load("provider-capture-v3.json"),
+        _load("provider-capture-v4-approved.json"),
         thresholds,
     )
 
     assert report.passed is True
     assert report.score_source == "provider_capture"
     assert report.scores == {
-        "profile_adherence": 72,
-        "narrative_quality": 86,
-        "player_agency": 96,
-        "world_canon": 88,
-        "roadmap_length": 90,
+        "profile_adherence": 70,
+        "narrative_quality": 84,
+        "player_agency": 93,
+        "world_canon": 86,
+        "roadmap_length": 95,
         "overall": 85,
     }
-    assert report.measurements["measured_length"] == 551
-    assert report.measurements["provider_calls"] == 7
+    assert report.measurements["measured_length"] == 573
+    assert report.measurements["provider_calls"] == 8
 
 
 def test_evaluator_rejects_synthetic_or_tampered_model_score_evidence() -> None:

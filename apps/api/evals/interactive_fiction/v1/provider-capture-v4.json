@@ -1,0 +1,80 @@
+{
+  "abstract_profile": {
+    "analysis_method": "deterministic",
+    "descriptive_density": 0.0,
+    "dialogue_ratio": 0.412,
+    "figurative_density": 0.0,
+    "pacing": "fast",
+    "paragraph_rhythm": "compact",
+    "sentence_length_mean": 44.7,
+    "sentence_length_variation": "high",
+    "tense": "mixed",
+    "viewpoint": "third"
+  },
+  "author": {
+    "model": "Qwen/Qwen3-Max",
+    "provider": "deepinfra"
+  },
+  "calls": {
+    "call_limit": 8,
+    "judge_calls": 1,
+    "lifecycle_calls": 7,
+    "lifecycle_routes": [
+      "deepinfra:Qwen/Qwen3-Max:normal_chat",
+      "deepinfra:Qwen/Qwen3-Max:normal_chat",
+      "deepinfra:Qwen/Qwen3-Max:normal_chat",
+      "openai:gpt-5.5:consistency_check",
+      "openai:gpt-5.5:consistency_check",
+      "deepinfra:Qwen/Qwen3-Max:state_update",
+      "deepinfra:Qwen/Qwen3-Max:normal_chat"
+    ],
+    "profiling_calls": 0
+  },
+  "capture_base_url_class": "loopback_http",
+  "capture_method": "bounded_live_provider_end_to_end",
+  "captured_at": "2026-08-20T19:45:17.422527Z",
+  "case_sha256": "81586a1d3887c79a324c0b2dd993259bf3f60996922ce3cc2e47707049f51a8f",
+  "deployment_revision": "aeb100e3726ebb83081ce4aa6b262078eae01073",
+  "evaluation_version": "interactive-fiction-style-v1",
+  "evidence_kind": "provider_capture",
+  "generated_chapter": "## 2. Tea and Tactical Silence\n\nRain detained Ashcombe House with a hard, steady fall. The drawing room had been arranged for afternoon tea, though no one seemed settled enough to drink it. Cups stood poured on the low table. The silver pot gave off a thinning breath of steam.\n\nEleanor Vale remained by the window.\n\nMrs. Poole, the housekeeper, stood near the door with a silver tray held level in both hands. Her cap was neat, her mouth set, her shoes dark from the passage outside.\n\nEleanor Vale asked Mrs. Poole whether any letters had arrived, without opening or accepting any letter.\n\n“None addressed to you, miss,” Mrs. Poole said.\n\nLady Ashcombe lowered her cup a fraction. “A simple answer, Mrs. Poole, is usually the safest.”\n\n“It was a simple answer, my lady.”\n\nMr. Ashcombe folded one edge of his newspaper and did not lower it. “There is no need to turn tea into an inquiry. The post is late, the road is half under water, and Wilkes says the bridge is unsafe.”\n\nMrs. Poole kept the tray steady. “There was one letter delivered before the worst of the rain, sir.”\n\nThe newspaper came down.\n\nLady Ashcombe’s spoon touched china with a bright sound. “For whom?”\n\n“For Mr. Ashcombe.”\n\n“Then why is it not in Mr. Ashcombe’s study?” Lady Ashcombe asked.\n\nMrs. Poole’s eyes stayed forward. “Because it was not placed with the household post.”\n\nMr. Ashcombe rose too quickly; the newspaper slid from his knee to the rug. “That is enough. If a servant has mishandled private correspondence, it will be dealt with below stairs.”\n\n“No servant mishandled it, sir,” Mrs. Poole said.\n\nThe room tightened around the answer.\n\nLady Ashcombe stood. “You are choosing your words with unusual care.”\n\n“I have served this house for twenty-seven years, my lady.”\n\n“That was not an answer.”\n\n“No, my lady.”\n\nOn the tray lay a single ivory envelope, unsealed, unmarked, and clean despite the weather. It had no direction, no crest, no visible hand. It sat in the exact center of the silver.\n\nMr. Ashcombe stared at it. “Take that away.”\n\n“To the study, sir?”\n\n“No.”\n\n“To the hall table?”\n\n“No.”\n\nLady Ashcombe looked from her husband to the envelope. “How interesting. You dislike every ordinary destination.”\n\nMr. Ashcombe turned on her. “Do not perform calmness for company.”\n\n“And do not confuse company with ignorance,” she replied.\n\nMrs. Poole’s grip shifted only enough to make the tray give a soft metallic note. “I was told not to bring it into this room.”\n\n“By whom?” Lady Ashcombe asked.\n\nMr. Ashcombe said, “By me.”\n\nMrs. Poole said, “No, sir.”\n\nThe denial landed cleanly.\n\nLady Ashcombe drew herself upright. “Then by whom?”\n\nMrs. Poole looked at her mistress. “By Mr. Julian.”\n\nMr. Ashcombe’s face changed before he could hide it.\n\nLady Ashcombe laughed once, without amusement. “Julian is in London.”\n\n“So I understood, my lady.”\n\n“He has not been here.”\n\n“No, my lady.”\n\nMr. Ashcombe crossed to the tea table and stopped short of the tray. “This is a family matter.”\n\n“It became a household matter,” Mrs. Poole said, “when the letter was left in my pantry.”\n\nLady Ashcombe’s voice dropped. “Left by whom?”\n\nMrs. Poole did not answer at once. The tray remained between all of them.\n\nThen the housekeeper turned toward the room at large and said, “Shall I take it to the study, lock it in the plate cupboard, or place it on the tea table where everyone may see it?”",
+  "generated_chapter_sha256": "c963e82d1bfe7c2166b6f40570cab4be97a5ae1e6c0052274f6da7ece2ffd7d2",
+  "generated_features": {
+    "analysis_method": "deterministic",
+    "descriptive_density": 0.055,
+    "dialogue_ratio": 0.184,
+    "figurative_density": 0.0,
+    "pacing": "moderate",
+    "paragraph_rhythm": "compact",
+    "sentence_length_mean": 25.5,
+    "sentence_length_variation": "high",
+    "tense": "mixed",
+    "viewpoint": "third"
+  },
+  "judge": {
+    "input_tokens": 1262,
+    "latency_ms": 9432,
+    "model": "gpt-5.5",
+    "output_tokens": 475,
+    "prompt_version": "interactive-fiction-judge-v1",
+    "provider": "openai"
+  },
+  "profile_reused": true,
+  "reference_source_url": "https://www.gutenberg.org/ebooks/1342",
+  "schema_version": 1,
+  "scores": {
+    "narrative_quality": 84,
+    "overall": 81,
+    "player_agency": 92,
+    "profile_adherence": 64,
+    "reasons": [
+      "Maintains third-person viewpoint, compact paragraphs, mixed tense feel, and no figurative language, but dialogue ratio is far below the target and pacing reads more moderate than fast.",
+      "Strong scene construction with clear tension, escalating social stakes, and a clean cliffhanger centered on the envelope.",
+      "Player action is respected without adding unrequested protagonist thoughts, consent, decisions, or direct invented speech beyond the requested question.",
+      "Setting and household dynamics feel internally consistent and period-appropriate, with no obvious canon contradictions in the supplied material.",
+      "Chapter is reasonably close to the 500-word target but appears somewhat over target."
+    ],
+    "roadmap_length": 82,
+    "world_canon": 83
+  }
+}

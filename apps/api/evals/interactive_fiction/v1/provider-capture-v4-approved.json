@@ -1,0 +1,81 @@
+{
+  "abstract_profile": {
+    "analysis_method": "deterministic",
+    "descriptive_density": 0.0,
+    "dialogue_ratio": 0.412,
+    "figurative_density": 0.0,
+    "pacing": "fast",
+    "paragraph_rhythm": "compact",
+    "sentence_length_mean": 44.7,
+    "sentence_length_variation": "high",
+    "tense": "mixed",
+    "viewpoint": "third"
+  },
+  "author": {
+    "model": "Qwen/Qwen3-Max",
+    "provider": "deepinfra"
+  },
+  "calls": {
+    "call_limit": 8,
+    "judge_calls": 1,
+    "lifecycle_calls": 7,
+    "lifecycle_routes": [
+      "deepinfra:Qwen/Qwen3-Max:normal_chat",
+      "deepinfra:Qwen/Qwen3-Max:normal_chat",
+      "deepinfra:Qwen/Qwen3-Max:normal_chat",
+      "openai:gpt-5.5:consistency_check",
+      "openai:gpt-5.5:consistency_check",
+      "deepinfra:Qwen/Qwen3-Max:state_update",
+      "deepinfra:Qwen/Qwen3-Max:normal_chat"
+    ],
+    "profiling_calls": 0
+  },
+  "capture_base_url_class": "loopback_http",
+  "capture_method": "bounded_live_provider_end_to_end",
+  "captured_at": "2026-08-20T19:47:14.465620Z",
+  "case_sha256": "81586a1d3887c79a324c0b2dd993259bf3f60996922ce3cc2e47707049f51a8f",
+  "deployment_revision": "aeb100e3726ebb83081ce4aa6b262078eae01073",
+  "evaluation_version": "interactive-fiction-style-v1",
+  "evidence_kind": "provider_capture",
+  "generated_chapter": "## 2. Tea and Contradictions\n\nRain kept the household in the drawing room, where the tea table had become a quiet tribunal of cups, plates, and glances. The windows faced lawns beaten flat by weather. Near the hearth, Mr. Ashcombe stood with the teapot in hand, not pouring.\n\nEleanor Vale remained by the window and asked the housekeeper whether any letters had arrived. Eleanor Vale did not open or accept any letter.\n\nMrs. Poole had entered with a silver tray, and the question stopped her short. A spoon shifted against porcelain. Lady Celia’s fan closed with a soft click.\n\n“None by the ordinary post, miss,” Mrs. Poole said.\n\nMr. Ashcombe set the teapot down. “The roads are half washed out. It would be a marvel if the post arrived before supper.”\n\n“The lower lane is flooded,” said Colonel Harbury from the armchair nearest the fire. “I told Ashcombe so at breakfast.”\n\nLady Celia looked over her cup. “At breakfast? I understood you had not come down until nearly noon.”\n\nThe colonel’s moustache lifted. “I was speaking generally.”\n\n“You spoke very particularly,” Lady Celia said. “You mentioned the lower lane.”\n\nMrs. Poole’s face tightened, then smoothed. “There was a telegram for the master before breakfast. That is all I know of, my lady.”\n\nMr. Ashcombe’s reply came too quickly. “A business matter. Tedious and irrelevant.”\n\n“Business travels well in storms,” Lady Celia said. “It always finds a dry servant.”\n\n“Direct things are rarely welcome here,” Lady Celia said.\n\nMrs. Poole set the tray on the table. The cups rattled. “Shall I pour, sir?”\n\n“No,” Mr. Ashcombe said. Then, after a pause: “Yes. Pour.”\n\nOn the low table beside a cold cup lay a cream envelope, face-down, without a stamp. In one corner, dark initials slanted across the paper: J.W. No one claimed it.\n\nColonel Harbury leaned forward. “If there has been confusion with letters, Ashcombe, best settle it plainly.”\n\n“There has been no confusion,” Mr. Ashcombe said.\n\nMrs. Poole poured tea into six cups. “The servants’ hall received nothing misdirected.”\n\nLady Celia smiled faintly. “How efficient. Even mistakes have been trained out of the place.”\n\n“That is enough,” Mr. Ashcombe said.\n\n“It is never enough when everyone remembers a different morning,” she replied. “Colonel Harbury was at breakfast and was not. The telegram was tedious and urgent. The post did not come, yet paper breeds on tables.”\n\nThe clock in the hall struck three.\n\nAt the last stroke, a footman appeared in the doorway. His cuffs were damp, and he held an envelope in white gloves. He looked first to Mr. Ashcombe, then to Mrs. Poole.\n\n“Another delivery, sir,” he said. “It came by the stable path.”\n\nMr. Ashcombe’s mouth hardened. “For whom?”\n\nThe footman swallowed. “Addressed to Miss Vale, sir.”\n\nMrs. Poole turned sharply toward him. “You said the stable path?”\n\n“Yes, ma’am. The boy would not come round front.”\n\n“What boy?” Colonel Harbury demanded.\n\n“I did not get his name, sir. He left as soon as I took it.”\n\nLady Celia set down her cup. “How dramatic of him. Ashcombe, your tedious business is becoming sociable.”\n\nMr. Ashcombe said, “Bring it here.”\n\nThe footman hesitated, the envelope still extended but undelivered. Rainwater dropped from his sleeve to the polished floor. The cream envelope on the table remained face-down. The new one waited in his gloved hand, addressed to Eleanor Vale, while the room held around the question of who would be permitted to take charge of it.",
+  "generated_chapter_sha256": "2bcc122d06d13b74e3ecdd3573830946a0ff33f656a84b55ed794bf1d36188e7",
+  "generated_features": {
+    "analysis_method": "deterministic",
+    "descriptive_density": 0.0,
+    "dialogue_ratio": 0.282,
+    "figurative_density": 0.0,
+    "pacing": "moderate",
+    "paragraph_rhythm": "compact",
+    "sentence_length_mean": 27.4,
+    "sentence_length_variation": "high",
+    "tense": "mixed",
+    "viewpoint": "third"
+  },
+  "judge": {
+    "input_tokens": 1240,
+    "latency_ms": 10678,
+    "model": "gpt-5.5",
+    "output_tokens": 497,
+    "prompt_version": "interactive-fiction-judge-v1",
+    "provider": "openai"
+  },
+  "profile_reused": true,
+  "reference_source_url": "https://www.gutenberg.org/ebooks/1342",
+  "schema_version": 1,
+  "scores": {
+    "narrative_quality": 84,
+    "overall": 85,
+    "player_agency": 93,
+    "profile_adherence": 70,
+    "reasons": [
+      "Respects third-person viewpoint, compact paragraphing, mixed tense, and low overt description, but dialogue ratio is below target, pacing is more moderate than fast, and sentences are much shorter than the profile mean.",
+      "A few figurative turns appear despite the zero figurative-density target.",
+      "Strong drawing-room tension, clear contradictions, and effective cliffhanger around the addressed envelope.",
+      "Player action is not expanded into unrequested speech, acceptance, opening, inner thoughts, or decisions; the envelope remains undelivered.",
+      "Setting and social dynamics are internally consistent for a household mystery scene.",
+      "Length is close to the 500-word target."
+    ],
+    "roadmap_length": 95,
+    "world_canon": 86
+  }
+}
