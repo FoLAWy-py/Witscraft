@@ -71,8 +71,8 @@ def test_slo_monitor_rejects_unsafe_targets_and_writes_private_state(tmp_path) -
     assert module._safe_base_url("http://127.0.0.1:8000", True) == ("http://127.0.0.1:8000")
     for unsafe in (
         "http://example.invalid",
-        "https://user:secret@example.invalid",
-        "https://example.invalid/?token=secret",
+        "https://operator@example.invalid",
+        "https://example.invalid/?mode=probe",
     ):
         with pytest.raises(ValueError):
             module._safe_base_url(unsafe, False)
