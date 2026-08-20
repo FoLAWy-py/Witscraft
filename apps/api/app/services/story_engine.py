@@ -804,11 +804,13 @@ class StoryEngine:
         minimum = math.ceil(story.target_chapter_length * 0.85)
         maximum = math.floor(story.target_chapter_length * 1.15)
         profile = await self._load_style_profile(story)
+        protagonist_name = await self._main_character_name(story)
         abstract_style_profile = style_prompt(profile.features) if profile is not None else ""
         instruction = ChatMessage(
             role="user",
             content=agency_editor_instruction(
                 player_action=request.message,
+                protagonist_name=protagonist_name or "",
                 target_length=story.target_chapter_length,
                 length_unit=story.chapter_length_unit,
                 abstract_style_profile=abstract_style_profile,

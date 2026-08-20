@@ -1,5 +1,6 @@
 import asyncio
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -71,6 +72,7 @@ def test_agency_editor_must_retain_every_explicit_player_action() -> None:
             "I remain by the window and ask the housekeeper whether any letters arrived, "
             "without opening one."
         ),
+        protagonist_name="Eleanor Vale",
         target_length=500,
         length_unit="words",
         abstract_style_profile="Dialogue-led and compact.",
@@ -81,6 +83,9 @@ def test_agency_editor_must_retain_every_explicit_player_action() -> None:
     assert "retain its stated subject" in instruction
     assert "insert that item in indirect narration" in instruction
     assert "do not compose protagonist dialogue" in instruction
+    assert "First-person I/me" in instruction
+    assert "Eleanor Vale asked that person" in instruction
+    assert "An NPC reply, reaction, or consequence is not evidence" in instruction
 
 
 def test_continue_delegates_exactly_one_reversible_turn() -> None:
@@ -150,6 +155,7 @@ def test_agency_editor_uses_openai_and_trims_only_an_overlong_result() -> None:
     gateway = AgencyGateway([" ".join(["draft"] * 120), " ".join(["trimmed"] * 100)])
     engine = StoryEngine.__new__(StoryEngine)
     engine.llm_gateway = gateway
+    engine._main_character_name = AsyncMock(return_value="Eleanor Vale")
 
     revised, response = asyncio.run(
         engine._enforce_player_agency(
@@ -174,6 +180,7 @@ def test_agency_editor_fails_closed_when_provider_edit_fails() -> None:
     gateway = AgencyGateway(error=RuntimeError("provider unavailable"))
     engine = StoryEngine.__new__(StoryEngine)
     engine.llm_gateway = gateway
+    engine._main_character_name = AsyncMock(return_value="Eleanor Vale")
 
     with pytest.raises(RuntimeError, match="provider unavailable"):
         asyncio.run(
