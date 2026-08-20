@@ -3,8 +3,9 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  applicationName: "Witscraft",
   title: "Witscraft",
-  description: "Customizable AI-authored interactive novel"
+  description: "Player-led, AI-authored interactive fiction"
 };
 
 export default function RootLayout({
