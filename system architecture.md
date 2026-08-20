@@ -2,7 +2,7 @@
 
 **Document status:** Production baseline
 
-**Architecture version:** 3.25
+**Architecture version:** 3.26
 
 **Last updated:** 21 August 2026
 
@@ -234,6 +234,8 @@ Story creation accepts those chapter settings and generates the complete branch-
 `StyleProfile` stores only an account owner, provenance category, normalized content hash, analysis version, language, abstract feature JSON, and an internal fixed-size Bloom signature for non-reproduction checks. The schema has no raw-reference column. The authenticated creation flow accepts pasted UTF-8 text or browser-read `.txt`/`.md` files only after an ownership, permission, or public-domain attestation. Normalization, profile extraction, and overlap-signature construction are deterministic and local: importing a reference does not call a model or create an embedding. A compatible account-scoped content-hash cache returns the existing profile under concurrent or repeated import.
 
 The browser keeps raw reference text outside its persisted wizard draft and clears it after profiling. API responses, account exports, and story exports remove the internal safety signature and expose only abstract features. Generation receives those abstract features as an explicit no-author-imitation/no-source-wording instruction. The raw source, source label, and profile name are never included. Before a styled response is persisted or released from the SSE buffer, normalized character and word n-grams are tested against the versioned Bloom signature; suspicious overlap returns `422`. Styled streams deliberately disable partial checkpoints and buffer prose until this gate succeeds. Profiles can be reused by multiple stories for one account, are removed with that account, and are set to `NULL` on a story when the profile is deleted. Provider-backed quality scoring remains a separate release-evaluation gate.
+
+Every ordinary player-action chapter now has a fail-closed agency-edit boundary after authoring and any length expansion. The editor receives the player's action as an exhaustive, untrusted whitelist and removes invented protagonist speech, thoughts, emotions, consent, decisions, and behavior while retaining NPC action and external consequences. This boundary uses the registered OpenAI `gpt-5.5` consistency route independently of the player's narrative-author selection; the call is audited and consumes the same account-wide weekly allowance. If the agency edit cannot complete, the unreviewed draft is not persisted. Player-action SSE is buffered until editing, chapter-length measurement, style-overlap checks, and consistency handling finish. **Continue** is exempt because it is the explicit one-turn delegation. An overlong edited chapter may receive one low-reasoning trim pass; the measured 85–115% chapter range controls acceptance.
 
 ### 6.1 Query and Index Strategy
 

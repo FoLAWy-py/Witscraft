@@ -38,6 +38,10 @@ class OpenAIAdapter(LLMAdapter):
 
         started = time.perf_counter()
         instructions, input_messages = self._split_instructions(request)
+        input_messages = self._json_input_messages(
+            request,
+            input_messages,
+        )
         kwargs: dict = {
             "model": request.model,
             "input": input_messages,
@@ -74,6 +78,10 @@ class OpenAIAdapter(LLMAdapter):
             return
 
         instructions, input_messages = self._split_instructions(request)
+        input_messages = self._json_input_messages(
+            request,
+            input_messages,
+        )
         kwargs: dict = {
             "model": request.model,
             "input": input_messages,
@@ -108,3 +116,19 @@ class OpenAIAdapter(LLMAdapter):
 
         instructions = "\n\n".join(instruction_parts) if instruction_parts else None
         return instructions, input_messages
+
+    @staticmethod
+    def _json_input_messages(
+        request: LLMRequest,
+        input_messages: list[dict[str, str]],
+    ) -> list[dict[str, str]]:
+        if request.response_format != "json":
+            return input_messages
+
+        if any("json" in message["content"] for message in input_messages):
+            return input_messages
+
+        return [
+            *input_messages,
+            {"role": "user", "content": "Return one valid json object."},
+        ]

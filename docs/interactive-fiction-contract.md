@@ -98,6 +98,8 @@ Style quality is measured against the abstract profile, not against author ident
 
 Model quality scores must come from bounded real-provider captures. Deterministic fixtures validate parsers, policies, and scorers but cannot be reported as provider quality. A capture is reusable while the provider/model, prompt version, evaluation corpus, style-analysis version, and post-processing contract remain unchanged. Generation and judging should use independent model routes where practical, and provider traffic must be sequential, capped, sanitized, and explicitly recorded without secrets.
 
+The 2026-08-21 release candidate used a public-domain excerpt from [Project Gutenberg eBook 1342](https://www.gutenberg.org/ebooks/1342), DeepInfra `Qwen/Qwen3-Max` for authoring, OpenAI `gpt-5.5` for the mandatory agency edit and conditional length trim, and a separate OpenAI `gpt-5.5` judge call. The final bounded run made seven generation-lifecycle calls, reused the deterministic style profile with zero profiling calls, produced 571 words for a 500-word target, and scored 96 player agency, 80 narrative quality, 88 roadmap-length adherence, 84 world/canon consistency, 61 abstract-profile adherence, and 79 overall. This single-case capture is release evidence, not a general benchmark; a route change or evaluation-contract change requires a new bounded capture.
+
 Initial style evaluation must use reviewed public-domain reference text with documented provenance. It must not use private user stories, living-author samples selected for imitation, or text with uncertain rights.
 
 ## 8. Acceptance Invariants

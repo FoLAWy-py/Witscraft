@@ -73,9 +73,9 @@ def build_overlap_signature(text: str, content_hash: str) -> dict:
     characters = _normalized_characters(text)
     words = _normalized_words(text)
     for index in range(0, max(0, len(characters) - 31), 4):
-        _add_bloom(bits, f"c:{characters[index:index + 32]}", content_hash)
+        _add_bloom(bits, f"c:{characters[index : index + 32]}", content_hash)
     for index in range(0, max(0, len(words) - 7), 2):
-        _add_bloom(bits, f"w:{' '.join(words[index:index + 8])}", content_hash)
+        _add_bloom(bits, f"w:{' '.join(words[index : index + 8])}", content_hash)
     return {
         "version": STYLE_SAFETY_VERSION,
         "bits": _BLOOM_BITS,
@@ -103,12 +103,11 @@ def evaluate_reference_overlap(text: str, content_hash: str, signature: object) 
         return OverlapResult(False, 0.0, 0, 0.0, 0)
     characters = _normalized_characters(text)
     character_windows = [
-        f"c:{characters[index:index + 32]}"
-        for index in range(max(0, len(characters) - 31))
+        f"c:{characters[index : index + 32]}" for index in range(max(0, len(characters) - 31))
     ]
     words = _normalized_words(text)
     word_windows = [
-        f"w:{' '.join(words[index:index + 8])}" for index in range(max(0, len(words) - 7))
+        f"w:{' '.join(words[index : index + 8])}" for index in range(max(0, len(words) - 7))
     ]
     character_hits = sum(_has_bloom(bits, value, content_hash) for value in character_windows)
     word_hits = sum(_has_bloom(bits, value, content_hash) for value in word_windows)
@@ -145,7 +144,9 @@ def analyze_style_features(text: str, language: str, content_hash: str) -> dict:
     )
     first_person = sum(normalized.count(token) for token in ("我", "我们", " i ", " we "))
     third_person = sum(normalized.count(token) for token in ("他", "她", "他们", " she ", " he "))
-    viewpoint = "first" if first_person > third_person * 1.2 else "third" if third_person else "mixed"
+    viewpoint = (
+        "first" if first_person > third_person * 1.2 else "third" if third_person else "mixed"
+    )
     average = statistics.fmean(sentence_lengths)
     deviation = statistics.pstdev(sentence_lengths) if len(sentence_lengths) > 1 else 0.0
     paragraph_average = statistics.fmean(len(_normalized_characters(item)) for item in paragraphs)
@@ -158,14 +159,24 @@ def analyze_style_features(text: str, language: str, content_hash: str) -> dict:
         _density(normalized, ("仿佛", "宛如", "好似", "like a", "as if", "as though")),
         3,
     )
-    pacing = "fast" if average < 18 or dialogue_ratio > 0.38 else "slow" if average > 38 else "moderate"
+    pacing = (
+        "fast" if average < 18 or dialogue_ratio > 0.38 else "slow" if average > 38 else "moderate"
+    )
     return {
         "sentence_length_mean": round(average, 1),
         "sentence_length_variation": (
-            "high" if deviation > average * 0.65 else "low" if deviation < average * 0.3 else "medium"
+            "high"
+            if deviation > average * 0.65
+            else "low"
+            if deviation < average * 0.3
+            else "medium"
         ),
         "paragraph_rhythm": (
-            "compact" if paragraph_average < 90 else "expansive" if paragraph_average > 220 else "balanced"
+            "compact"
+            if paragraph_average < 90
+            else "expansive"
+            if paragraph_average > 220
+            else "balanced"
         ),
         "dialogue_ratio": dialogue_ratio,
         "viewpoint": viewpoint,
@@ -188,10 +199,74 @@ def style_prompt(features: object) -> str:
     public = public_style_features(features)
     if not public:
         return ""
-    ordered = ", ".join(f"{key}={public[key]}" for key in sorted(public))
+    instructions: list[str] = []
+    viewpoint = public.get("viewpoint")
+    if viewpoint in {"first", "third"}:
+        instructions.append(f"use predominantly {viewpoint}-person viewpoint")
+    pacing = public.get("pacing")
+    if pacing in {"fast", "moderate", "slow"}:
+        pacing_detail = {
+            "fast": "advance through frequent social or physical beats rather than static atmosphere",
+            "moderate": "balance scene movement with reflection and description",
+            "slow": "allow sustained observation while still changing the external situation",
+        }[pacing]
+        instructions.append(f"sustain {pacing} narrative pacing—{pacing_detail}")
+    paragraph_rhythm = public.get("paragraph_rhythm")
+    if paragraph_rhythm in {"compact", "balanced", "expansive"}:
+        rhythm_detail = {
+            "compact": "many brief paragraphs",
+            "balanced": "a mix of brief and developed paragraphs",
+            "expansive": "fewer, developed paragraphs",
+        }[paragraph_rhythm]
+        instructions.append(f"use {paragraph_rhythm} paragraph rhythm ({rhythm_detail})")
+    variation = public.get("sentence_length_variation")
+    mean = public.get("sentence_length_mean")
+    if variation in {"low", "medium", "high"} and isinstance(mean, int | float):
+        instructions.append(
+            f"keep sentence length variation {variation}, averaging about {mean:g} "
+            "alphanumeric characters per sentence"
+        )
+    dialogue_ratio = public.get("dialogue_ratio")
+    if isinstance(dialogue_ratio, int | float):
+        instructions.append(
+            f"aim for roughly {round(dialogue_ratio * 100):d}% dialogue, using NPC speech to meet "
+            "the target whenever protagonist dialogue is not player-authorized"
+        )
+    descriptive_density = public.get("descriptive_density")
+    if isinstance(descriptive_density, int | float):
+        descriptive_level = (
+            "sparse"
+            if descriptive_density < 0.2
+            else "moderate"
+            if descriptive_density < 0.55
+            else "rich"
+        )
+        instructions.append(
+            "avoid decorative description and keep descriptive cues sparse"
+            if descriptive_level == "sparse"
+            else f"keep descriptive cues {descriptive_level}"
+        )
+    figurative_density = public.get("figurative_density")
+    if isinstance(figurative_density, int | float):
+        figurative_level = (
+            "sparse"
+            if figurative_density < 0.2
+            else "moderate"
+            if figurative_density < 0.55
+            else "frequent"
+        )
+        instructions.append(
+            "avoid figurative comparisons"
+            if figurative_level == "sparse"
+            else f"keep figurative language {figurative_level}"
+        )
+    if not instructions:
+        return ""
     return (
-        "Apply this abstract prose profile without naming or imitating any author and without "
-        f"reusing source wording: {ordered}."
+        "Apply only these abstract prose characteristics without naming or imitating any author, "
+        "reusing source wording, borrowing distinctive phrases, or overriding player agency: "
+        + "; ".join(instructions)
+        + "."
     )
 
 

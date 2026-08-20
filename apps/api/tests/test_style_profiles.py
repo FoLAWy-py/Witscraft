@@ -27,6 +27,9 @@ def test_abstract_profile_is_deterministic_and_hides_safety_signature() -> None:
     assert REFERENCE[:80] not in str(features)
     prompt = style_prompt(features)
     assert "without naming or imitating any author" in prompt
+    assert "paragraph rhythm" in prompt
+    assert "dialogue" in prompt
+    assert "overriding player agency" in prompt
     assert REFERENCE[:20] not in prompt
 
 

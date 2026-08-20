@@ -103,7 +103,10 @@ def test_openai_generate_maps_responses_request_and_usage() -> None:
 
     call = create.calls[0]
     assert call["instructions"] == "system rules\n\ndeveloper context"
-    assert call["input"] == [{"role": "user", "content": "user input"}]
+    assert call["input"] == [
+        {"role": "user", "content": "user input"},
+        {"role": "user", "content": "Return one valid json object."},
+    ]
     assert call["max_output_tokens"] == 512
     assert call["reasoning"] == {"effort": "medium"}
     assert call["text"] == {"format": {"type": "json_object"}}
@@ -126,11 +129,7 @@ def test_openai_non_reasoning_request_preserves_sampling_parameters() -> None:
     adapter = OpenAIAdapter(Settings(openai_api_key="test-key"))
     adapter.client = SimpleNamespace(responses=create)
 
-    asyncio.run(
-        adapter.generate(
-            _request(reasoning_effort=None, response_format="text")
-        )
-    )
+    asyncio.run(adapter.generate(_request(reasoning_effort=None, response_format="text")))
 
     assert create.calls[0]["temperature"] == 0.4
     assert create.calls[0]["top_p"] == 0.8
@@ -156,6 +155,58 @@ def test_openai_stream_yields_only_text_delta_events() -> None:
 
     assert asyncio.run(collect()) == ["first", " second"]
     assert create.calls[0]["stream"] is True
+    assert create.calls[0]["input"][-1] == {
+        "role": "user",
+        "content": "Return one valid json object.",
+    }
+
+
+def test_openai_json_request_preserves_existing_lowercase_instruction() -> None:
+    create = AsyncCreate(
+        SimpleNamespace(
+            output_text='{"ok":true}',
+            usage=None,
+            model_dump=lambda: {},
+        )
+    )
+    adapter = OpenAIAdapter(Settings(openai_api_key="test-key"))
+    adapter.client = SimpleNamespace(responses=create)
+    request = _request(
+        messages=[
+            ChatMessage(role="system", content="Return a valid json object."),
+            ChatMessage(role="user", content="Evaluate this response."),
+        ]
+    )
+
+    asyncio.run(adapter.generate(request))
+
+    assert create.calls[0]["instructions"] == "Return a valid json object."
+    assert create.calls[0]["input"][-1] == {
+        "role": "user",
+        "content": "Return one valid json object.",
+    }
+
+
+def test_openai_json_request_preserves_existing_lowercase_user_input() -> None:
+    create = AsyncCreate(
+        SimpleNamespace(
+            output_text='{"ok":true}',
+            usage=None,
+            model_dump=lambda: {},
+        )
+    )
+    adapter = OpenAIAdapter(Settings(openai_api_key="test-key"))
+    adapter.client = SimpleNamespace(responses=create)
+    request = _request(
+        messages=[
+            ChatMessage(role="system", content="Return an object."),
+            ChatMessage(role="user", content="Return this as json."),
+        ]
+    )
+
+    asyncio.run(adapter.generate(request))
+
+    assert create.calls[0]["input"] == [{"role": "user", "content": "Return this as json."}]
 
 
 def test_deepinfra_generate_maps_chat_request_and_usage() -> None:
@@ -167,9 +218,7 @@ def test_deepinfra_generate_maps_chat_request_and_usage() -> None:
     )
     create = AsyncCreate(response_value)
     adapter = DeepInfraAdapter(Settings(deepinfra_api_key="test-key"))
-    adapter.client = SimpleNamespace(
-        chat=SimpleNamespace(completions=create)
-    )
+    adapter.client = SimpleNamespace(chat=SimpleNamespace(completions=create))
     request = _request(provider="deepinfra")
 
     response = asyncio.run(adapter.generate(request))
@@ -196,28 +245,17 @@ def test_deepinfra_stream_filters_empty_choices_and_content() -> None:
     stream = AsyncEvents(
         [
             SimpleNamespace(choices=[]),
-            SimpleNamespace(
-                choices=[SimpleNamespace(delta=SimpleNamespace(content=None))]
-            ),
-            SimpleNamespace(
-                choices=[SimpleNamespace(delta=SimpleNamespace(content="alpha"))]
-            ),
-            SimpleNamespace(
-                choices=[SimpleNamespace(delta=SimpleNamespace(content=" beta"))]
-            ),
+            SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content=None))]),
+            SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content="alpha"))]),
+            SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content=" beta"))]),
         ]
     )
     create = AsyncCreate(stream)
     adapter = DeepInfraAdapter(Settings(deepinfra_api_key="test-key"))
-    adapter.client = SimpleNamespace(
-        chat=SimpleNamespace(completions=create)
-    )
+    adapter.client = SimpleNamespace(chat=SimpleNamespace(completions=create))
 
     async def collect() -> list[str]:
-        return [
-            chunk
-            async for chunk in adapter.stream(_request(provider="deepinfra"))
-        ]
+        return [chunk async for chunk in adapter.stream(_request(provider="deepinfra"))]
 
     assert asyncio.run(collect()) == ["alpha", " beta"]
     assert create.calls[0]["stream"] is True

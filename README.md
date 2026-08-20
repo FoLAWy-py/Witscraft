@@ -2,6 +2,8 @@
 
 Witscraft is a customizable AI-authored interactive novel. The AI acts as the author and narrator, while the user plays a character and decides the direction of the plot through actions and choices. Stories support 3–120 chapter roadmaps, language-aware chapter targets, and optional rights-attested reference text that becomes a reusable abstract style profile without retaining or embedding the source. Normal turns preserve exclusive player control over the protagonist; an explicit Continue action delegates only one reversible turn. The application follows the architecture in `system architecture.md`: a Next.js frontend, a FastAPI backend, PostgreSQL with fixed-dimension pgvector memory storage, and an LLM Gateway that hides OpenAI and DeepInfra differences from story logic.
 
+Ordinary player-action chapters are buffered until a fail-closed OpenAI agency edit removes any protagonist behavior not explicitly supplied by the player. This quality boundary and its conditional overlength trim are audited, share the account-wide weekly allowance, and stay within the per-turn external-call ceiling; **Continue** remains the only one-turn delegation.
+
 ## Project Shape
 
 ```text
