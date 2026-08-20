@@ -1,0 +1,81 @@
+{
+  "abstract_profile": {
+    "analysis_method": "deterministic",
+    "descriptive_density": 0.0,
+    "dialogue_ratio": 0.412,
+    "figurative_density": 0.0,
+    "pacing": "fast",
+    "paragraph_rhythm": "compact",
+    "sentence_length_mean": 44.7,
+    "sentence_length_variation": "high",
+    "tense": "mixed",
+    "viewpoint": "third"
+  },
+  "author": {
+    "model": "Qwen/Qwen3-Max",
+    "provider": "deepinfra"
+  },
+  "calls": {
+    "call_limit": 8,
+    "judge_calls": 1,
+    "lifecycle_calls": 7,
+    "lifecycle_routes": [
+      "deepinfra:Qwen/Qwen3-Max:normal_chat",
+      "deepinfra:Qwen/Qwen3-Max:normal_chat",
+      "deepinfra:Qwen/Qwen3-Max:normal_chat",
+      "openai:gpt-5.5:consistency_check",
+      "openai:gpt-5.5:consistency_check",
+      "deepinfra:Qwen/Qwen3-Max:state_update",
+      "deepinfra:Qwen/Qwen3-Max:normal_chat"
+    ],
+    "profiling_calls": 0
+  },
+  "capture_base_url_class": "loopback_http",
+  "capture_method": "bounded_live_provider_end_to_end",
+  "captured_at": "2026-08-20T19:17:19.167074Z",
+  "case_sha256": "149018ace297b7e5488d1a9f64d42b8a5c8d15f342250c6482891e62f2e357ce",
+  "deployment_revision": "1a5e8a65bf6198175041827614641297c4ce7a1f",
+  "evaluation_version": "interactive-fiction-style-v1",
+  "evidence_kind": "provider_capture",
+  "generated_chapter": "## 2. Tea and Tactical Silence\n\nRain held Ashcombe House in place, and afternoon tea had become a social duty with no merciful ending. The drawing room smelled of wet wool, bergamot, and fire ash. Eleanor remained by the window while the garden blurred behind the glass.\n\nMrs. Croft entered with a fresh silver tray. Its china rattled once, then stilled beneath her gloved hand.\n\nEleanor asked the housekeeper whether any letters had arrived. She did not open or accept one.\n\nMrs. Croft stopped beside the tea table. “One came this morning, miss. I placed it on your breakfast tray.”\n\nLady Ashcombe lowered her cup. “Letters? In this weather? The post has become heroic when it ought to be practical.”\n\nMr. Ashcombe did not look up from the book on his knee. “The post is never heroic. It merely arrives late and charges more each year.”\n\n“It was a plain envelope,” Mrs. Croft said. “No crest. No seal. Your name was written clearly.”\n\nLady Ashcombe gave a small laugh. “How very ominous, Croft. You make it sound as though the thing crept in under its own power.”\n\n“I only say what I saw, my lady.”\n\n“And do you always see so much?”\n\nThe housekeeper’s tray dipped a fraction before she steadied it. “In this house, yes.”\n\nThat brought Mr. Ashcombe’s eyes up. The fire cracked; no one moved to mend it.\n\nLady Ashcombe stirred tea that had already gone pale. “You have been rather dramatic of late. First the misplaced cellar key, then the matter of the blue room linen, and now a vanishing letter.”\n\n“The cellar key was returned to your writing desk,” Mrs. Croft said.\n\n“My writing desk was locked.”\n\n“So I was told.”\n\nA spoon struck porcelain too sharply. Lady Ashcombe smiled without warmth. “You were told many things over twenty-three years. It is a wonder you remember only the inconvenient ones.”\n\nMr. Ashcombe closed his book with one finger between the pages. “That is enough.”\n\n“Is it?” Lady Ashcombe asked. “Because if a guest’s correspondence has disappeared, surely the household must be reassured. Or corrected.”\n\nMrs. Croft’s gaze moved once toward the hall. “The morning letters were sorted in the usual way. Mr. Bell brought the bag in at eight. I unlocked it. Two for you, my lady. Three for the master. One circular for the vicarage that came here by mistake. And one for Miss Vale.”\n\n“The vicarage circular reached the vicarage,” Mr. Ashcombe said.\n\n“Yes, sir.”\n\n“But the guest’s letter did not remain where you put it.”\n\n“No, sir.”\n\nLady Ashcombe leaned back. “How tidy. Everyone else receives what is due, except the one letter no one can describe beyond its being plain.”\n\n“I can describe the hand,” Mrs. Croft said.\n\nThe room changed at that. Not loudly. The rain filled the pause, running along the gutters in a hard, steady rush.\n\nMr. Ashcombe said, “Can you?”\n\n“I have seen it before.”\n\nLady Ashcombe’s smile vanished. “Careful, Croft.”\n\n“I am being careful, my lady.”\n\nThe host rose, then stopped beside the hearth as if the rug itself had become disputed ground. “Where?”\n\nMrs. Croft kept both hands on the tray. “On a note left for Mr. Graham last spring. Before he was dismissed.”\n\nLady Ashcombe stood so quickly her chair scraped the carpet. “That servant was dismissed for theft.”\n\n“He was dismissed before the silver was counted.”\n\n“Enough.”\n\nMr. Ashcombe’s voice was quiet, but it ended the exchange for a moment. The clock ticked. Tea cooled untouched. Rain struck the glass behind Eleanor.\n\nFrom the hall came a hurried step, then the boot boy appeared at the open door, cap crushed in both hands.\n\n“Beg pardon, sir,” he said. “There’s a man at the south entrance. Says he won’t leave till the letter’s returned.”\n\nMrs. Croft did not turn. Lady Ashcombe did. Mr. Ashcombe looked toward the door, and the room waited.",
+  "generated_chapter_sha256": "729e437ed075af23c44cba5777bb22644eefc2b392739231664edf37b792081e",
+  "generated_features": {
+    "analysis_method": "deterministic",
+    "descriptive_density": 0.0,
+    "dialogue_ratio": 0.223,
+    "figurative_density": 0.098,
+    "pacing": "moderate",
+    "paragraph_rhythm": "compact",
+    "sentence_length_mean": 26.4,
+    "sentence_length_variation": "high",
+    "tense": "mixed",
+    "viewpoint": "third"
+  },
+  "judge": {
+    "input_tokens": 1319,
+    "latency_ms": 11133,
+    "model": "gpt-5.5",
+    "output_tokens": 587,
+    "prompt_version": "interactive-fiction-judge-v1",
+    "provider": "openai"
+  },
+  "profile_reused": true,
+  "reference_source_url": "https://www.gutenberg.org/ebooks/1342",
+  "schema_version": 1,
+  "scores": {
+    "narrative_quality": 86,
+    "overall": 82,
+    "player_agency": 94,
+    "profile_adherence": 64,
+    "reasons": [
+      "Maintains third-person viewpoint, compact paragraph rhythm, mixed tense, and low descriptive density consistent with the profile.",
+      "Dialogue is substantially below the target ratio, sentence length is much shorter than specified, pacing reads moderate rather than fast, and some figurative phrasing appears despite a zero figurative-density target.",
+      "The chapter cleanly respects the player action: Eleanor remains by the window, asks about letters indirectly, and does not open or accept one; it does not add unrequested protagonist thoughts, consent, or decisions.",
+      "Narrative quality is strong, with clear social tension, escalating revelations, and an effective closing hook.",
+      "World and social details are coherent for the manor-house setting, with plausible household hierarchy and period-inflected conflict.",
+      "Length appears moderately over the 500-word target, reducing roadmap-length adherence."
+    ],
+    "roadmap_length": 72,
+    "world_canon": 88
+  }
+}

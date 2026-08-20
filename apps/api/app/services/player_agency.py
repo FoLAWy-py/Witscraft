@@ -165,6 +165,49 @@ def chapter_needs_expansion(text: str, target_length: int, length_unit: str) -> 
     return measured_chapter_length(text, length_unit) < math.ceil(target_length * 0.85)
 
 
+def prune_chapter_to_length_band(
+    text: str,
+    target_length: int,
+    length_unit: str,
+) -> str | None:
+    """Remove low-value narration paragraphs while preserving dialogue and the ending hook."""
+    minimum = math.ceil(target_length * 0.85)
+    maximum = math.floor(target_length * 1.15)
+    stripped = text.strip()
+    measured = measured_chapter_length(stripped, length_unit)
+    if minimum <= measured <= maximum:
+        return stripped
+    if measured < minimum:
+        return None
+
+    paragraphs = [
+        paragraph.strip() for paragraph in re.split(r"\n\s*\n", stripped) if paragraph.strip()
+    ]
+    while measured > maximum and len(paragraphs) > 2:
+        removable: list[tuple[int, int, bool]] = []
+        for index in range(1, len(paragraphs) - 1):
+            paragraph_length = measured_chapter_length(paragraphs[index], length_unit)
+            next_length = measured - paragraph_length
+            if next_length < minimum:
+                continue
+            is_dialogue = bool(re.match(r'^[“"「『]', paragraphs[index]))
+            removable.append((index, next_length, is_dialogue))
+        if not removable:
+            break
+        non_dialogue = [candidate for candidate in removable if not candidate[2]]
+        candidates = non_dialogue or removable
+        completing = [candidate for candidate in candidates if candidate[1] <= maximum]
+        if completing:
+            selected = max(completing, key=lambda candidate: candidate[1])
+        else:
+            selected = max(candidates, key=lambda candidate: candidate[1])
+        paragraphs.pop(selected[0])
+        measured = selected[1]
+
+    result = "\n\n".join(paragraphs)
+    return result if minimum <= measured_chapter_length(result, length_unit) <= maximum else None
+
+
 def ensure_chapter_heading(text: str, chapter_number: int, chapter_title: str) -> str:
     heading = f"## {chapter_number}. {chapter_title}"
     stripped = text.strip()

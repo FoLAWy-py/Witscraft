@@ -10,6 +10,7 @@ from app.services.player_agency import (
     chapter_authoring_instruction,
     ensure_chapter_heading,
     measured_chapter_length,
+    prune_chapter_to_length_band,
     reject_known_impossible_action,
 )
 from app.services.story_engine import StoryEngine
@@ -105,6 +106,25 @@ def test_chapter_length_uses_player_facing_units_and_fifteen_percent_floor() -> 
     assert measured_chapter_length("Three precise words", "words") == 3
     assert chapter_needs_expansion("潮" * 424, 500, "characters") is True
     assert chapter_needs_expansion("潮" * 425, 500, "characters") is False
+
+
+def test_deterministic_length_pruning_preserves_dialogue_and_ending_hook() -> None:
+    paragraphs = [
+        "Opening establishes the external room and conflict " * 8,
+        "Atmospheric rain description without a new event " * 10,
+        "“An NPC gives a substantial answer that should remain in the chapter.” " * 8,
+        "Repeated staging description without a new event " * 10,
+        "The ending hook remains available for the player's next decision " * 8,
+    ]
+    overlong = "\n\n".join(paragraphs)
+
+    pruned = prune_chapter_to_length_band(overlong, 210, "words")
+
+    assert pruned is not None
+    assert 179 <= measured_chapter_length(pruned, "words") <= 241
+    assert "An NPC gives a substantial answer" in pruned
+    assert "ending hook remains" in pruned
+    assert "Atmospheric rain description" not in pruned
 
 
 def test_agency_editor_uses_openai_and_trims_only_an_overlong_result() -> None:

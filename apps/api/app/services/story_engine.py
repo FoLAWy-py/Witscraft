@@ -53,6 +53,7 @@ from app.services.player_agency import (
     chapter_authoring_instruction,
     ensure_chapter_heading,
     measured_chapter_length,
+    prune_chapter_to_length_band,
     reject_known_impossible_action,
 )
 from app.services.state_extractor import extract_story_updates_with_llm
@@ -855,14 +856,25 @@ class StoryEngine:
                     "reasoning_effort": "low",
                 }
             )
+            candidate = revised
+            candidate_response = response
             try:
                 trimmed_response = await self.llm_gateway.generate(trim_request)
+                trimmed, _ = split_story_response(trimmed_response.text, "open")
+                trimmed_measure = measured_chapter_length(trimmed, story.chapter_length_unit)
+                if trimmed.strip() and minimum <= trimmed_measure < measured:
+                    candidate = trimmed
+                    candidate_response = trimmed_response
             except Exception:
-                return revised, response
-            trimmed, _ = split_story_response(trimmed_response.text, "open")
-            trimmed_measure = measured_chapter_length(trimmed, story.chapter_length_unit)
-            if trimmed.strip() and minimum <= trimmed_measure <= maximum:
-                return trimmed, trimmed_response
+                pass
+            pruned = prune_chapter_to_length_band(
+                candidate,
+                story.target_chapter_length,
+                story.chapter_length_unit,
+            )
+            if pruned is None:
+                raise RuntimeError("Player-agency editor could not satisfy chapter length")
+            return pruned, candidate_response
         return revised, response
 
     async def _preflight_player_turn(
