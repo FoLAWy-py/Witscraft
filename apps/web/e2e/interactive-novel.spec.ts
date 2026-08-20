@@ -342,10 +342,18 @@ test("player signs in and directs the next scene", async ({ page }) => {
   await expect(correctionReview).toContainText("The archive door has never opened.");
   await expect(correctionReview).toContainText("The archive door opened before midnight.");
   await expect(correctionReview).toContainText("14 个未来章节计划");
-  const correctionRequest = page.waitForRequest((request) => request.url().includes("/api/workspace/canon-facts/"));
+  const correctionResponse = page.waitForResponse(
+    (response) =>
+      response.url().includes("/api/workspace/canon-facts/") && response.status() === 200,
+  );
   await page.getByRole("button", { name: "确认修正" }).click();
-  await correctionRequest;
-  await expect(page.getByText("The archive door opened before midnight.", { exact: true })).toBeVisible();
+  await correctionResponse;
+  await expect(correctionReview).toHaveCount(0);
+  await expect(
+    page
+      .getByRole("region", { name: "既定事实" })
+      .getByText("The archive door opened before midnight.", { exact: true }),
+  ).toBeVisible();
   await expect(page.getByText("Unwritten Chapter 15", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "设置", exact: true }).click();
