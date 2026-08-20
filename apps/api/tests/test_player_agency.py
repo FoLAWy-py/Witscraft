@@ -6,6 +6,7 @@ import pytest
 from app.schemas.llm import ChatMessage, LLMRequest, LLMResponse
 from app.services.player_agency import (
     chapter_needs_expansion,
+    chapter_prose,
     chapter_authoring_instruction,
     ensure_chapter_heading,
     measured_chapter_length,
@@ -95,6 +96,8 @@ def test_canonical_chapter_heading_is_idempotent() -> None:
     titled = ensure_chapter_heading("The gate opens.", 3, "The Last Lock")
     assert titled.startswith("## 3. The Last Lock\n\n")
     assert ensure_chapter_heading(titled, 3, "The Last Lock") == titled
+    assert chapter_prose(titled) == "The gate opens."
+    assert chapter_prose("The gate opens.") == "The gate opens."
 
 
 def test_chapter_length_uses_player_facing_units_and_fifteen_percent_floor() -> None:

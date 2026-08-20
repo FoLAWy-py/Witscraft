@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "thresholds": {
+    "min_profile_adherence": 65,
+    "min_narrative_quality": 80,
+    "min_player_agency": 90,
+    "min_world_canon": 80,
+    "min_roadmap_length": 85,
+    "min_overall": 80,
+    "max_dialogue_ratio_error": 0.3
+  }
+}

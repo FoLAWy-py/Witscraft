@@ -10,6 +10,7 @@ from dataclasses import dataclass
 
 STYLE_ANALYSIS_VERSION = "style-profile-v1"
 STYLE_SAFETY_VERSION = "overlap-bloom-v1"
+STYLE_PROMPT_VERSION = "abstract-style-prompt-v2"
 MIN_REFERENCE_CHARACTERS = 500
 MAX_REFERENCE_CHARACTERS = 30_000
 _BLOOM_BITS = 262_144

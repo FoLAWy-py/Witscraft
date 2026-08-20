@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "evaluation_version": "interactive-fiction-style-v1",
+  "judge_prompt_version": "interactive-fiction-judge-v1",
+  "prompt_versions": {
+    "chapter_authoring": "chapter-authoring-v2",
+    "player_agency_editor": "player-agency-editor-v2",
+    "style_prompt": "abstract-style-prompt-v2"
+  },
+  "style_analysis_version": "style-profile-v1",
+  "style_safety_version": "overlap-bloom-v1",
+  "data_classification": "public-domain-reference-and-synthetic-scenario",
+  "reference": {
+    "path": "reference.txt",
+    "source_url": "https://www.gutenberg.org/ebooks/1342",
+    "source_title": "Pride and Prejudice",
+    "author": "Jane Austen",
+    "rights_basis": "public_domain",
+    "excerpt_note": "Chapter I dialogue excerpt; illustration block omitted",
+    "normalized_sha256": "8e26e63ae052ec059c92bf98bd28669bdea4fa86d0f1e415ac676bafe7e6882d",
+    "language": "en",
+    "expected_abstract_features": {
+      "analysis_method": "deterministic",
+      "descriptive_density": 0.0,
+      "dialogue_ratio": 0.412,
+      "figurative_density": 0.0,
+      "pacing": "fast",
+      "paragraph_rhythm": "compact",
+      "sentence_length_mean": 44.7,
+      "sentence_length_variation": "high",
+      "tense": "mixed",
+      "viewpoint": "third"
+    }
+  },
+  "scenario": {
+    "title": "The Rain at Ashcombe House",
+    "genre": "social mystery",
+    "world_name": "Ashcombe House",
+    "premise": "During a rainbound country visit, a misdirected letter exposes a conflict of loyalties.",
+    "protagonist_name": "Eleanor Vale",
+    "protagonist_role": "A guest who notices the household's contradictions",
+    "tone": "witty social observation, restrained tension, dialogue-led scenes",
+    "opening_text": "Rain detained every guest at Ashcombe House, while an unsigned letter waited on the breakfast tray.",
+    "custom_prompt": "Preserve player agency. Use original characters and wording; do not imitate or name any author.",
+    "interaction_mode": "open",
+    "planned_chapter_count": 3,
+    "target_chapter_length": 500,
+    "chapter_length_unit": "words",
+    "prose_language": "en",
+    "player_action": "I remain by the window and ask the housekeeper whether any letters arrived, without opening or accepting one.",
+    "control_mode": "player_action"
+  },
+  "expected_routes": {
+    "author": {
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Max"
+    },
+    "agency_editor": {
+      "provider": "openai",
+      "model": "gpt-5.5",
+      "purpose": "consistency_check"
+    },
+    "judge": {
+      "provider": "openai",
+      "model": "gpt-5.5"
+    }
+  },
+  "call_limit": 8
+}
