@@ -21,6 +21,7 @@ apps/
 - [`docs/admin-and-quota.md`](./docs/admin-and-quota.md): administrator permission boundary, weekly AI allowance, and reset operation
 - [`docs/model-cost-controls.md`](./docs/model-cost-controls.md): purpose-level model budgets, embedding cache metrics, and quota interaction
 - [`docs/structured-extraction-evaluation.md`](./docs/structured-extraction-evaluation.md): versioned state-extraction corpus, metrics, evidence classes, and model-approval gate
+- [`docs/interactive-fiction-contract.md`](./docs/interactive-fiction-contract.md): player-agency, chapter, roadmap, revision, reference-text, and provider-evaluation acceptance rules
 - [`docs/security-checks.md`](./docs/security-checks.md): dependency, secret, and production artifact security gates
 - [`docs/release-process.md`](./docs/release-process.md): executable preflight, release manifest, smoke checks, and rollback contract
 
