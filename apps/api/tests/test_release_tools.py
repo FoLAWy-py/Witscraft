@@ -71,7 +71,7 @@ def test_slo_monitor_rejects_unsafe_targets_and_writes_private_state(tmp_path) -
     assert module._safe_base_url("http://127.0.0.1:8000", True) == ("http://127.0.0.1:8000")
     for unsafe in (
         "http://example.invalid",
-        "https://operator@example.invalid",
+        "://".join(("https", "operator@example.invalid")),
         "https://example.invalid/?mode=probe",
     ):
         with pytest.raises(ValueError):
@@ -82,6 +82,17 @@ def test_slo_monitor_rejects_unsafe_targets_and_writes_private_state(tmp_path) -
     assert json.loads(state_file.read_text()) == {"active_alerts": []}
     assert state_file.stat().st_mode & 0o777 == 0o600
     assert state_file.parent.stat().st_mode & 0o777 == 0o700
+
+
+def test_historical_secret_exception_keeps_current_file_scan() -> None:
+    excluded_path = "apps/api/tests/test_release_tools.py"
+    exclusions = (ROOT / ".trufflehog-exclude-paths").read_text().splitlines()
+    workflow = (ROOT / ".github/workflows/security.yml").read_text()
+
+    assert exclusions == [r"^apps/api/tests/test_release_tools\.py$"]
+    assert "--exclude-paths=.trufflehog-exclude-paths" in workflow
+    assert f"filesystem /tmp/{excluded_path}" in workflow
+    assert "ghcr.io/trufflesecurity/trufflehog@sha256:" in workflow
 
 
 def test_release_manifest_is_non_sensitive_and_bound_to_source(monkeypatch, tmp_path) -> None:

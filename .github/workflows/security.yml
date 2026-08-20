@@ -29,7 +29,12 @@ jobs:
           base: ""
           head: ${{ github.sha }}
           version: "3.96.0"
-          extra_args: --no-verification --results=unverified --fail-on-scan-errors
+          extra_args: --no-verification --results=unverified --fail-on-scan-errors --exclude-paths=.trufflehog-exclude-paths
+      - name: Scan current historical-exception file
+        run: >-
+          docker run --rm -v "$PWD:/tmp" ghcr.io/trufflesecurity/trufflehog@sha256:aa821cf4ace8861c7d096d83818cdf7bb9719028a52d37a52eaad44086a52577
+          filesystem /tmp/apps/api/tests/test_release_tools.py --fail --no-update
+          --github-actions --no-verification --results=unverified --fail-on-scan-errors
 
   backend:
     name: Backend quality and PostgreSQL checks

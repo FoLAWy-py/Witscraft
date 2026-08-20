@@ -5,7 +5,7 @@ It is a release gate: do not deploy a revision while any job is failing.
 
 ## Checks
 
-- TruffleHog scans the complete committed Git history for secret candidates. Verification is disabled so suspected credentials are never sent to a provider API.
+- TruffleHog scans the complete committed Git history for secret candidates. Verification is disabled so suspected credentials are never sent to a provider API. One exact release-tool test path is excluded from historical scanning because an already-pushed synthetic credential-shaped URI is an immutable false positive; a separate digest-pinned filesystem scan checks that file's current contents on every run, so the exception cannot hide a new credential.
 - `pip-audit` checks the installed Python dependency graph created from `uv.lock`.
 - `npm audit` checks production and development packages from `package-lock.json` and fails at high severity.
 - Ruff checks the API, tests, Alembic migration source, and production Python utilities including the memory embedding worker and provider-capture tools.
