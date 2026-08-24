@@ -8,6 +8,8 @@ from types import SimpleNamespace
 
 import pytest
 
+from app.config import Settings
+
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -76,13 +78,32 @@ def test_staging_postgres_lan_access_requires_tls_scram_and_restricted_role() ->
     hba = (ROOT / "ops/staging/postgres-pg_hba.conf").read_text()
     entrypoint = (ROOT / "ops/staging/postgres-entrypoint.sh").read_text()
 
-    assert '"0.0.0.0:${STAGING_DATABASE_PORT' in compose
+    assert '"127.0.0.1:${STAGING_DATABASE_BACKEND_PORT' in compose
+    assert "listen __STAGING_DATABASE_PORT__" in (
+        ROOT / "ops/staging/nginx.conf.template"
+    ).read_text()
     assert "ssl=on" in entrypoint
     assert "password_encryption=scram-sha-256" in entrypoint
     assert "hostssl     all       all   192.168.31.0/24" in hba
     assert "hostssl     all       all   10.0.0.0/24" in hba
-    assert "host        all       all   192.168.65.1/32" in hba
+    assert "hostssl     all       all   192.168.65.1/32" in hba
     assert "hostnossl   all       all   0.0.0.0/0           reject" in hba
+
+
+def test_database_url_can_require_asyncpg_tls() -> None:
+    settings = Settings(
+        database_username="test_user",
+        database_password="test_password",
+        database_host="127.0.0.1",
+        database_port=15433,
+        database_name="test_database",
+        database_ssl_mode="require",
+    )
+
+    assert settings.database_url == (
+        "postgresql+asyncpg://test_user:test_password@127.0.0.1:15433/"
+        "test_database?ssl=require"
+    )
 
 
 def test_staging_nginx_normalizes_upstream_failures_without_buffering_sse() -> None:

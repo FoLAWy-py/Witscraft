@@ -30,9 +30,13 @@ source address receive HTTP 403 before reaching the application.
 PostgreSQL listens on port `15432`, but `pg_hba.conf` accepts only TLS connections
 from `192.168.31.0/24`, `10.0.0.0/24`, and loopback. Non-TLS connections and all
 other source networks are rejected. SCRAM-SHA-256 authentication is mandatory.
-The exact Docker Desktop gateway address `192.168.65.1/32` has a separate SCRAM
-exception so loopback-only host processes can reach the container after Docker's
-address translation; this exception is not a client LAN range.
+Nginx stream access control owns the client source boundary on `15432` and proxies
+accepted raw PostgreSQL traffic to the Docker port bound only at
+`127.0.0.1:15433`. This preserves the original source decision before Docker
+Desktop rewrites container traffic to `192.168.65.1`. PostgreSQL accepts that exact
+Docker gateway address only with TLS; application and migration connections also
+set asyncpg `ssl=require`. This layered boundary prevents a Docker NAT address from
+accidentally widening LAN access or allowing plaintext database sessions.
 
 Startup creates or rotates a dedicated `witscraft_lan_access` role with data access
 to application tables and sequences. It is not a superuser and cannot create

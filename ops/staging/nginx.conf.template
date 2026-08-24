@@ -2,6 +2,19 @@ worker_processes 1;
 pid nginx.pid;
 error_log logs/nginx-error.log notice;
 
+stream {
+    server {
+        listen __STAGING_DATABASE_PORT__;
+        allow 127.0.0.1;
+        allow 192.168.31.0/24;
+        allow 10.0.0.0/24;
+        deny all;
+        proxy_connect_timeout 5s;
+        proxy_timeout 1h;
+        proxy_pass 127.0.0.1:__STAGING_DATABASE_BACKEND_PORT__;
+    }
+}
+
 events {
     worker_connections 1024;
 }

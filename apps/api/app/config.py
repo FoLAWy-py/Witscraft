@@ -72,6 +72,7 @@ class Settings(BaseSettings):
     database_host: str = "localhost"
     database_port: int = 5432
     database_name: str = "witscraft"
+    database_ssl_mode: Literal["disable", "require"] = "disable"
 
     default_provider: str = "deepinfra"
     default_openai_model: str = "gpt-5.5"
@@ -156,11 +157,14 @@ class Settings(BaseSettings):
     def database_url(self) -> str | None:
         if not self.database_username or not self.database_password:
             return None
-        return (
+        url = (
             "postgresql+asyncpg://"
             f"{self.database_username}:{self.database_password}"
             f"@{self.database_host}:{self.database_port}/{self.database_name}"
         )
+        if self.database_ssl_mode == "require":
+            return f"{url}?ssl=require"
+        return url
 
     @property
     def frontend_origin(self) -> str:
