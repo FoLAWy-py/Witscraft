@@ -165,5 +165,6 @@ def test_judge_contract_uses_only_abstract_profile_and_generated_prose() -> None
     assert payload["generated_installment"] == "Original prose."
     assert payload["chapter_transition"] == {"completed": False}
     assert "never penalize a shorter installment" in request.messages[0].content
+    assert "belongs only to profile_adherence" in request.messages[0].content
     assert "Pride and Prejudice" not in request.model_dump_json()
     assert case["reference"]["source_url"] not in request.model_dump_json()

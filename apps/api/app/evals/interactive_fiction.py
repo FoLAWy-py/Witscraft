@@ -25,7 +25,7 @@ from app.services.style_profiles import (
 )
 
 
-JUDGE_PROMPT_VERSION = "interactive-fiction-judge-v3"
+JUDGE_PROMPT_VERSION = "interactive-fiction-judge-v4"
 SCORE_NAMES = (
     "profile_adherence",
     "narrative_quality",
@@ -106,7 +106,10 @@ def build_judge_request(
                     "An installment ending returns control to the player and is not a chapter ending. "
                     "A chapter may span many installments. Apply the supplied minimum only when "
                     "chapter_transition.completed is true; never penalize a shorter installment when "
-                    "it is false. There is no target or maximum chapter or installment length."
+                    "it is false. Keep profile_adherence and narrative_pacing orthogonal: stylistic "
+                    "speed such as fast versus moderate belongs only to profile_adherence and must "
+                    "not be deducted again from pacing. There is no target or maximum chapter or "
+                    "installment length."
                 ),
             ),
             ChatMessage(

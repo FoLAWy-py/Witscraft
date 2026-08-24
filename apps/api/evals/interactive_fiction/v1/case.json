@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "evaluation_version": "interactive-fiction-natural-pacing-v2",
-  "judge_prompt_version": "interactive-fiction-judge-v3",
+  "judge_prompt_version": "interactive-fiction-judge-v4",
   "prompt_versions": {
     "chapter_authoring": "chapter-authoring-v6",
     "player_agency_editor": "player-agency-editor-v5",
