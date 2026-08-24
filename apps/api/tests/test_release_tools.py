@@ -187,6 +187,7 @@ def test_staging_observer_requires_https_and_private_runtime_output() -> None:
     source = (ROOT / "scripts/staging-release.sh").read_text(encoding="utf-8")
     assert "observe [--minutes 30]" in source
     assert 'status >/dev/null || fail "staging must be healthy before observation"' in source
+    assert 'create-release-manifest.py" --output "$RUNTIME/candidate.json"' in source
 
 
 def test_slo_monitor_rejects_unsafe_targets_and_writes_private_state(tmp_path) -> None:

@@ -351,6 +351,7 @@ start() {
   elif [[ ! -r "$ROOT/apps/web/.next/BUILD_ID" ]]; then
     fail "--skip-build requires an existing production build"
   fi
+  python3 "$ROOT/scripts/create-release-manifest.py" --output "$RUNTIME/candidate.json"
 
   render_launch_agents
   start_agent api
