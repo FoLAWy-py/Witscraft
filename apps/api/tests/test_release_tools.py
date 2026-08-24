@@ -62,10 +62,25 @@ def test_staging_release_script_is_syntactically_valid_and_isolated() -> None:
         "STAGING_ADDITIONAL_HOSTS",
         "allowed_hosts_json",
         "trusted_origins_json",
+        "configure_lan_database_access",
+        "witscraft_lan_access",
     ):
         assert required in content or required in (ROOT / "ops/staging/compose.yml").read_text()
     assert "myunsw.witsqua.com" not in content
     assert "deploy/nginx.remote.conf" not in content
+
+
+def test_staging_postgres_lan_access_requires_tls_scram_and_restricted_role() -> None:
+    compose = (ROOT / "ops/staging/compose.yml").read_text()
+    hba = (ROOT / "ops/staging/postgres-pg_hba.conf").read_text()
+    entrypoint = (ROOT / "ops/staging/postgres-entrypoint.sh").read_text()
+
+    assert '"0.0.0.0:${STAGING_DATABASE_PORT' in compose
+    assert "ssl=on" in entrypoint
+    assert "password_encryption=scram-sha-256" in entrypoint
+    assert "hostssl     all       all   192.168.31.0/24" in hba
+    assert "hostssl     all       all   10.0.0.0/24" in hba
+    assert "hostnossl   all       all   0.0.0.0/0           reject" in hba
 
 
 def test_staging_nginx_normalizes_upstream_failures_without_buffering_sse() -> None:

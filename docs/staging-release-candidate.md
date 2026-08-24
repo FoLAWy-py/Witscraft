@@ -2,7 +2,7 @@
 
 **Status:** Operational, isolated, and non-public
 
-Witscraft staging reproduces the single-host production boundary without changing the public deployment. A TLS Nginx gateway is reachable on the local network; the Next.js production build, FastAPI API, and embedding worker run as supervised launchd jobs. PostgreSQL remains bound to loopback and is never exposed directly to the LAN.
+Witscraft staging reproduces the single-host production boundary without changing the public deployment. A TLS Nginx gateway is reachable on the local network; the Next.js production build, FastAPI API, and embedding worker run as supervised launchd jobs. PostgreSQL provides a separately authenticated, TLS-only LAN endpoint for approved development clients.
 
 ## Runtime topology
 
@@ -11,19 +11,35 @@ Witscraft staging reproduces the single-host production boundary without changin
 | Player gateway | Nginx TLS | LAN host on port `19473` |
 | Web application | Next.js production server | loopback port `18321` |
 | API and SSE | Uvicorn/FastAPI | loopback port `18322` |
-| Database | PostgreSQL 18.6 + pgvector 0.8.6 | loopback port `15432` |
+| Database | PostgreSQL 18.6 + pgvector 0.8.6 | TLS port `15432`, approved LANs only |
 | Background work | memory embedding worker | no listener |
 
 The gateway listens on all local IPv4 and IPv6 interfaces. On first preparation it
 records the primary LAN address plus any other detected RFC 1918 addresses (for
 example a private VPN address), and includes all of them in the TLS certificate,
-Host allowlist, CORS origins, and CSRF origins. PostgreSQL, the API, and the web
-process remain loopback-only; LAN clients must use the TLS gateway. Override the
+Host allowlist, CORS origins, and CSRF origins. The API and web process remain
+loopback-only; browser clients must use the TLS gateway. Override the
 aliases before first preparation with the comma-separated
 `WITSCRAFT_STAGING_ADDITIONAL_HOSTS` setting when automatic detection is unsuitable.
 Nginx additionally enforces a client source allowlist: `192.168.31.0/24`,
 `10.0.0.0/24`, IPv4 loopback, and IPv6 loopback. Requests arriving from any other
 source address receive HTTP 403 before reaching the application.
+
+### Database access from the LAN
+
+PostgreSQL listens on port `15432`, but `pg_hba.conf` accepts only TLS connections
+from `192.168.31.0/24`, `10.0.0.0/24`, and loopback. Non-TLS connections and all
+other source networks are rejected. SCRAM-SHA-256 authentication is mandatory.
+
+Startup creates or rotates a dedicated `witscraft_lan_access` role with data access
+to application tables and sequences. It is not a superuser and cannot create
+databases or roles. Do not use or distribute the application owner credentials.
+Private client credentials are written to ignored mode-`0600`
+`.runtime/staging/database-client.env`; the public database certificate is written
+to `.runtime/staging/tls/postgres-server.crt`. Transfer those two files to an
+authorized client through a trusted channel, adjust `PGHOST` to either server LAN
+address when needed, and keep `PGSSLMODE=verify-full`. Never commit, paste into
+logs, or share the credentials file.
 
 ### Trusting the LAN certificate on a client
 
@@ -82,7 +98,9 @@ The encrypted backup workflow uses `scripts/backup-postgres.sh`. Recovery must t
 
 ## Security boundary
 
-- Do not bind PostgreSQL, Uvicorn, or Next.js to the LAN.
+- Do not bind Uvicorn or Next.js to the LAN. PostgreSQL is the sole non-gateway
+  exception and must retain its TLS, SCRAM, source-network, and restricted-role
+  controls.
 - Do not add public DNS, router forwarding, tunnelling, or public certificates to this environment.
 - Do not commit `.runtime`, provider output, private certificates, IP addresses, credentials, or database artifacts.
 - Use only synthetic accounts and stories. Real user content and restored production data are prohibited.

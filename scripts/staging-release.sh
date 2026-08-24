@@ -133,6 +133,8 @@ write_runtime_env() {
     print "DATABASE_USERNAME=witscraft_staging"
     print "DATABASE_PASSWORD=$database_password"
     print "DATABASE_NAME=witscraft_staging"
+    print "LAN_DATABASE_USERNAME=witscraft_lan_access"
+    print "LAN_DATABASE_PASSWORD=$(openssl rand -hex 24)"
   } > "$RUNTIME_ENV"
   chmod 600 "$RUNTIME_ENV"
 }
@@ -142,6 +144,16 @@ load_runtime_env() {
   set -a
   source "$RUNTIME_ENV"
   set +a
+  if [[ -z "${LAN_DATABASE_USERNAME:-}" || -z "${LAN_DATABASE_PASSWORD:-}" ]]; then
+    LAN_DATABASE_USERNAME=witscraft_lan_access
+    LAN_DATABASE_PASSWORD="$(openssl rand -hex 24)"
+    {
+      print "LAN_DATABASE_USERNAME=$LAN_DATABASE_USERNAME"
+      print "LAN_DATABASE_PASSWORD=$LAN_DATABASE_PASSWORD"
+    } >> "$RUNTIME_ENV"
+    chmod 600 "$RUNTIME_ENV"
+    export LAN_DATABASE_USERNAME LAN_DATABASE_PASSWORD
+  fi
   STAGING_ADDITIONAL_HOSTS="${STAGING_ADDITIONAL_HOSTS:-${WITSCRAFT_STAGING_ADDITIONAL_HOSTS:-$(default_additional_lan_hosts "$STAGING_HOST")}}"
   export STAGING_ADDITIONAL_HOSTS
   if ! grep -q '^STAGING_ADDITIONAL_HOSTS=' "$RUNTIME_ENV"; then
@@ -166,6 +178,11 @@ load_runtime_env() {
   : "${DATABASE_USERNAME:?DATABASE_USERNAME is required}"
   : "${DATABASE_PASSWORD:?DATABASE_PASSWORD is required}"
   : "${DATABASE_NAME:?DATABASE_NAME is required}"
+  : "${LAN_DATABASE_USERNAME:?LAN_DATABASE_USERNAME is required}"
+  : "${LAN_DATABASE_PASSWORD:?LAN_DATABASE_PASSWORD is required}"
+  [[ "$DATABASE_USERNAME" =~ '^[A-Za-z0-9_]+$' ]] || fail "database username contains unsafe characters"
+  [[ "$LAN_DATABASE_USERNAME" =~ '^[A-Za-z0-9_]+$' ]] || fail "LAN database username contains unsafe characters"
+  [[ "$LAN_DATABASE_PASSWORD" =~ '^[A-Fa-f0-9]+$' ]] || fail "LAN database password is not generated safely"
   validate_staging_hosts
   validate_port STAGING_GATEWAY_PORT "$STAGING_GATEWAY_PORT"
   validate_port STAGING_WEB_PORT "$STAGING_WEB_PORT"
@@ -349,6 +366,49 @@ compose() {
     "$@"
 }
 
+configure_lan_database_access() {
+  compose exec --no-TTY postgres psql \
+    --username "$DATABASE_USERNAME" \
+    --dbname "$DATABASE_NAME" \
+    --set=lan_role="$LAN_DATABASE_USERNAME" \
+    --set=lan_password="$LAN_DATABASE_PASSWORD" <<'SQL'
+SELECT format(
+  'CREATE ROLE %I LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION PASSWORD %L',
+  :'lan_role', :'lan_password'
+) WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = :'lan_role') \gexec
+SELECT format(
+  'ALTER ROLE %I LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION PASSWORD %L',
+  :'lan_role', :'lan_password'
+) \gexec
+SELECT format('GRANT CONNECT ON DATABASE %I TO %I', current_database(), :'lan_role') \gexec
+SELECT format('GRANT USAGE ON SCHEMA public TO %I', :'lan_role') \gexec
+SELECT format('GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO %I', :'lan_role') \gexec
+SELECT format('GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO %I', :'lan_role') \gexec
+SELECT format('ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO %I', :'lan_role') \gexec
+SELECT format('ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO %I', :'lan_role') \gexec
+SQL
+
+  local temporary_certificate="$RUNTIME/tls/postgres-server.crt.tmp"
+  compose cp postgres:/var/lib/postgresql/tls/server.crt "$temporary_certificate" >/dev/null
+  openssl x509 -in "$temporary_certificate" -noout -checkend 0 >/dev/null
+  chmod 600 "$temporary_certificate"
+  mv "$temporary_certificate" "$RUNTIME/tls/postgres-server.crt"
+
+  local temporary_credentials="$RUNTIME/database-client.env.tmp"
+  {
+    print "PGHOST=$STAGING_HOST"
+    print "PGALTERNATEHOSTS=$STAGING_ADDITIONAL_HOSTS"
+    print "PGPORT=$STAGING_DATABASE_PORT"
+    print "PGDATABASE=$DATABASE_NAME"
+    print "PGUSER=$LAN_DATABASE_USERNAME"
+    print "PGPASSWORD=$LAN_DATABASE_PASSWORD"
+    print "PGSSLMODE=verify-full"
+    print "PGSSLROOTCERT=postgres-server.crt"
+  } > "$temporary_credentials"
+  chmod 600 "$temporary_credentials"
+  mv "$temporary_credentials" "$RUNTIME/database-client.env"
+}
+
 build_web() {
   require_command npm
   cd "$ROOT/apps/web"
@@ -415,6 +475,7 @@ start() {
   cd "$ROOT/apps/api"
   runtime_env_command uv run alembic upgrade head
   runtime_env_command uv run alembic check
+  configure_lan_database_access
   runtime_env_command uv run python -c \
     "from app.config import get_settings, validate_runtime_security; validate_runtime_security(get_settings())"
   write_staging_secrets
