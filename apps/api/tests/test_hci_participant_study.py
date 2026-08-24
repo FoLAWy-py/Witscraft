@@ -212,3 +212,35 @@ def test_runtime_rehearsal_report_is_private(monkeypatch, tmp_path) -> None:
     assert output.parent.stat().st_mode & 0o777 == 0o700
     with pytest.raises(module.StudyValidationError, match="already exists"):
         module._write_sanitized_report(output, {"status": "rehearsal"})
+
+
+def test_session_template_is_incomplete_and_append_is_atomic() -> None:
+    module = _load_module()
+    template = module._session_template(
+        "P-ABCDEF12", "2026-08-25", "mobile", "390x844_mobile", "some"
+    )
+    study = _study(module, [])
+    session = _session("P-ABCDEF12")
+
+    updated = module.append_session(study, session)
+
+    assert template["tasks"]["1"]["status"] == "not_attempted"
+    assert study["sessions"] == []
+    assert updated["sessions"] == [session]
+    assert module.evaluate_study(updated)["status"] == "pending"
+    with pytest.raises(module.StudyValidationError, match="already exists"):
+        module.append_session(updated, session)
+    with pytest.raises(module.StudyValidationError, match="unattempted tasks"):
+        module.append_session(study, template)
+
+
+def test_session_path_is_private_and_code_bound(monkeypatch, tmp_path) -> None:
+    module = _load_module()
+    runtime = tmp_path / ".runtime"
+    monkeypatch.setattr(module, "RUNTIME", runtime)
+    monkeypatch.setattr(module, "RUNTIME_SESSIONS", runtime / "hci" / "sessions")
+
+    expected = runtime / "hci" / "sessions" / "P-ABCDEF12.json"
+    assert module._session_path("P-ABCDEF12", expected) == expected.resolve()
+    with pytest.raises(module.StudyValidationError, match="filename must match"):
+        module._session_path("P-ABCDEF12", expected.with_name("P-00000000.json"))

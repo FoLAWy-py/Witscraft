@@ -43,6 +43,25 @@ Generate participant codes independently of identity or recruitment records:
 python3 scripts/evaluate-hci-participant-study.py new-code
 ```
 
+After eligibility and observation consent are confirmed, create one private
+incomplete facilitator form. All confirmation flags are required so the tool cannot
+silently assume eligibility:
+
+```bash
+python3 scripts/evaluate-hci-participant-study.py session-template \
+  --output .runtime/hci/sessions/P-0123ABCD.json \
+  --participant-code P-0123ABCD \
+  --session-date 2026-08-25 \
+  --device-class desktop \
+  --viewport-class desktop \
+  --experience-band regular \
+  --confirm-adult \
+  --confirm-target-reader \
+  --confirm-non-contributor \
+  --confirm-task-script-unexposed \
+  --confirm-observation-consent
+```
+
 After the rehearsal confirms the workflow, initialize a separate `formal` record.
 Never rename rehearsal data as formal data.
 
@@ -98,6 +117,32 @@ WITSCRAFT_SECRETS_FILE=../../.runtime/staging/api.env \
 
 An invalid session requires one enumerated exclusion reason. A valid unfavorable
 session must remain valid and must not be removed from the result.
+
+Use the standard SUS statements in this exact order, with 1 = strongly disagree
+and 5 = strongly agree:
+
+1. I think that I would like to use this system frequently.
+2. I found the system unnecessarily complex.
+3. I thought the system was easy to use.
+4. I think that I would need the support of a technical person to use this system.
+5. I found the various functions in this system were well integrated.
+6. I thought there was too much inconsistency in this system.
+7. I would imagine that most people would learn to use this system very quickly.
+8. I found the system very cumbersome to use.
+9. I felt very confident using the system.
+10. I needed to learn a lot of things before I could get going with this system.
+
+After completing and checking the private session form, atomically append it to the
+formal study. The command validates both files, rejects duplicate participant codes,
+updates the study through a mode-`0600` temporary file, and deletes the consumed
+single-session file only after success:
+
+```bash
+python3 scripts/evaluate-hci-participant-study.py append-session \
+  --study .runtime/hci/witscraft-hci-20260824-r1-formal.json \
+  --session .runtime/hci/sessions/P-0123ABCD.json \
+  --confirm-consume-session-file
+```
 
 ## Evaluation and evidence
 
