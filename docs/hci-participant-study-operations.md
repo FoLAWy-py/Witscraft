@@ -46,6 +46,23 @@ python3 scripts/evaluate-hci-participant-study.py new-code
 After the rehearsal confirms the workflow, initialize a separate `formal` record.
 Never rename rehearsal data as formal data.
 
+Provision a verified synthetic account for a generated code. Run from the API
+environment with the staging secrets file; the command refuses non-staging database
+names, non-loopback backends, missing database TLS, and non-HTTPS candidates:
+
+```bash
+cd apps/api
+WITSCRAFT_SECRETS_FILE=../../.runtime/staging/api.env \
+  uv run python ../../scripts/manage-hci-study-account.py \
+  --confirm-isolated-staging create \
+  --participant-code P-0123ABCD \
+  --output ../../.runtime/hci/accounts/P-0123ABCD.env
+```
+
+The command prints only the credential-file location, never its contents. Give the
+synthetic credentials to the participant locally and do not copy them into the
+study record.
+
 ## Session procedure
 
 For each participant:
@@ -66,6 +83,18 @@ For each participant:
    HCI principle, short sanitized title, status, and fixed revision.
 7. Delete the synthetic account, clear the clean browser profile, and reconfirm
    readiness before the next participant.
+
+Account deletion is an exact, confirmed operation keyed by the anonymous code. It
+cascade-deletes the synthetic account data and removes its private credential file:
+
+```bash
+cd apps/api
+WITSCRAFT_SECRETS_FILE=../../.runtime/staging/api.env \
+  uv run python ../../scripts/manage-hci-study-account.py \
+  --confirm-isolated-staging delete \
+  --participant-code P-0123ABCD \
+  --credentials ../../.runtime/hci/accounts/P-0123ABCD.env
+```
 
 An invalid session requires one enumerated exclusion reason. A valid unfavorable
 session must remain valid and must not be removed from the result.

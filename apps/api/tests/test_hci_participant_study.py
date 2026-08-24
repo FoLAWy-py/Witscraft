@@ -8,10 +8,19 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = ROOT / "scripts" / "evaluate-hci-participant-study.py"
+ACCOUNT_SCRIPT = ROOT / "scripts" / "manage-hci-study-account.py"
 
 
 def _load_module():
     spec = importlib.util.spec_from_file_location("evaluate_hci_participant_study", SCRIPT)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_account_module():
+    spec = importlib.util.spec_from_file_location("manage_hci_study_account", ACCOUNT_SCRIPT)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -167,3 +176,25 @@ def test_retest_rejects_an_incomplete_prior_participant_set() -> None:
 
     with pytest.raises(module.StudyValidationError, match="at least five prior-round"):
         module.validate_study(retest)
+
+
+def test_synthetic_account_identity_uses_only_anonymous_code() -> None:
+    module = _load_account_module()
+
+    assert module._participant_identity("P-A1B2C3D4") == (
+        "hci-a1b2c3d4@example.invalid",
+        "HCI Study P-A1B2C3D4",
+    )
+    with pytest.raises(module.AccountOperationError, match="participant code"):
+        module._participant_identity("Alice")
+
+
+def test_synthetic_credentials_cannot_leave_private_runtime(tmp_path) -> None:
+    module = _load_account_module()
+    with pytest.raises(module.AccountOperationError, match="must remain under"):
+        module._private_output(tmp_path / "participant.env")
+
+    with pytest.raises(module.AccountOperationError, match="filename must match"):
+        module._participant_credentials_path(
+            "P-A1B2C3D4", module.RUNTIME_ACCOUNTS / "P-FFFFFFFF.env"
+        )

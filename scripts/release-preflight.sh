@@ -13,7 +13,7 @@ fi
 cd "$ROOT/apps/api"
 uv sync --frozen --all-extras
 uv run --with pip-audit==2.10.1 pip-audit --local
-uv run ruff check app tests migrations ../../scripts/capture-interactive-fiction.py ../../scripts/capture-staging-experience.py ../../scripts/capture-structured-extraction.py ../../scripts/check-hci-evaluation.py ../../scripts/check-pgvector-migration.py ../../scripts/check-production-slos.py ../../scripts/create-release-manifest.py ../../scripts/evaluate-hci-participant-study.py ../../scripts/evaluate-interactive-fiction.py ../../scripts/evaluate-memory-retrieval.py ../../scripts/evaluate-structured-extraction.py ../../scripts/observe-staging.py ../../scripts/run-memory-embedding-worker.py ../../scripts/smoke-release.py ../../scripts/staging-slow-upstream.py
+uv run ruff check app tests migrations ../../scripts/capture-interactive-fiction.py ../../scripts/capture-staging-experience.py ../../scripts/capture-structured-extraction.py ../../scripts/check-hci-evaluation.py ../../scripts/check-pgvector-migration.py ../../scripts/check-production-slos.py ../../scripts/create-release-manifest.py ../../scripts/evaluate-hci-participant-study.py ../../scripts/evaluate-interactive-fiction.py ../../scripts/evaluate-memory-retrieval.py ../../scripts/evaluate-structured-extraction.py ../../scripts/manage-hci-study-account.py ../../scripts/observe-staging.py ../../scripts/run-memory-embedding-worker.py ../../scripts/smoke-release.py ../../scripts/staging-slow-upstream.py
 uv run python ../../scripts/evaluate-structured-extraction.py
 uv run python ../../scripts/evaluate-interactive-fiction.py
 ../../scripts/run-backend-tests-isolated.sh
