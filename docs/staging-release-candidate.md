@@ -33,10 +33,12 @@ other source networks are rejected. SCRAM-SHA-256 authentication is mandatory.
 Nginx stream access control owns the client source boundary on `15432` and proxies
 accepted raw PostgreSQL traffic to the Docker port bound only at
 `127.0.0.1:15433`. This preserves the original source decision before Docker
-Desktop rewrites container traffic to `192.168.65.1`. PostgreSQL accepts that exact
-Docker gateway address only with TLS; application and migration connections also
-set asyncpg `ssl=require`. This layered boundary prevents a Docker NAT address from
-accidentally widening LAN access or allowing plaintext database sessions.
+Desktop rewrites container traffic to a private bridge address. PostgreSQL accepts
+the Docker bridge ranges `172.16.0.0/12` and `192.168.65.0/24` only with TLS and
+SCRAM; those ranges cannot reach the loopback-bound backend directly from the LAN.
+Application and migration connections also set asyncpg `ssl=require`. This layered
+boundary prevents Docker NAT from widening LAN access or allowing plaintext
+database sessions.
 
 Startup creates or rotates a dedicated `witscraft_lan_access` role with data access
 to application tables and sequences. It is not a superuser and cannot create

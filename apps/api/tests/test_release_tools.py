@@ -86,7 +86,8 @@ def test_staging_postgres_lan_access_requires_tls_scram_and_restricted_role() ->
     assert "password_encryption=scram-sha-256" in entrypoint
     assert "hostssl     all       all   192.168.31.0/24" in hba
     assert "hostssl     all       all   10.0.0.0/24" in hba
-    assert "hostssl     all       all   192.168.65.1/32" in hba
+    assert "hostssl     all       all   172.16.0.0/12" in hba
+    assert "hostssl     all       all   192.168.65.0/24" in hba
     assert "hostnossl   all       all   0.0.0.0/0           reject" in hba
 
 
