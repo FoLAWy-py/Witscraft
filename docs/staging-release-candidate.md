@@ -14,6 +14,14 @@ Witscraft staging reproduces the single-host production boundary without changin
 | Database | PostgreSQL 18.6 + pgvector 0.8.6 | loopback port `15432` |
 | Background work | memory embedding worker | no listener |
 
+The gateway listens on all local IPv4 and IPv6 interfaces. On first preparation it
+records the primary LAN address plus any other detected RFC 1918 addresses (for
+example a private VPN address), and includes all of them in the TLS certificate,
+Host allowlist, CORS origins, and CSRF origins. PostgreSQL, the API, and the web
+process remain loopback-only; LAN clients must use the TLS gateway. Override the
+aliases before first preparation with the comma-separated
+`WITSCRAFT_STAGING_ADDITIONAL_HOSTS` setting when automatic detection is unsuitable.
+
 The database uses a PostgreSQL 18 parent-directory volume mount at `/var/lib/postgresql`, allowing major-version-specific cluster directories and future `pg_upgrade` workflows. The previous PG17 staging volume is not attached or deleted by the upgrade.
 
 ## Operator workflow

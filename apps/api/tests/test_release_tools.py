@@ -59,6 +59,9 @@ def test_staging_release_script_is_syntactically_valid_and_isolated() -> None:
         "--ca-file",
         "verify-resilience",
         "live-experience",
+        "STAGING_ADDITIONAL_HOSTS",
+        "allowed_hosts_json",
+        "trusted_origins_json",
     ):
         assert required in content or required in (ROOT / "ops/staging/compose.yml").read_text()
     assert "myunsw.witsqua.com" not in content

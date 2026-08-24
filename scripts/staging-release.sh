@@ -58,16 +58,74 @@ detect_lan_host() {
   print "127.0.0.1"
 }
 
+detect_additional_lan_hosts() {
+  local primary_host="$1"
+  local -a detected_hosts
+  detected_hosts=("${(@f)$(ifconfig 2>/dev/null | awk '$1 == "inet" { print $2 }' | sort -u)}")
+  local host
+  for host in "${detected_hosts[@]}"; do
+    [[ "$host" == "$primary_host" || "$host" == "127.0.0.1" ]] && continue
+    if [[ "$host" == 10.* || "$host" == 192.168.* || \
+          "$host" =~ '^172\.(1[6-9]|2[0-9]|3[01])\.' ]]; then
+      print "$host"
+    fi
+  done
+}
+
+default_additional_lan_hosts() {
+  local primary_host="$1"
+  local -a hosts
+  hosts=("${(@f)$(detect_additional_lan_hosts "$primary_host")}")
+  print "${(j:,:)hosts}"
+}
+
+validate_staging_hosts() {
+  local host
+  for host in "$STAGING_HOST" "${(@s:,:)STAGING_ADDITIONAL_HOSTS}"; do
+    [[ -z "$host" ]] && continue
+    [[ "$host" =~ '^[A-Za-z0-9.-]+$' ]] || fail "staging host contains unsafe characters"
+  done
+}
+
+staging_hosts() {
+  local host
+  print "$STAGING_HOST"
+  for host in "${(@s:,:)STAGING_ADDITIONAL_HOSTS}"; do
+    [[ -z "$host" || "$host" == "$STAGING_HOST" ]] && continue
+    print "$host"
+  done
+}
+
+allowed_hosts_json() {
+  local result='["localhost","127.0.0.1"'
+  local host
+  for host in "${(@f)$(staging_hosts)}"; do
+    result+=',"'"$host"'"'
+  done
+  print "$result]"
+}
+
+trusted_origins_json() {
+  local result='["https://localhost:'"$STAGING_GATEWAY_PORT"'"'
+  local host
+  for host in "${(@f)$(staging_hosts)}"; do
+    result+=',"https://'"$host:$STAGING_GATEWAY_PORT"'"'
+  done
+  print "$result]"
+}
+
 write_runtime_env() {
   if [[ -f "$RUNTIME_ENV" ]]; then
     return
   fi
   local staging_host="${WITSCRAFT_STAGING_HOST:-$(detect_lan_host)}"
   [[ "$staging_host" =~ '^[A-Za-z0-9.-]+$' ]] || fail "staging host contains unsafe characters"
+  local additional_hosts="${WITSCRAFT_STAGING_ADDITIONAL_HOSTS:-$(default_additional_lan_hosts "$staging_host")}"
   local database_password
   database_password="$(openssl rand -hex 24)"
   {
     print "STAGING_HOST=$staging_host"
+    print "STAGING_ADDITIONAL_HOSTS=$additional_hosts"
     print "STAGING_GATEWAY_PORT=${WITSCRAFT_STAGING_GATEWAY_PORT:-19473}"
     print "STAGING_WEB_PORT=${WITSCRAFT_STAGING_WEB_PORT:-18321}"
     print "STAGING_API_PORT=${WITSCRAFT_STAGING_API_PORT:-18322}"
@@ -84,6 +142,11 @@ load_runtime_env() {
   set -a
   source "$RUNTIME_ENV"
   set +a
+  STAGING_ADDITIONAL_HOSTS="${STAGING_ADDITIONAL_HOSTS:-${WITSCRAFT_STAGING_ADDITIONAL_HOSTS:-$(default_additional_lan_hosts "$STAGING_HOST")}}"
+  export STAGING_ADDITIONAL_HOSTS
+  if ! grep -q '^STAGING_ADDITIONAL_HOSTS=' "$RUNTIME_ENV"; then
+    print "STAGING_ADDITIONAL_HOSTS=$STAGING_ADDITIONAL_HOSTS" >> "$RUNTIME_ENV"
+  fi
   if [[ "$STAGING_HOST" == "127.0.0.1" ]]; then
     local detected_host="$(detect_lan_host)"
     if [[ "$detected_host" != "127.0.0.1" ]]; then
@@ -103,6 +166,7 @@ load_runtime_env() {
   : "${DATABASE_USERNAME:?DATABASE_USERNAME is required}"
   : "${DATABASE_PASSWORD:?DATABASE_PASSWORD is required}"
   : "${DATABASE_NAME:?DATABASE_NAME is required}"
+  validate_staging_hosts
   validate_port STAGING_GATEWAY_PORT "$STAGING_GATEWAY_PORT"
   validate_port STAGING_WEB_PORT "$STAGING_WEB_PORT"
   validate_port STAGING_API_PORT "$STAGING_API_PORT"
@@ -110,11 +174,16 @@ load_runtime_env() {
 }
 
 tls_subject_alt_name() {
-  if [[ "$STAGING_HOST" =~ '^[0-9]+(\.[0-9]+){3}$' ]]; then
-    print "DNS:localhost,IP:127.0.0.1,IP:$STAGING_HOST"
-  else
-    print "DNS:localhost,IP:127.0.0.1,DNS:$STAGING_HOST"
-  fi
+  local result="DNS:localhost,IP:127.0.0.1"
+  local host
+  for host in "${(@f)$(staging_hosts)}"; do
+    if [[ "$host" =~ '^[0-9]+(\.[0-9]+){3}$' ]]; then
+      result+=",IP:$host"
+    else
+      result+=",DNS:$host"
+    fi
+  done
+  print "$result"
 }
 
 prepare() {
@@ -127,7 +196,7 @@ prepare() {
   load_runtime_env
 
   if [[ ! -f "$RUNTIME/tls/server.crt" || ! -f "$RUNTIME/tls/server.key" || \
-        ! -f "$RUNTIME/tls/host" || "$(<"$RUNTIME/tls/host")" != "$STAGING_HOST" ]]; then
+        ! -f "$RUNTIME/tls/host" || "$(<"$RUNTIME/tls/host")" != "$STAGING_HOST,$STAGING_ADDITIONAL_HOSTS" ]]; then
     openssl req -x509 -newkey rsa:2048 -sha256 -nodes -days 30 \
       -keyout "$RUNTIME/tls/server.key" \
       -out "$RUNTIME/tls/server.crt" \
@@ -135,7 +204,7 @@ prepare() {
       -addext "subjectAltName=$(tls_subject_alt_name)" \
       -addext "basicConstraints=critical,CA:TRUE" >/dev/null 2>&1
     chmod 600 "$RUNTIME/tls/server.key" "$RUNTIME/tls/server.crt"
-    print "$STAGING_HOST" > "$RUNTIME/tls/host"
+    print "$STAGING_HOST,$STAGING_ADDITIONAL_HOSTS" > "$RUNTIME/tls/host"
     chmod 600 "$RUNTIME/tls/host"
   fi
 
@@ -158,16 +227,18 @@ runtime_env_command() {
 }
 
 configure_runtime_environment() {
+  local allowed_hosts="$(allowed_hosts_json)"
+  local trusted_origins="$(trusted_origins_json)"
   export APP_ENVIRONMENT=production
   export WITSCRAFT_SECRETS_FILE="$SOURCE_SECRETS"
   export DATABASE_USERNAME DATABASE_PASSWORD DATABASE_NAME
   export DATABASE_HOST=127.0.0.1
   export DATABASE_PORT="$STAGING_DATABASE_PORT"
   export FRONTEND_BASE_URL="https://$STAGING_HOST:$STAGING_GATEWAY_PORT/witscraft"
-  export ALLOWED_HOSTS="[\"$STAGING_HOST\",\"localhost\",\"127.0.0.1\"]"
-  export CORS_ORIGINS="[\"https://$STAGING_HOST:$STAGING_GATEWAY_PORT\",\"https://localhost:$STAGING_GATEWAY_PORT\"]"
+  export ALLOWED_HOSTS="$allowed_hosts"
+  export CORS_ORIGINS="$trusted_origins"
   export CORS_ORIGIN_REGEX=
-  export CSRF_TRUSTED_ORIGINS="[\"https://$STAGING_HOST:$STAGING_GATEWAY_PORT\",\"https://localhost:$STAGING_GATEWAY_PORT\"]"
+  export CSRF_TRUSTED_ORIGINS="$trusted_origins"
   export AUTH_COOKIE_SECURE=true
   export RATE_LIMIT_ENABLED=true
   export OPERATIONAL_METRICS_LOG_PATH="$RUNTIME/access-metrics.log"
@@ -179,6 +250,8 @@ write_staging_secrets() {
   [[ "$mode" == "normal" || "$mode" == "bounded" ]] || fail "unknown staging secrets mode"
   [[ "$SOURCE_SECRETS" != "$STAGING_SECRETS" ]] || fail "source and staging secrets paths must differ"
   local temporary_secrets="$STAGING_SECRETS.tmp"
+  local allowed_hosts="$(allowed_hosts_json)"
+  local trusted_origins="$(trusted_origins_json)"
   cp "$SOURCE_SECRETS" "$temporary_secrets"
   {
     print ""
@@ -190,10 +263,10 @@ write_staging_secrets() {
     print "DATABASE_PORT=$STAGING_DATABASE_PORT"
     print "DATABASE_NAME=$DATABASE_NAME"
     print "FRONTEND_BASE_URL=https://$STAGING_HOST:$STAGING_GATEWAY_PORT/witscraft"
-    print "ALLOWED_HOSTS=[\"$STAGING_HOST\",\"localhost\",\"127.0.0.1\"]"
-    print "CORS_ORIGINS=[\"https://$STAGING_HOST:$STAGING_GATEWAY_PORT\",\"https://localhost:$STAGING_GATEWAY_PORT\"]"
+    print "ALLOWED_HOSTS=$allowed_hosts"
+    print "CORS_ORIGINS=$trusted_origins"
     print "CORS_ORIGIN_REGEX="
-    print "CSRF_TRUSTED_ORIGINS=[\"https://$STAGING_HOST:$STAGING_GATEWAY_PORT\",\"https://localhost:$STAGING_GATEWAY_PORT\"]"
+    print "CSRF_TRUSTED_ORIGINS=$trusted_origins"
     print "AUTH_COOKIE_SECURE=true"
     print "RATE_LIMIT_ENABLED=true"
     print "OPERATIONAL_METRICS_LOG_PATH=$RUNTIME/access-metrics.log"
