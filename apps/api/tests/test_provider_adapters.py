@@ -137,6 +137,25 @@ def test_openai_non_reasoning_request_preserves_sampling_parameters() -> None:
     assert "text" not in create.calls[0]
 
 
+def test_openai_incomplete_max_output_maps_to_length_limited() -> None:
+    create = AsyncCreate(
+        SimpleNamespace(
+            output_text="unfinished",
+            status="incomplete",
+            incomplete_details=SimpleNamespace(reason="max_output_tokens"),
+            usage=None,
+            model_dump=lambda: {},
+        )
+    )
+    adapter = OpenAIAdapter(Settings(openai_api_key="test-key"))
+    adapter.client = SimpleNamespace(responses=create)
+
+    response = asyncio.run(adapter.generate(_request(response_format="text")))
+
+    assert response.completion_status == "length_limited"
+    assert response.finish_reason == "max_output_tokens"
+
+
 def test_openai_stream_yields_only_text_delta_events() -> None:
     events = AsyncEvents(
         [
@@ -259,6 +278,26 @@ def test_deepinfra_stream_filters_empty_choices_and_content() -> None:
 
     assert asyncio.run(collect()) == ["alpha", " beta"]
     assert create.calls[0]["stream"] is True
+
+
+def test_deepinfra_length_finish_reason_is_preserved() -> None:
+    response_value = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(content="unfinished"), finish_reason="length"
+            )
+        ],
+        usage=SimpleNamespace(prompt_tokens=22, completion_tokens=512),
+        model_dump=lambda: {},
+    )
+    create = AsyncCreate(response_value)
+    adapter = DeepInfraAdapter(Settings(deepinfra_api_key="test-key"))
+    adapter.client = SimpleNamespace(chat=SimpleNamespace(completions=create))
+
+    response = asyncio.run(adapter.generate(_request(provider="deepinfra")))
+
+    assert response.completion_status == "length_limited"
+    assert response.finish_reason == "length"
 
 
 @pytest.mark.parametrize("adapter_type", [OpenAIAdapter, DeepInfraAdapter])

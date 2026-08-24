@@ -30,7 +30,9 @@ def main() -> int:
     )
     parser.add_argument("--case", type=Path, default=DEFAULT_ROOT / "case.json")
     parser.add_argument(
-        "--capture", type=Path, default=DEFAULT_ROOT / "provider-capture-v4-approved.json"
+        "--capture",
+        type=Path,
+        default=DEFAULT_ROOT / "provider-capture-v5-natural-pacing-approved.json",
     )
     parser.add_argument("--thresholds", type=Path, default=DEFAULT_ROOT / "thresholds.json")
     parser.add_argument("--output", type=Path)

@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 ProviderName = Literal["openai", "deepinfra"]
 MessageRole = Literal["system", "developer", "user", "assistant"]
 ResponseFormat = Literal["text", "json"]
+CompletionStatus = Literal["completed", "length_limited", "interrupted", "failed"]
 StoryPurpose = Literal[
     "critical_story_generation",
     "normal_chat",
@@ -45,6 +46,8 @@ class LLMResponse(BaseModel):
     latency_ms: int | None = None
     call_id: str | None = None
     cost_estimate: float | None = None
+    completion_status: CompletionStatus = "completed"
+    finish_reason: str | None = None
 
 
 class ModelOption(BaseModel):

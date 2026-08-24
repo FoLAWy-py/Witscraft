@@ -224,6 +224,7 @@ export type WorkspaceMessage = {
   time?: string | null;
   choices?: string[];
   consistency_check?: ConsistencyCheck | null;
+  chapter_id?: string | null;
 };
 
 export type ConsistencyIssue = {
@@ -326,7 +327,7 @@ export type WorkspaceResponse = {
   consistency_mode: "manual" | "auto" | "off";
   planned_chapter_count: number;
   minimum_planned_chapter_count: number;
-  target_chapter_length: number;
+  minimum_chapter_length: number;
   chapter_length_unit: "characters" | "words";
   prose_language: string;
   roadmap_version: number;
@@ -359,12 +360,12 @@ export type CreateStoryInput = {
   customPrompt: string;
   interactionMode: "choices" | "open";
   plannedChapterCount: number;
-  targetChapterLength: number;
+  minimumChapterLength: number;
   chapterLengthUnit: "characters" | "words";
   proseLanguage: string;
 };
 
-export type StoryDraftSuggestion = Omit<CreateStoryInput, "worldId" | "styleProfileId" | "openingMode" | "customPrompt" | "interactionMode" | "plannedChapterCount" | "targetChapterLength" | "chapterLengthUnit" | "proseLanguage">;
+export type StoryDraftSuggestion = Omit<CreateStoryInput, "worldId" | "styleProfileId" | "openingMode" | "customPrompt" | "interactionMode" | "plannedChapterCount" | "minimumChapterLength" | "chapterLengthUnit" | "proseLanguage">;
 
 export type StyleProfile = {
   id: string;
@@ -462,6 +463,20 @@ export type ChatResponse = {
   choices: string[];
   idempotency_key?: string | null;
   branch_version?: number | null;
+  chapter_transition?: {
+    completed: boolean;
+    chapter_number: number;
+    measured_length: number;
+    minimum_length: number;
+    length_unit: "characters" | "words";
+    phase: "setup" | "rising" | "climax" | "resolution" | "transition";
+    objective_resolved: boolean;
+    natural_break: boolean;
+    exceptional_break: "none" | "story_ending" | "irreversible_failure";
+    reason: string;
+    next_chapter_number?: number;
+    next_chapter_title?: string;
+  } | null;
   model_call: {
     id?: string;
     provider: ProviderName;
@@ -471,6 +486,9 @@ export type ChatResponse = {
     input_tokens?: number | null;
     output_tokens?: number | null;
     cost_estimate?: number | null;
+    completion_status?: "completed" | "length_limited" | "interrupted" | "failed";
+    finish_reason?: string | null;
+    continued_after_length_limit?: boolean;
     turn_id?: string | null;
     request_id?: string | null;
     status?: string;

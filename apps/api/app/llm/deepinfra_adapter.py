@@ -12,6 +12,8 @@ from app.schemas.llm import LLMRequest, LLMResponse
 class DeepInfraAdapter(LLMAdapter):
     def __init__(self, settings: Settings):
         self.settings = settings
+        self.last_stream_completion_status = "completed"
+        self.last_stream_finish_reason: str | None = None
         self.client = (
             AsyncOpenAI(
                 api_key=settings.deepinfra_api_key,
@@ -66,11 +68,17 @@ class DeepInfraAdapter(LLMAdapter):
             input_tokens=getattr(usage, "prompt_tokens", None),
             output_tokens=getattr(usage, "completion_tokens", None),
             latency_ms=latency_ms,
+            completion_status=self._completion_status(getattr(choice, "finish_reason", None)),
+            finish_reason=getattr(choice, "finish_reason", None),
         )
 
     async def stream(self, request: LLMRequest) -> AsyncIterator[str]:
+        self.last_stream_completion_status = "interrupted"
+        self.last_stream_finish_reason = None
         if self.settings.dry_run_llm or self.client is None:
             response = await self.generate(request)
+            self.last_stream_completion_status = response.completion_status
+            self.last_stream_finish_reason = response.finish_reason
             for chunk in response.text.split(" "):
                 yield f"{chunk} "
             return
@@ -97,9 +105,23 @@ class DeepInfraAdapter(LLMAdapter):
             if not event.choices:
                 continue
             delta = event.choices[0].delta
+            finish_reason = getattr(event.choices[0], "finish_reason", None)
+            if finish_reason is not None:
+                self.last_stream_finish_reason = str(finish_reason)
+                self.last_stream_completion_status = self._completion_status(finish_reason)
             content = getattr(delta, "content", None)
             if content:
                 yield content
+
+    @staticmethod
+    def _completion_status(finish_reason) -> str:
+        if finish_reason in {None, "stop", "eos", "eos_token"}:
+            return "completed"
+        if finish_reason in {"length", "max_tokens", "max_output_tokens"}:
+            return "length_limited"
+        if finish_reason in {"content_filter", "error"}:
+            return "failed"
+        return "interrupted"
 
     @staticmethod
     def _to_chat_completion_message(message) -> dict[str, str]:

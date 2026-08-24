@@ -69,13 +69,13 @@ def test_client_model_hint_must_match_backend_route() -> None:
     )
     assert matching.model == "zai-org/GLM-5.2"
 
-    long_chapter = engine._routed_generation_request(
+    natural_chapter_turn = engine._routed_generation_request(
         ChatRequest(message="continue", story_id="story"),
         messages,
-        SimpleNamespace(target_chapter_length=5000, chapter_length_unit="words"),
+        SimpleNamespace(minimum_chapter_length=5000, chapter_length_unit="words"),
         stream=False,
     )
-    assert long_chapter.max_output_tokens == 4096
+    assert natural_chapter_turn.max_output_tokens == 3200
 
     with pytest.raises(HTTPException) as caught:
         engine._routed_generation_request(

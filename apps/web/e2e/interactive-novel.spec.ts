@@ -99,7 +99,7 @@ async function installApiFixture(page: Page) {
     consistency_mode: "auto",
     planned_chapter_count: plannedChapterCount,
     minimum_planned_chapter_count: 3,
-    target_chapter_length: 1800,
+    minimum_chapter_length: 1200,
     chapter_length_unit: "words",
     prose_language: "en",
     roadmap_version: roadmapVersion,
@@ -242,7 +242,7 @@ async function installApiFixture(page: Page) {
     if (path.endsWith("/api/workspace/stories") && request.method() === "POST") {
       const payload = request.postDataJSON();
       expect(payload.planned_chapter_count).toBe(24);
-      expect(payload.target_chapter_length).toBe(2400);
+      expect(payload.minimum_chapter_length).toBe(2400);
       expect(payload.chapter_length_unit).toBe("words");
       expect(payload.prose_language).toBe("en");
       expect(payload.style_profile_id).toBe(styleProfileId);
@@ -335,6 +335,7 @@ test("player signs in and directs the next scene", async ({ page }) => {
   await expect(page.getByText("计划已调整为 15 章", { exact: false })).toBeVisible();
   await expect(page.getByText("Chapter 15", { exact: true })).toBeVisible();
 
+  await page.locator("summary").filter({ hasText: "故事档案与高级工具" }).click();
   await page.getByTestId("edit-canon-00000000-0000-0000-0000-000000000801").click();
   await page.getByLabel("既定事实 content").fill("The archive door opened before midnight.");
   await page.getByRole("button", { name: "检查影响" }).click();
@@ -368,7 +369,7 @@ test("player signs in and directs the next scene", async ({ page }) => {
   await expect(page.getByTestId("model-role-embedding")).toContainText("更换模型需要受控重建索引");
   await page.getByRole("button", { name: "故事", exact: true }).click();
 
-  const composer = page.getByPlaceholder("引导下一幕…");
+  const composer = page.getByPlaceholder("描述主角下一步行动…");
   await composer.fill("I turn the key and enter the sealed room.");
   await page.getByRole("button", { name: "发送" }).click();
 
@@ -384,7 +385,7 @@ test("player signs in and directs the next scene", async ({ page }) => {
   await expect(page.getByText("继续", { exact: true }).last()).toBeVisible();
 });
 
-test("player configures chapter count and chapter length during story creation", async ({ page }) => {
+test("player configures chapter count and minimum development during story creation", async ({ page }) => {
   await installApiFixture(page);
   await page.goto("/witscraft/");
   await page.getByLabel("邮箱").fill(user.email);
@@ -397,12 +398,13 @@ test("player configures chapter count and chapter length during story creation",
   await page.getByLabel("叙事风格").fill("Restrained and tense");
   await page.getByLabel("计划章节数").fill("24");
   await page.getByLabel("正文语言").selectOption("en");
-  await page.getByLabel("自定义长度").fill("2400");
+  await page.getByLabel("自定义最低量").fill("2400");
   await page.getByLabel("世界名称").fill("The Tidal City");
   await page.getByLabel("故事前提").fill("A sealed archive opens only when the tide is lowest.");
   await page.getByLabel("主角姓名").fill("Mira");
   await page.getByLabel("主角身份与目标").fill("An archivist searching for a missing record.");
   await page.getByLabel("小说专属 Prompt").fill("Preserve player agency and build clues fairly.");
+  await page.locator("summary").filter({ hasText: "可选：导入参考文风" }).click();
   await page.getByLabel("画像名称").fill("Public-domain harbor profile");
   await page.getByLabel("权利来源").selectOption("public_domain");
   await page.getByLabel("来源说明（不填作者模仿指令）").fill("Reviewed public-domain fixture");

@@ -79,7 +79,7 @@ async def build_story_export_payload(
             "title": story.title,
             "status": story.status,
             "planned_chapter_count": story.planned_chapter_count,
-            "target_chapter_length": story.target_chapter_length,
+            "minimum_chapter_length": story.minimum_chapter_length,
             "chapter_length_unit": story.chapter_length_unit,
             "prose_language": story.prose_language,
             "created_at": _iso(story.created_at),

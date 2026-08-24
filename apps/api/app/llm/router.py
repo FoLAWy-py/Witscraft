@@ -53,6 +53,8 @@ class LLMGateway:
         self.last_stream_cost_estimate: float | None = None
         self.last_stream_provider: str | None = None
         self.last_stream_model: str | None = None
+        self.last_stream_completion_status = "interrupted"
+        self.last_stream_finish_reason: str | None = None
         self.adapters = {
             "openai": OpenAIAdapter(settings),
             "deepinfra": DeepInfraAdapter(settings),
@@ -125,6 +127,8 @@ class LLMGateway:
         self.last_stream_cost_estimate = None
         self.last_stream_provider = None
         self.last_stream_model = None
+        self.last_stream_completion_status = "interrupted"
+        self.last_stream_finish_reason = None
         last_error: BaseException | None = None
         attempt_number = 0
 
@@ -180,6 +184,13 @@ class LLMGateway:
                     break
 
                 self._record_circuit_success(candidate)
+                adapter = self.adapters[candidate.provider]
+                self.last_stream_completion_status = getattr(
+                    adapter, "last_stream_completion_status", "completed"
+                )
+                self.last_stream_finish_reason = getattr(
+                    adapter, "last_stream_finish_reason", None
+                )
                 await self._record_stream_call(
                     candidate, chunks, started, first_token_latency_ms,
                     "succeeded", attempt_number,
@@ -215,6 +226,8 @@ class LLMGateway:
             provider=request.provider, model=request.model, text="".join(chunks),
             raw={"stream": True},
             latency_ms=int((time.perf_counter() - started) * 1000),
+            completion_status=self.last_stream_completion_status,
+            finish_reason=self.last_stream_finish_reason,
         )
         call_id, cost = await self.auditor.record_llm(
             request, response, status=status, latency_ms=response.latency_ms or 0,

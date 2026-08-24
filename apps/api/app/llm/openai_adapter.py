@@ -12,6 +12,8 @@ from app.schemas.llm import LLMRequest, LLMResponse
 class OpenAIAdapter(LLMAdapter):
     def __init__(self, settings: Settings):
         self.settings = settings
+        self.last_stream_completion_status = "completed"
+        self.last_stream_finish_reason: str | None = None
         self.client = (
             AsyncOpenAI(
                 api_key=settings.openai_api_key,
@@ -60,6 +62,7 @@ class OpenAIAdapter(LLMAdapter):
         response = await self.client.responses.create(**kwargs)
         latency_ms = int((time.perf_counter() - started) * 1000)
         usage = getattr(response, "usage", None)
+        completion_status, finish_reason = self._completion_status(response)
         return LLMResponse(
             provider="openai",
             model=request.model,
@@ -68,11 +71,17 @@ class OpenAIAdapter(LLMAdapter):
             input_tokens=getattr(usage, "input_tokens", None),
             output_tokens=getattr(usage, "output_tokens", None),
             latency_ms=latency_ms,
+            completion_status=completion_status,
+            finish_reason=finish_reason,
         )
 
     async def stream(self, request: LLMRequest) -> AsyncIterator[str]:
+        self.last_stream_completion_status = "interrupted"
+        self.last_stream_finish_reason = None
         if self.settings.dry_run_llm or self.client is None:
             response = await self.generate(request)
+            self.last_stream_completion_status = response.completion_status
+            self.last_stream_finish_reason = response.finish_reason
             if response.text:
                 yield response.text
             return
@@ -102,6 +111,31 @@ class OpenAIAdapter(LLMAdapter):
         async for event in stream:
             if event.type == "response.output_text.delta":
                 yield event.delta
+            elif event.type in {"response.completed", "response.incomplete", "response.failed"}:
+                response = getattr(event, "response", None)
+                if response is None:
+                    self.last_stream_completion_status = (
+                        "completed" if event.type == "response.completed" else "interrupted"
+                    )
+                    self.last_stream_finish_reason = event.type.removeprefix("response.")
+                else:
+                    (
+                        self.last_stream_completion_status,
+                        self.last_stream_finish_reason,
+                    ) = self._completion_status(response)
+
+    @staticmethod
+    def _completion_status(response) -> tuple[str, str | None]:
+        status = str(getattr(response, "status", "completed") or "completed")
+        details = getattr(response, "incomplete_details", None)
+        reason = getattr(details, "reason", None) if details is not None else None
+        if status == "completed":
+            return "completed", reason or status
+        if reason in {"max_output_tokens", "max_tokens"}:
+            return "length_limited", str(reason)
+        if status == "failed":
+            return "failed", str(reason or status)
+        return "interrupted", str(reason or status)
 
     @staticmethod
     def _split_instructions(request: LLMRequest) -> tuple[str | None, list[dict[str, str]]]:

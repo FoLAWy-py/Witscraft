@@ -44,7 +44,7 @@ export async function createStory(input: CreateStoryInput): Promise<WorkspaceRes
       custom_prompt: input.customPrompt,
       interaction_mode: input.interactionMode,
       planned_chapter_count: input.plannedChapterCount,
-      target_chapter_length: input.targetChapterLength,
+      minimum_chapter_length: input.minimumChapterLength,
       chapter_length_unit: input.chapterLengthUnit,
       prose_language: input.proseLanguage
     })
@@ -143,7 +143,7 @@ type InterviewWire = {
     custom_prompt: string;
     interaction_mode: "choices" | "open";
     planned_chapter_count: number;
-    target_chapter_length: number;
+    minimum_chapter_length: number;
     chapter_length_unit: "characters" | "words";
     prose_language: string;
   };
@@ -173,7 +173,7 @@ function serializeStoryInterview(input: {
       custom_prompt: input.draft.customPrompt,
       interaction_mode: input.draft.interactionMode,
       planned_chapter_count: input.draft.plannedChapterCount,
-      target_chapter_length: input.draft.targetChapterLength,
+      minimum_chapter_length: input.draft.minimumChapterLength,
       chapter_length_unit: input.draft.chapterLengthUnit,
       prose_language: input.draft.proseLanguage
     }
@@ -200,7 +200,7 @@ function mapStoryInterview(response: InterviewWire): StoryInterviewResponse {
       customPrompt: response.draft.custom_prompt,
       interactionMode: response.draft.interaction_mode,
       plannedChapterCount: response.draft.planned_chapter_count,
-      targetChapterLength: response.draft.target_chapter_length,
+      minimumChapterLength: response.draft.minimum_chapter_length,
       chapterLengthUnit: response.draft.chapter_length_unit,
       proseLanguage: response.draft.prose_language
     }

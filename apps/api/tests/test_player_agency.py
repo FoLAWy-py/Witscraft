@@ -7,12 +7,10 @@ import pytest
 from app.schemas.llm import ChatMessage, LLMRequest, LLMResponse
 from app.services.player_agency import (
     agency_editor_instruction,
-    chapter_needs_expansion,
     chapter_prose,
     chapter_authoring_instruction,
     ensure_chapter_heading,
     measured_chapter_length,
-    prune_chapter_to_length_band,
     reject_known_impossible_action,
 )
 from app.services.story_engine import StoryEngine
@@ -51,7 +49,9 @@ def test_normal_turn_preserves_protagonist_control() -> None:
         chapter_number=4,
         chapter_title="The Locked Gate",
         chapter_objective="Reveal the cost of entry.",
-        target_length=1800,
+        minimum_chapter_length=1200,
+        current_chapter_length=640,
+        chapter_started=True,
         length_unit="words",
         prose_language="en",
         player_action="I wait beside the gate.",
@@ -63,7 +63,9 @@ def test_normal_turn_preserves_protagonist_control() -> None:
     assert "silently delete" in instruction
     assert "quoted dialogue" in instruction
     assert "NPC dialogue and reactions" in instruction
-    assert "approximately 1800" in instruction
+    assert "minimum pacing gate is 1200" in instruction
+    assert "never a target or maximum" in instruction
+    assert "Continue the active chapter" in instruction
 
 
 def test_agency_editor_must_retain_every_explicit_player_action() -> None:
@@ -73,8 +75,6 @@ def test_agency_editor_must_retain_every_explicit_player_action() -> None:
             "without opening one."
         ),
         protagonist_name="Eleanor Vale",
-        target_length=500,
-        length_unit="words",
         abstract_style_profile="Dialogue-led and compact.",
     )
 
@@ -94,11 +94,13 @@ def test_continue_delegates_exactly_one_reversible_turn() -> None:
         chapter_number=2,
         chapter_title="潮声",
         chapter_objective="推进线索。",
-        target_length=1800,
+        minimum_chapter_length=1200,
+        current_chapter_length=0,
+        chapter_started=False,
         length_unit="characters",
         prose_language="zh-CN",
     )
-    assert "for this chapter only" in instruction
+    assert "for this response only" in instruction
     assert "delegation expires after this reply" in instruction
     assert "irreversible commitment" in instruction
 
@@ -125,34 +127,13 @@ def test_canonical_chapter_heading_is_idempotent() -> None:
     assert chapter_prose("The gate opens.") == "The gate opens."
 
 
-def test_chapter_length_uses_player_facing_units_and_fifteen_percent_floor() -> None:
+def test_chapter_length_uses_player_facing_units_without_a_target_band() -> None:
     assert measured_chapter_length("潮 声\n又近了。", "characters") == 6
     assert measured_chapter_length("Three precise words", "words") == 3
-    assert chapter_needs_expansion("潮" * 424, 500, "characters") is True
-    assert chapter_needs_expansion("潮" * 425, 500, "characters") is False
 
 
-def test_deterministic_length_pruning_preserves_dialogue_and_ending_hook() -> None:
-    paragraphs = [
-        "Opening establishes the external room and conflict " * 8,
-        "Atmospheric rain description without a new event " * 10,
-        "“An NPC gives a substantial answer that should remain in the chapter.” " * 8,
-        "Repeated staging description without a new event " * 10,
-        "The ending hook remains available for the player's next decision " * 8,
-    ]
-    overlong = "\n\n".join(paragraphs)
-
-    pruned = prune_chapter_to_length_band(overlong, 210, "words")
-
-    assert pruned is not None
-    assert 179 <= measured_chapter_length(pruned, "words") <= 241
-    assert "An NPC gives a substantial answer" in pruned
-    assert "ending hook remains" in pruned
-    assert "Atmospheric rain description" not in pruned
-
-
-def test_agency_editor_uses_openai_and_trims_only_an_overlong_result() -> None:
-    gateway = AgencyGateway([" ".join(["draft"] * 120), " ".join(["trimmed"] * 100)])
+def test_agency_editor_uses_openai_without_length_trimming() -> None:
+    gateway = AgencyGateway([" ".join(["draft"] * 120)])
     engine = StoryEngine.__new__(StoryEngine)
     engine.llm_gateway = gateway
     engine._main_character_name = AsyncMock(return_value="Eleanor Vale")
@@ -160,20 +141,20 @@ def test_agency_editor_uses_openai_and_trims_only_an_overlong_result() -> None:
     revised, response = asyncio.run(
         engine._enforce_player_agency(
             "original",
-            story=SimpleNamespace(target_chapter_length=100, chapter_length_unit="words"),
+            story=SimpleNamespace(chapter_length_unit="words"),
             request=SimpleNamespace(control_mode="player_action", message="I wait."),
             chapter=SimpleNamespace(),
             llm_request=_agency_request(),
         )
     )
 
-    assert measured_chapter_length(revised, "words") == 100
+    assert measured_chapter_length(revised, "words") == 120
     assert response is not None
-    assert len(gateway.requests) == 2
+    assert len(gateway.requests) == 1
     assert gateway.requests[0].provider == "openai"
     assert gateway.requests[0].model == "gpt-5.5"
     assert gateway.requests[0].purpose == "consistency_check"
-    assert gateway.requests[1].reasoning_effort == "low"
+    assert "word count" in gateway.requests[0].messages[-1].content
 
 
 def test_agency_editor_fails_closed_when_provider_edit_fails() -> None:
@@ -186,7 +167,7 @@ def test_agency_editor_fails_closed_when_provider_edit_fails() -> None:
         asyncio.run(
             engine._enforce_player_agency(
                 "unreviewed",
-                story=SimpleNamespace(target_chapter_length=100, chapter_length_unit="words"),
+                story=SimpleNamespace(chapter_length_unit="words"),
                 request=SimpleNamespace(control_mode="player_action", message="I wait."),
                 chapter=SimpleNamespace(),
                 llm_request=_agency_request(),

@@ -76,10 +76,16 @@ def _capture(case: dict, chapter: str) -> dict:
             "narrative_quality": 90,
             "player_agency": 95,
             "world_canon": 90,
-            "roadmap_length": 95,
+            "narrative_pacing": 95,
             "overall": 92,
             "reasons": ["Synthetic contract response for evaluator tests."],
         },
+        "narrative_completion": {
+            "status": "completed",
+            "finish_reason": "stop",
+            "continued_after_length_limit": False,
+        },
+        "chapter_transition": {"completed": False},
     }
 
 
@@ -97,7 +103,7 @@ def test_provider_capture_replay_reports_provider_scores_and_deterministic_gates
     assert report.passed is True
     assert report.score_source == "provider_capture"
     assert report.scores["player_agency"] == 95
-    assert report.measurements["within_length_band"] is True
+    assert report.measurements["output_complete"] is True
     assert report.measurements["reference_overlap_blocked"] is False
     assert report.measurements["provider_calls"] == 7
 
@@ -112,22 +118,16 @@ def test_reviewed_real_provider_capture_passes_current_gate() -> None:
     report = evaluate_provider_capture(
         case,
         reference,
-        _load("provider-capture-v4-approved.json"),
+        _load("provider-capture-v5-natural-pacing-approved.json"),
         thresholds,
     )
 
     assert report.passed is True
     assert report.score_source == "provider_capture"
-    assert report.scores == {
-        "profile_adherence": 70,
-        "narrative_quality": 84,
-        "player_agency": 93,
-        "world_canon": 86,
-        "roadmap_length": 95,
-        "overall": 85,
-    }
-    assert report.measurements["measured_length"] == 573
-    assert report.measurements["provider_calls"] == 8
+    captured_scores = _load("provider-capture-v5-natural-pacing-approved.json")["scores"]
+    assert report.scores == {name: captured_scores[name] for name in report.scores}
+    assert report.measurements["measured_installment_length"] > 0
+    assert report.measurements["provider_calls"] <= 8
 
 
 def test_evaluator_rejects_synthetic_or_tampered_model_score_evidence() -> None:

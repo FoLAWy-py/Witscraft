@@ -1,7 +1,6 @@
 import asyncio
 import json
 import re
-from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -367,7 +366,7 @@ async def workspace(
         consistency_mode=story.consistency_mode or "auto",
         planned_chapter_count=story.planned_chapter_count,
         minimum_planned_chapter_count=max(3, protected_chapter_number or 0),
-        target_chapter_length=story.target_chapter_length,
+        minimum_chapter_length=story.minimum_chapter_length,
         chapter_length_unit=story.chapter_length_unit,
         prose_language=story.prose_language,
         roadmap_version=active_branch.roadmap_version if active_branch else 0,
@@ -397,7 +396,6 @@ async def create_story(
     if request.opening_mode == "custom" and not opening_text:
         raise HTTPException(status_code=422, detail="Custom opening text is required")
 
-    existing_world_id = None
     style_profile_id = None
     if request.style_profile_id:
         requested_profile_id = _parse_uuid_or_none(request.style_profile_id)
@@ -406,13 +404,10 @@ async def create_story(
             raise HTTPException(status_code=404, detail="Style profile not found")
         style_profile_id = profile.id
     if request.world_id:
-        requested_world_id = _parse_uuid_or_none(request.world_id)
-        if requested_world_id is None:
-            raise HTTPException(status_code=404, detail="World not found")
-        existing_world = await session.get(World, requested_world_id)
-        if existing_world is None or existing_world.user_id != user_id:
-            raise HTTPException(status_code=404, detail="World not found")
-        existing_world_id = existing_world.id
+        raise HTTPException(
+            status_code=422,
+            detail="Each novel creates and owns one world; an existing world cannot be reused",
+        )
 
     purpose_routes = await load_user_purpose_routes(session, user_id)
     await session.rollback()
@@ -424,23 +419,17 @@ async def create_story(
         purpose_routes=purpose_routes,
     )
 
-    world = None
-    if existing_world_id is not None:
-        world = await session.get(World, existing_world_id)
-        if world is None or world.user_id != user_id:
-            raise HTTPException(status_code=404, detail="World not found")
-    if world is None:
-        world = World(
-            id=uuid4(),
-            user_id=user_id,
-            name=world_name,
-            description=premise,
-            genre=genre,
-            rules={},
-            lorebook=[],
-            tone={"style": tone},
-        )
-        session.add(world)
+    world = World(
+        id=uuid4(),
+        user_id=user_id,
+        name=world_name,
+        description=premise,
+        genre=genre,
+        rules={},
+        lorebook=[],
+        tone={"style": tone},
+    )
+    session.add(world)
 
     character = Character(
         id=uuid4(),
@@ -467,7 +456,7 @@ async def create_story(
         custom_prompt=custom_prompt or None,
         interaction_mode=request.interaction_mode,
         planned_chapter_count=request.planned_chapter_count,
-        target_chapter_length=request.target_chapter_length,
+        minimum_chapter_length=request.minimum_chapter_length,
         chapter_length_unit=request.chapter_length_unit,
         prose_language=request.prose_language.strip(),
     )
@@ -497,16 +486,28 @@ async def create_story(
         },
     )
     session.add(snapshot)
-    opening_message_id = None
-    chapter_completed_at = None
+    chapter_rows = [
+        StoryChapter(
+            id=uuid4(),
+            story_id=story_id,
+            branch_id=branch_id,
+            chapter_number=chapter.chapter_number,
+            title=chapter.title,
+            objective=chapter.objective,
+            status="active" if chapter.chapter_number == 1 else "planned",
+            roadmap_version=1,
+        )
+        for chapter in planned_roadmap.draft.chapters
+    ]
+    session.add_all(chapter_rows)
+    await session.flush()
     if request.opening_mode == "custom":
-        opening_message_id = uuid4()
-        chapter_completed_at = datetime.now(timezone.utc)
         session.add(
             Message(
-                id=opening_message_id,
+                id=uuid4(),
                 story_id=story_id,
                 branch_id=branch_id,
+                chapter_id=chapter_rows[0].id,
                 role="assistant",
                 content=opening_text,
                 meta={
@@ -515,29 +516,6 @@ async def create_story(
                 },
             )
         )
-    session.add_all(
-        [
-            StoryChapter(
-                story_id=story_id,
-                branch_id=branch_id,
-                chapter_number=chapter.chapter_number,
-                title=chapter.title,
-                objective=chapter.objective,
-                status=(
-                    "completed"
-                    if chapter.chapter_number == 1 and opening_message_id is not None
-                    else "active"
-                    if chapter.chapter_number
-                    == (2 if opening_message_id is not None else 1)
-                    else "planned"
-                ),
-                roadmap_version=1,
-                message_id=(opening_message_id if chapter.chapter_number == 1 else None),
-                completed_at=(chapter_completed_at if chapter.chapter_number == 1 else None),
-            )
-            for chapter in planned_roadmap.draft.chapters
-        ]
-    )
     await session.commit()
 
     return await workspace(story_id=str(story_id), session=session, user_id=user_id)
@@ -700,9 +678,9 @@ async def _build_story_interview_request(
                 "question_focus 必须填写本轮唯一问题对应的 draft 字段名；如果已经完整则为 null。"
                 "draft 必须包含 title、genre、world_name、"
                 "premise、protagonist_name、protagonist_role、tone、opening_mode、opening_text、custom_prompt、interaction_mode、"
-                "planned_chapter_count、target_chapter_length、chapter_length_unit、prose_language。"
+                "planned_chapter_count、minimum_chapter_length、chapter_length_unit、prose_language。"
                 "opening_mode 只能是 blank 或 custom。没有可靠信息的字段保持空字符串。"
-                "planned_chapter_count 必须为 3 到 120，target_chapter_length 必须为 500 到 5000；"
+                "planned_chapter_count 必须为 3 到 120，minimum_chapter_length 必须为 500 到 5000；"
                 "除非用户明确要求改变篇幅，否则保留当前数值和语言单位。"
                 "custom_prompt 是必须收集的创建信息，但不要要求用户从零撰写：当类型、故事前提、主角和风格足够明确时，"
                 "主动生成一份针对该小说类型的专业、具体、可执行 Prompt，覆盖叙事视角、语言质感、节奏、人物弧光、"
@@ -1276,32 +1254,11 @@ async def create_world(
     session: AsyncSession = Depends(get_session),
     user_id: UUID = Depends(get_verified_user_id),
 ) -> WorkspaceResponse:
-    story = await _get_story_for_user(
-        session,
-        _parse_uuid(active_story_id, DEFAULT_STORY_ID),
-        user_id,
+    del request, active_story_id, session, user_id
+    raise HTTPException(
+        status_code=409,
+        detail="Each novel owns one world; edit the current novel's world instead",
     )
-    if story is None:
-        raise HTTPException(status_code=404, detail="Story not found")
-
-    name = request.name.strip()
-    if not name:
-        raise HTTPException(status_code=422, detail="World name cannot be empty")
-    world = World(
-        user_id=user_id,
-        name=name,
-        description=request.description.strip(),
-        genre=request.genre.strip(),
-        rules={},
-        lorebook=[],
-        tone={},
-    )
-    session.add(world)
-    await session.flush()
-    story.world_id = world.id
-    story.main_character_id = None
-    await session.commit()
-    return await workspace(story_id=str(story.id), session=session, user_id=user_id)
 
 
 @router.patch("/stories/{story_id}/world", response_model=WorkspaceResponse)
@@ -1311,22 +1268,11 @@ async def set_story_world(
     session: AsyncSession = Depends(get_session),
     user_id: UUID = Depends(get_verified_user_id),
 ) -> WorkspaceResponse:
-    story = await _get_story_for_user(session, _parse_uuid(story_id, DEFAULT_STORY_ID), user_id)
-    if story is None:
-        raise HTTPException(status_code=404, detail="Story not found")
-    world = await session.get(World, _parse_uuid(request.world_id, DEFAULT_WORLD_ID))
-    if world is None or world.user_id != user_id:
-        raise HTTPException(status_code=404, detail="World not found")
-
-    story.world_id = world.id
-    story.main_character_id = await session.scalar(
-        select(Character.id)
-        .where(Character.user_id == user_id, Character.world_id == world.id)
-        .order_by(Character.created_at.asc())
-        .limit(1)
+    del story_id, request, session, user_id
+    raise HTTPException(
+        status_code=409,
+        detail="A novel's world cannot be switched after creation",
     )
-    await session.commit()
-    return await workspace(story_id=str(story.id), session=session, user_id=user_id)
 
 
 @router.delete("/worlds/{world_id}", response_model=WorkspaceResponse)
@@ -1747,6 +1693,7 @@ async def _load_messages(
             time=message.meta.get("time") if message.meta else None,
             choices=message.meta.get("choices", []) if message.meta else [],
             consistency_check=message.meta.get("consistency_check") if message.meta else None,
+            chapter_id=str(message.chapter_id) if message.chapter_id else None,
         )
         for message in result.scalars().all()
     ]

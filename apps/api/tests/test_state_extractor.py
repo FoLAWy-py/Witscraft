@@ -42,7 +42,13 @@ def test_structured_state_update_populates_inspector_fields():
           "open_threads": ["07:47 的含义", "失踪兄长与车站的关系"],
           "relationships": [{"from": "周砚", "to": "周墨", "bond": "牵挂", "value": 72}],
           "memories": ["周砚在废弃的旧车站二号站台拾到旧车票。"],
-          "canon_facts": ["车票背面写着 07:47。"]
+          "canon_facts": ["车票背面写着 07:47。"],
+          "chapter_phase": "resolution",
+          "chapter_objective_resolved": true,
+          "natural_break": true,
+          "chapter_decision": "complete",
+          "chapter_decision_reason": "车票线索已确认，场景在新问题出现前自然闭合。",
+          "exceptional_break": "none"
         }"""
     )
 
@@ -52,6 +58,7 @@ def test_structured_state_update_populates_inspector_fields():
             StoryState(objective="调查雨夜车站"),
             "周砚在废弃的旧车站二号站台拾到旧车票，带着录音笔但没有拿走夹层纸片，查明失踪兄长与车站的关系。",
             "凌晨 00:47，周墨的留言令周砚感到潮湿、戒备、危险逐渐逼近；车票背面写着 07:47。",
+            chapter_context={"chapter_number": 1, "minimum_length": 1200},
         )
     )
 
@@ -66,6 +73,9 @@ def test_structured_state_update_populates_inspector_fields():
     assert result.memories == ["周砚在废弃的旧车站二号站台拾到旧车票"]
     assert result.canon_facts == ["车票背面写着 07:47"]
     assert result.source == "llm"
+    assert result.chapter_progress.decision == "complete"
+    assert result.chapter_progress.objective_resolved is True
+    assert result.chapter_progress.natural_break is True
 
 
 def test_invalid_structured_update_uses_generic_fallback_without_demo_objective():
@@ -81,6 +91,7 @@ def test_invalid_structured_update_uses_generic_fallback_without_demo_objective(
     assert "七号档案" not in result.state.objective
     assert result.state.objective == "寻找失踪的兄长"
     assert result.canon_facts == []
+    assert result.chapter_progress.decision == "continue"
 
 
 def test_explicit_kinship_populates_relationship_when_model_omits_it():

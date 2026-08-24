@@ -25,13 +25,13 @@ from app.services.style_profiles import (
 )
 
 
-JUDGE_PROMPT_VERSION = "interactive-fiction-judge-v1"
+JUDGE_PROMPT_VERSION = "interactive-fiction-judge-v2"
 SCORE_NAMES = (
     "profile_adherence",
     "narrative_quality",
     "player_agency",
     "world_canon",
-    "roadmap_length",
+    "narrative_pacing",
     "overall",
 )
 
@@ -76,7 +76,7 @@ def build_judge_request(
         "abstract_profile": abstract_profile,
         "measured_generated_profile": generated_profile,
         "player_action": _required_string(scenario, "player_action"),
-        "chapter_target_words": int(scenario["target_chapter_length"]),
+        "minimum_chapter_words": int(scenario["minimum_chapter_length"]),
         "generated_chapter": generated_chapter,
     }
     return LLMRequest(
@@ -96,9 +96,12 @@ def build_judge_request(
                     "generated chapter against the abstract style profile and explicit product "
                     "contract. Do not infer or reward resemblance to any named author. Return json "
                     "only with integer scores from 0 to 100 for profile_adherence, "
-                    "narrative_quality, player_agency, world_canon, roadmap_length, and overall, "
+                    "narrative_quality, player_agency, world_canon, narrative_pacing, and overall, "
                     "plus a concise reasons array. The player action must not be expanded into "
-                    "unrequested protagonist speech, thought, consent, or decisions."
+                    "unrequested protagonist speech, thought, consent, or decisions. Judge pacing "
+                    "by dramatic development and the natural player decision point, never by "
+                    "proximity to a target word count. The supplied minimum is only an anti-premature "
+                    "chapter-break gate; there is no target or maximum chapter length."
                 ),
             ),
             ChatMessage(
@@ -209,21 +212,30 @@ def evaluate_provider_capture(
     if capture_payload.get("profile_reused") is not True:
         raise ValueError("Capture must prove version-compatible profile reuse")
 
-    target_length = int(scenario["target_chapter_length"])
+    minimum_length = int(scenario["minimum_chapter_length"])
     length_unit = _required_string(scenario, "chapter_length_unit")
     measured_length = measured_chapter_length(prose, length_unit)
-    minimum_length = (target_length * 85 + 99) // 100
-    maximum_length = target_length * 115 // 100
+    narrative_completion = _required_dict(capture_payload, "narrative_completion")
+    completion_status = _required_string(narrative_completion, "status")
+    if completion_status != "completed":
+        raise ValueError("Provider capture narrative output is not complete")
+    chapter_transition = capture_payload.get("chapter_transition")
+    if chapter_transition is not None and not isinstance(chapter_transition, dict):
+        raise ValueError("Capture chapter_transition must be an object or null")
     dialogue_error = abs(
         float(abstract_profile["dialogue_ratio"]) - float(generated_features["dialogue_ratio"])
     )
     measurements = {
-        "target_length": target_length,
+        "minimum_chapter_length": minimum_length,
         "length_unit": length_unit,
-        "measured_length": measured_length,
-        "minimum_length": minimum_length,
-        "maximum_length": maximum_length,
-        "within_length_band": minimum_length <= measured_length <= maximum_length,
+        "measured_installment_length": measured_length,
+        "output_complete": True,
+        "continued_after_length_limit": bool(
+            narrative_completion.get("continued_after_length_limit", False)
+        ),
+        "chapter_transition_completed": bool(
+            chapter_transition and chapter_transition.get("completed")
+        ),
         "reference_overlap_blocked": overlap.blocked,
         "reference_character_overlap_ratio": overlap.character_ratio,
         "reference_word_overlap_ratio": overlap.word_ratio,
@@ -310,11 +322,6 @@ def _threshold_failures(
             raise ValueError(f"Unknown interactive-fiction threshold {name}")
         if scores[score_name] < threshold:
             failures.append(f"{score_name}={scores[score_name]} is below {threshold:g}")
-    if not measurements["within_length_band"]:
-        failures.append(
-            f"measured_length={measurements['measured_length']} is outside "
-            f"{measurements['minimum_length']}–{measurements['maximum_length']}"
-        )
     return failures
 
 

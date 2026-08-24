@@ -38,6 +38,13 @@ async def clone_story_branch(
     )
     source_messages = list(message_result.scalars().all())
     message_ids = {message.id: uuid4() for message in source_messages}
+    chapter_result = await session.execute(
+        select(StoryChapter)
+        .where(StoryChapter.story_id == story.id, StoryChapter.branch_id == source_branch.id)
+        .order_by(StoryChapter.chapter_number.asc())
+    )
+    source_chapters = list(chapter_result.scalars().all())
+    chapter_ids = {chapter.id: uuid4() for chapter in source_chapters}
 
     branch = StoryBranch(
         id=uuid4(),
@@ -52,9 +59,9 @@ async def clone_story_branch(
     session.add(branch)
     await session.flush()
 
+    cloned_messages: dict[UUID, Message] = {}
     for message in source_messages:
-        session.add(
-            Message(
+        cloned = Message(
                 id=message_ids[message.id],
                 story_id=story.id,
                 branch_id=branch.id,
@@ -64,16 +71,14 @@ async def clone_story_branch(
                 meta=deepcopy(message.meta or {}),
                 created_at=message.created_at,
             )
-        )
+        session.add(cloned)
+        cloned_messages[message.id] = cloned
+    await session.flush()
 
-    chapter_result = await session.execute(
-        select(StoryChapter)
-        .where(StoryChapter.story_id == story.id, StoryChapter.branch_id == source_branch.id)
-        .order_by(StoryChapter.chapter_number.asc())
-    )
-    for chapter in chapter_result.scalars().all():
+    for chapter in source_chapters:
         session.add(
             StoryChapter(
+                id=chapter_ids[chapter.id],
                 story_id=story.id,
                 branch_id=branch.id,
                 chapter_number=chapter.chapter_number,
@@ -87,6 +92,12 @@ async def clone_story_branch(
                 updated_at=chapter.updated_at,
             )
         )
+    await session.flush()
+    for source_message in source_messages:
+        if source_message.chapter_id is not None:
+            cloned_messages[source_message.id].chapter_id = chapter_ids.get(
+                source_message.chapter_id
+            )
 
     snapshot_result = await session.execute(
         select(StoryStateSnapshot)

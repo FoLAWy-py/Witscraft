@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -11,10 +12,12 @@ from app.schemas.chat import StoryState
 from app.schemas.llm import ChatMessage
 
 
-STATE_EXTRACTION_PROMPT_VERSION = "state-extraction-v2"
+STATE_EXTRACTION_PROMPT_VERSION = "state-extraction-v3"
 STATE_EXTRACTION_SYSTEM_PROMPT = (
     "你是小说连续性状态提取器。只提取本轮结束时明确成立的信息，不续写剧情。"
-    "返回 JSON：location、time、mood、objective、inventory、open_threads、relationships "
+    "返回 JSON：location、time、mood、objective、inventory、open_threads、relationships、"
+    "chapter_phase、chapter_objective_resolved、natural_break、chapter_decision、"
+    "chapter_decision_reason、exceptional_break。"
     "均可为 null，null 表示沿用旧值；memories、canon_facts 为本轮新增数组。"
     "mood 是当前场景情绪而非作品文风；objective 是角色眼下可执行目标而非故事简介。"
     "location 只表示本轮结束时角色实际身处的地点；不要求文本使用固定动词。计划前往、讨论是否去、"
@@ -33,6 +36,12 @@ STATE_EXTRACTION_SYSTEM_PROMPT = (
     "禁止补充本轮文本没有出现的姓名、物品、日期、时间或背景。"
     "relationships 必须是数组，例如 [{\"from\":\"甲\",\"to\":\"乙\","
     "\"bond\":\"信任\",\"value\":60}]，没有关系变化时返回 null。"
+    "chapter_phase 只能是 setup、rising、climax、resolution、transition；"
+    "只有当前章节目标已经在正文中实质解决且本轮形成自然场景闭合或强转折时，"
+    "chapter_decision 才能为 complete，否则必须为 continue。不要为了达到长度而结束章节。"
+    "natural_break 表示在这里出现章节分隔不会破坏动作、对话或悬念的即时连续性。"
+    "exceptional_break 只能是 none、story_ending、irreversible_failure；只有故事明确结局或"
+    "主角遭遇不可逆失败时才使用后两项。chapter_decision_reason 必须简洁说明叙事依据。"
     "所有文本使用简洁中文。"
 )
 
@@ -56,6 +65,15 @@ CANON_PATTERNS = [
 ]
 
 
+class ChapterProgress(BaseModel):
+    phase: Literal["setup", "rising", "climax", "resolution", "transition"] = "rising"
+    objective_resolved: bool = False
+    natural_break: bool = False
+    decision: Literal["continue", "complete"] = "continue"
+    reason: str = Field(default="No verified natural chapter break.", max_length=240)
+    exceptional_break: Literal["none", "story_ending", "irreversible_failure"] = "none"
+
+
 @dataclass
 class ExtractionResult:
     state: StoryState
@@ -63,6 +81,7 @@ class ExtractionResult:
     memories: list[str] = field(default_factory=list)
     canon_facts: list[str] = field(default_factory=list)
     source: str = "deterministic"
+    chapter_progress: ChapterProgress = field(default_factory=ChapterProgress)
 
 
 class RelationshipUpdate(BaseModel):
@@ -82,6 +101,12 @@ class StructuredStateUpdate(BaseModel):
     relationships: list[RelationshipUpdate] | None = None
     memories: list[str] = Field(default_factory=list)
     canon_facts: list[str] = Field(default_factory=list)
+    chapter_phase: Literal["setup", "rising", "climax", "resolution", "transition"] | None = None
+    chapter_objective_resolved: bool | None = None
+    natural_break: bool | None = None
+    chapter_decision: Literal["continue", "complete"] | None = None
+    chapter_decision_reason: str | None = Field(default=None, max_length=240)
+    exceptional_break: Literal["none", "story_ending", "irreversible_failure"] | None = None
 
 
 async def extract_story_updates_with_llm(
@@ -91,6 +116,7 @@ async def extract_story_updates_with_llm(
     assistant_message: str,
     relationships: list[dict] | None = None,
     perspective_character: str | None = None,
+    chapter_context: dict | None = None,
 ) -> ExtractionResult:
     fallback = extract_story_updates(
         previous,
@@ -104,6 +130,7 @@ async def extract_story_updates_with_llm(
         "perspective_character": perspective_character,
         "user_turn": user_message,
         "assistant_turn": assistant_message,
+        "chapter_context": chapter_context or {},
     }
     messages = [
         ChatMessage(
@@ -182,6 +209,15 @@ async def extract_story_updates_with_llm(
         memories=_grounded_memories(payload.memories, source_text),
         canon_facts=_grounded_canon_facts(payload.canon_facts, source_text),
         source="llm",
+        chapter_progress=ChapterProgress(
+            phase=payload.chapter_phase or "rising",
+            objective_resolved=bool(payload.chapter_objective_resolved),
+            natural_break=bool(payload.natural_break),
+            decision=payload.chapter_decision or "continue",
+            reason=(payload.chapter_decision_reason or "").strip()
+            or "No narrative reason supplied.",
+            exceptional_break=payload.exceptional_break or "none",
+        ),
     )
 
 

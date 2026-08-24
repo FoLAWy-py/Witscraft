@@ -195,7 +195,7 @@ async def _capture(args: argparse.Namespace) -> dict[str, Any]:
                     "custom_prompt",
                     "interaction_mode",
                     "planned_chapter_count",
-                    "target_chapter_length",
+                    "minimum_chapter_length",
                     "chapter_length_unit",
                     "prose_language",
                 )
@@ -207,7 +207,11 @@ async def _capture(args: argparse.Namespace) -> dict[str, Any]:
                 }
             )
             created = await client.post("api/workspace/stories", json=create_payload)
-            created.raise_for_status()
+            if created.is_error:
+                raise RuntimeError(
+                    f"Story creation failed with HTTP {created.status_code}: "
+                    f"{created.text[:500]}"
+                )
             workspace = created.json()
             calls_before_turn = await _model_calls(user_id)
             prior_call_ids = {call.id for call in calls_before_turn}
@@ -225,7 +229,8 @@ async def _capture(args: argparse.Namespace) -> dict[str, Any]:
                 },
             )
             generated.raise_for_status()
-            generated_chapter = _required_string(generated.json(), "content")
+            generated_payload = generated.json()
+            generated_chapter = _required_string(generated_payload, "content")
 
         lifecycle_calls = await _model_calls(user_id)
         turn_calls = [call for call in lifecycle_calls if call.id not in prior_call_ids]
@@ -298,6 +303,14 @@ async def _capture(args: argparse.Namespace) -> dict[str, Any]:
             "generated_chapter": generated_chapter,
             "generated_chapter_sha256": hashlib.sha256(generated_chapter.encode()).hexdigest(),
             "generated_features": generated_features,
+            "narrative_completion": {
+                "status": generated_payload.get("model_call", {}).get("completion_status"),
+                "finish_reason": generated_payload.get("model_call", {}).get("finish_reason"),
+                "continued_after_length_limit": generated_payload.get("model_call", {}).get(
+                    "continued_after_length_limit", False
+                ),
+            },
+            "chapter_transition": generated_payload.get("chapter_transition"),
             "scores": scores,
         }
     finally:

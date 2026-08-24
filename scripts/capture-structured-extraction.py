@@ -53,6 +53,7 @@ def _request_for_case(case: dict[str, Any], provider: str, model: str) -> LLMReq
         "perspective_character": case.get("perspective_character"),
         "user_turn": str(case.get("user_turn", "")),
         "assistant_turn": str(case.get("assistant_turn", "")),
+        "chapter_context": case.get("chapter_context") or {},
     }
     return LLMRequest(
         provider=provider,

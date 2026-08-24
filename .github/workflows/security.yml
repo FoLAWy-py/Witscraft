@@ -81,7 +81,7 @@ jobs:
       - name: Audit installed dependencies
         run: uv run --with pip-audit==2.10.1 pip-audit --local
       - name: Lint backend
-        run: uv run ruff check app tests migrations scripts ../../scripts/capture-interactive-fiction.py ../../scripts/capture-structured-extraction.py ../../scripts/check-pgvector-migration.py ../../scripts/check-production-slos.py ../../scripts/create-release-manifest.py ../../scripts/evaluate-interactive-fiction.py ../../scripts/evaluate-memory-retrieval.py ../../scripts/evaluate-structured-extraction.py ../../scripts/run-memory-embedding-worker.py ../../scripts/smoke-release.py
+        run: uv run ruff check app tests migrations scripts ../../scripts/capture-interactive-fiction.py ../../scripts/capture-structured-extraction.py ../../scripts/check-hci-evaluation.py ../../scripts/check-pgvector-migration.py ../../scripts/check-production-slos.py ../../scripts/create-release-manifest.py ../../scripts/evaluate-interactive-fiction.py ../../scripts/evaluate-memory-retrieval.py ../../scripts/evaluate-structured-extraction.py ../../scripts/run-memory-embedding-worker.py ../../scripts/smoke-release.py
       - name: Run structured extraction evaluation gate
         run: uv run python ../../scripts/evaluate-structured-extraction.py
       - name: Run interactive fiction provider evaluation gate
@@ -133,6 +133,8 @@ jobs:
       - name: Build production frontend
         run: npm run build:production
         working-directory: apps/web
+      - name: Validate HCI expert review evidence
+        run: python3 scripts/check-hci-evaluation.py
       - name: Check browser artifacts
         run: python3 scripts/check-production-artifacts.py
       - name: Install Chromium for browser E2E

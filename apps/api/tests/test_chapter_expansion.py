@@ -1,34 +1,29 @@
 import asyncio
-from types import SimpleNamespace
 
-from app.schemas.chat import ChatRequest
+import pytest
+
 from app.schemas.llm import ChatMessage, LLMRequest, LLMResponse
-from app.services.story_engine import StoryEngine
+from app.services.story_engine import StoryEngine, merge_story_continuation
 
 
 class FakeGateway:
-    def __init__(
-        self, text: str = "扩" * 450, *, texts: list[str] | None = None, fail: bool = False
-    ) -> None:
-        self.texts = list(texts or [text])
-        self.fail = fail
+    def __init__(self, responses: list[LLMResponse]) -> None:
+        self.responses = list(responses)
         self.requests: list[LLMRequest] = []
 
     async def generate(self, request: LLMRequest) -> LLMResponse:
         self.requests.append(request)
-        if self.fail:
-            raise RuntimeError("provider unavailable")
-        return LLMResponse(
-            provider=request.provider,
-            model=request.model,
-            text=self.texts[min(len(self.requests) - 1, len(self.texts) - 1)],
-        )
+        return self.responses.pop(0)
 
 
-def _engine(gateway: FakeGateway) -> StoryEngine:
-    engine = StoryEngine.__new__(StoryEngine)
-    engine.llm_gateway = gateway
-    return engine
+def _response(text: str, status: str = "completed") -> LLMResponse:
+    return LLMResponse(
+        provider="deepinfra",
+        model="Qwen/Qwen3-Max",
+        text=text,
+        completion_status=status,
+        finish_reason="length" if status == "length_limited" else "stop",
+    )
 
 
 def _request() -> LLMRequest:
@@ -39,75 +34,65 @@ def _request() -> LLMRequest:
     )
 
 
-def test_short_chapter_gets_one_bounded_replacement_call() -> None:
-    gateway = FakeGateway()
-    content, response = asyncio.run(
-        _engine(gateway)._expand_short_chapter(
-            "短稿",
-            story=SimpleNamespace(target_chapter_length=500, chapter_length_unit="characters"),
-            request=ChatRequest(message="我检查信封。", story_id="story"),
-            chapter=SimpleNamespace(),
-            llm_request=_request(),
-        )
+def _engine(gateway: FakeGateway) -> StoryEngine:
+    engine = StoryEngine.__new__(StoryEngine)
+    engine.llm_gateway = gateway
+    return engine
+
+
+def test_completed_narrative_needs_no_continuation() -> None:
+    gateway = FakeGateway([])
+    primary = _response("完整场景。")
+
+    result = asyncio.run(
+        _engine(gateway)._ensure_complete_narrative_response(_request(), primary)
     )
 
-    assert content == "扩" * 450
-    assert response is not None
-    assert len(gateway.requests) == 1
-    assert gateway.requests[0].stream is False
-    assert "measures only 2" in gateway.requests[0].messages[-1].content
-    assert "no chapter heading" in gateway.requests[0].messages[-1].content
-
-
-def test_acceptable_chapter_skips_replacement_call() -> None:
-    gateway = FakeGateway()
-    original = "足" * 425
-    content, response = asyncio.run(
-        _engine(gateway)._expand_short_chapter(
-            original,
-            story=SimpleNamespace(target_chapter_length=500, chapter_length_unit="characters"),
-            request=ChatRequest(message="继续观察。", story_id="story"),
-            chapter=SimpleNamespace(),
-            llm_request=_request(),
-        )
-    )
-
-    assert content == original
-    assert response is None
+    assert result is primary
     assert gateway.requests == []
 
 
-def test_first_improvement_below_floor_gets_one_final_bounded_attempt() -> None:
-    gateway = FakeGateway(texts=["改" * 300, "扩" * 450])
-    content, response = asyncio.run(
-        _engine(gateway)._expand_short_chapter(
-            "短稿",
-            story=SimpleNamespace(target_chapter_length=500, chapter_length_unit="characters"),
-            request=ChatRequest(message="继续观察。", story_id="story"),
-            chapter=SimpleNamespace(),
-            llm_request=_request(),
-        )
+def test_length_limited_narrative_gets_one_bounded_continuation() -> None:
+    gateway = FakeGateway([_response("门终于打开，决定权回到你手中。")])
+    primary = _response("雨声压住脚步。", "length_limited")
+
+    result = asyncio.run(
+        _engine(gateway)._ensure_complete_narrative_response(_request(), primary)
     )
 
-    assert content == "扩" * 450
-    assert response is not None
-    assert len(gateway.requests) == 2
-    assert "measures only 300" in gateway.requests[1].messages[-1].content
-    assert "hard minimum of 425" in gateway.requests[1].messages[-1].content
-
-
-def test_failed_replacement_keeps_the_successful_primary_draft() -> None:
-    gateway = FakeGateway(fail=True)
-    content, response = asyncio.run(
-        _engine(gateway)._expand_short_chapter(
-            "短稿",
-            story=SimpleNamespace(target_chapter_length=500, chapter_length_unit="characters"),
-            request=ChatRequest(message="继续观察。", story_id="story"),
-            chapter=SimpleNamespace(),
-            llm_request=_request(),
-        )
-    )
-
-    assert content == "短稿"
-    assert response is None
+    assert result.text == "雨声压住脚步。\n\n门终于打开，决定权回到你手中。"
+    assert result.completion_status == "completed"
+    assert result.raw["continued_after_length_limit"] is True
     assert len(gateway.requests) == 1
+    assert gateway.requests[0].stream is False
+    assert "Do not recap" in gateway.requests[0].messages[-1].content
+
+
+def test_second_length_limit_fails_closed_without_persistable_text() -> None:
+    gateway = FakeGateway([_response("仍未结束", "length_limited")])
+
+    with pytest.raises(RuntimeError, match="still incomplete"):
+        asyncio.run(
+            _engine(gateway)._ensure_complete_narrative_response(
+                _request(), _response("被截断", "length_limited")
+            )
+        )
+
+
+def test_non_length_interruption_is_not_guessed_or_continued() -> None:
+    gateway = FakeGateway([])
+
+    with pytest.raises(RuntimeError, match="incomplete response"):
+        asyncio.run(
+            _engine(gateway)._ensure_complete_narrative_response(
+                _request(), _response("部分正文", "interrupted")
+            )
+        )
+    assert gateway.requests == []
+
+
+def test_continuation_overlap_is_removed_once() -> None:
+    assert merge_story_continuation(
+        "灯光逐渐暗下，门外传来三声敲击。",
+        "门外传来三声敲击。林岚抬起头。",
+    ) == "灯光逐渐暗下，门外传来三声敲击。林岚抬起头。"

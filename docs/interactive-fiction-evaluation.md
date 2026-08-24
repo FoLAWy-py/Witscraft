@@ -2,9 +2,9 @@
 
 **Status:** Required release gate
 
-**Evaluation version:** `interactive-fiction-style-v1`
+**Evaluation version:** `interactive-fiction-natural-pacing-v2`
 
-**Last updated:** 21 August 2026
+**Last updated:** 24 August 2026
 
 ## Purpose
 
@@ -19,7 +19,8 @@ The canonical files are under `apps/api/evals/interactive_fiction/v1/`:
 - `reference.txt` is the normalized public-domain input;
 - `case.json` binds its hash, scenario, prompt versions, expected abstract profile, and provider routes;
 - `thresholds.json` defines the release minimums;
-- `provider-capture-v4-approved.json` is the current sanitized real-provider evidence;
+- `provider-capture-v5-natural-pacing-approved.json` is the current sanitized real-provider evidence;
+- `provider-capture-v4-approved.json` preserves the previous target-length contract evidence;
 - `provider-capture-v4.json` preserves the first v4 run, which passed agency but missed style and roadmap/length thresholds;
 - `provider-capture-v3.json` preserves the preceding approved v3 evidence;
 - `provider-capture.json` preserves the preceding approved v2 evidence; and
@@ -33,20 +34,21 @@ Live capture is sequential, requires both configured provider credentials, refus
 
 ## Approved evidence
 
-The current capture is bound to revision `aeb100e3726ebb83081ce4aa6b262078eae01073` and passed all version 1 thresholds. The v4 agency editor binds first-person player instructions to the named protagonist and requires the protagonist to remain the explicit grammatical actor. This followed public v2/v3 validation that exposed how an over-conservative edit could preserve an NPC answer while omitting the player's authorized question:
+The current natural-pacing capture passed every version 2 threshold. It proves that a completed provider response may exceed the minimum without forcing a chapter transition, while the agency editor still binds first-person player instructions to the named protagonist:
 
 | Measurement | Result |
 | --- | ---: |
-| Abstract-profile adherence | 70 |
-| Narrative quality | 84 |
-| Player agency | 93 |
-| World and canon | 86 |
-| Roadmap and length | 95 |
-| Overall | 85 |
-| Prose length | 573 words / 500 target |
-| Dialogue-ratio error | 0.130 |
+| Abstract-profile adherence | 86 |
+| Narrative quality | 90 |
+| Player agency | 94 |
+| World and canon | 91 |
+| Narrative pacing | 92 |
+| Overall | 91 |
+| Prose length | 879 words / 500 minimum |
+| Provider completion | completed |
+| Chapter transition | remained active |
 | Reference overlap | 0 blocked overlap |
-| Provider calls | 8 total / 8 maximum |
+| Provider calls | 5 total / 8 maximum |
 | Profiling calls | 0 |
 
 The score source is `provider_capture`. These figures describe one regression case and are release evidence, not a broad literary benchmark.

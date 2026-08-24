@@ -21,7 +21,7 @@ import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ConsistencyCheck, StoryState, WorkspaceResponse } from "@/lib/types";
-import { CommandButton, EmptyState, SelectMenu, uiText } from "./workspace-ui";
+import { CommandButton, SelectMenu, uiText } from "./workspace-ui";
 
 type UiLanguage = "zh-CN" | "en";
 type InteractionMode = "choices" | "open";
@@ -46,7 +46,7 @@ export function Transcript({
   chapters,
   plannedChapterCount,
   minimumPlannedChapterCount,
-  targetChapterLength,
+  minimumChapterLength,
   chapterLengthUnit,
   endingTitle,
   roadmapVersion,
@@ -88,7 +88,7 @@ export function Transcript({
   chapters: WorkspaceResponse["chapters"];
   plannedChapterCount: number;
   minimumPlannedChapterCount: number;
-  targetChapterLength: number;
+  minimumChapterLength: number;
   chapterLengthUnit: "characters" | "words";
   endingTitle: string;
   roadmapVersion: number;
@@ -185,10 +185,10 @@ export function Transcript({
               {currentChapter?.title ? ` · ${currentChapter.title}` : ""}
             </strong>
             <small>
-              {targetChapterLength.toLocaleString()} {uiText(
+              {uiText(uiLanguage, "自然切章 · 最低 ", "Natural break · minimum ")}{minimumChapterLength.toLocaleString()} {uiText(
                 uiLanguage,
-                chapterLengthUnit === "characters" ? "字/章" : "词/章",
-                chapterLengthUnit === "characters" ? "characters/chapter" : "words/chapter"
+                chapterLengthUnit === "characters" ? "字" : "词",
+                chapterLengthUnit === "characters" ? "characters" : "words"
               )}
             </small>
           </summary>
@@ -301,7 +301,20 @@ export function Transcript({
               />
             ))
           ) : (
-            <EmptyState>{uiText(uiLanguage, "当前小说还没有消息。", "This story has no messages yet.")}</EmptyState>
+            <section className="storyStartState" aria-labelledby="story-start-title">
+              <span><BookOpen size={22} /></span>
+              <div>
+                <h2 id="story-start-title">{uiText(uiLanguage, "从第一幕开始", "Begin the first scene")}</h2>
+                <p>{uiText(
+                  uiLanguage,
+                  "你可以描述主角的行动；也可以选择“继续”，授权 AI 在这一轮替主角推进。",
+                  "Describe the protagonist's action, or choose Continue to let AI advance the protagonist for this turn."
+                )}</p>
+              </div>
+              <button className="cmdButton primary" type="button" onClick={onContinue} disabled={pending}>
+                <Sparkles size={14} />{uiText(uiLanguage, "继续，让 AI 开场", "Continue and let AI open")}
+              </button>
+            </section>
           )}
           {pending && !hasStreamingAssistant && (
             <article className="entry assistant">
@@ -363,7 +376,9 @@ export function Transcript({
             ref={composerRef}
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
-            placeholder={customChoiceActive ? uiText(uiLanguage, "输入你自己的推进方式…", "Enter your own direction...") : uiText(uiLanguage, "引导下一幕…", "Direct the scene...")}
+            placeholder={customChoiceActive
+              ? uiText(uiLanguage, "输入你自己的推进方式…", "Enter your own direction...")
+              : uiText(uiLanguage, "描述主角下一步行动…", "Describe the protagonist's next action...")}
             rows={1}
             onKeyDown={(event) => {
               if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) onSend();

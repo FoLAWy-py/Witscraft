@@ -37,7 +37,6 @@ import {
   Route,
   Settings2,
   ShieldCheck,
-  Sparkles,
   Sun,
   Target,
   Trash2,
@@ -67,7 +66,6 @@ import {
   Panel,
   Pill,
   ProgressiveControls,
-  SelectMenu,
   Stat,
   TabButton,
   Telemetry,
@@ -323,7 +321,7 @@ export default function WorkspaceClient() {
   const [plannedChapterCount, setPlannedChapterCount] = useState(12);
   const [minimumPlannedChapterCount, setMinimumPlannedChapterCount] = useState(3);
   const [roadmapVersion, setRoadmapVersion] = useState(0);
-  const [targetChapterLength, setTargetChapterLength] = useState(1800);
+  const [minimumChapterLength, setMinimumChapterLength] = useState(1200);
   const [chapterLengthUnit, setChapterLengthUnit] = useState<"characters" | "words">("characters");
   const [endingTitle, setEndingTitle] = useState("");
 
@@ -419,7 +417,7 @@ export default function WorkspaceClient() {
     setPlannedChapterCount(data.planned_chapter_count ?? 12);
     setMinimumPlannedChapterCount(data.minimum_planned_chapter_count ?? 3);
     setRoadmapVersion(data.roadmap_version ?? 0);
-    setTargetChapterLength(data.target_chapter_length ?? 1800);
+    setMinimumChapterLength(data.minimum_chapter_length ?? 1200);
     setChapterLengthUnit(data.chapter_length_unit ?? "characters");
     setEndingTitle(data.ending_title ?? "");
     setState(data.story_state ?? emptyStoryState);
@@ -457,7 +455,7 @@ export default function WorkspaceClient() {
     setPlannedChapterCount(12);
     setMinimumPlannedChapterCount(3);
     setRoadmapVersion(0);
-    setTargetChapterLength(1800);
+    setMinimumChapterLength(1200);
     setChapterLengthUnit("characters");
     setEndingTitle("");
     setState(emptyStoryState);
@@ -1108,6 +1106,23 @@ export default function WorkspaceClient() {
               setBranchList((current) => current.map((branch) =>
                 branch.id === branchId ? { ...branch, version: response.branch_version as number } : branch
               ));
+            }
+            if (response.chapter_transition?.completed) {
+              const transition = response.chapter_transition;
+              setChapters((current) => current.map((chapter) => {
+                if (chapter.number === transition.chapter_number) {
+                  return { ...chapter, status: "completed" };
+                }
+                if (chapter.number === transition.next_chapter_number) {
+                  return { ...chapter, status: "active" };
+                }
+                return chapter;
+              }));
+              setChapterCountNotice(
+                transition.next_chapter_number
+                  ? uiText(uiLanguage, `第 ${transition.chapter_number} 章自然收束，进入第 ${transition.next_chapter_number} 章。`, `Chapter ${transition.chapter_number} reached a natural close. Chapter ${transition.next_chapter_number} begins.`)
+                  : uiText(uiLanguage, `第 ${transition.chapter_number} 章与故事已完成。`, `Chapter ${transition.chapter_number} and the story are complete.`)
+              );
             }
             setMessages((current) => {
               const last = current[current.length - 1];
@@ -1784,31 +1799,6 @@ export default function WorkspaceClient() {
           </div>
         )}
 
-        <SelectMenu
-          className="purposeMenu"
-          icon={Route}
-          label={uiText(uiLanguage, "选择模型用途", "Select model purpose")}
-          value={selectedPurpose}
-          options={purposeRoutes.map((route) => ({ value: route.id, label: uiLanguage === "zh-CN" ? purposeRoutesZh[route.id].label : route.label }))}
-          onChange={(value) => setSelectedPurpose(value as StoryPurpose)}
-        />
-
-        <SelectMenu
-          className="modelMenu"
-          icon={Sparkles}
-          label={uiText(uiLanguage, "选择模型", "Select model")}
-          value={activeModel?.model ?? ""}
-          options={models.map((model) => ({
-            value: model.model,
-            label: model.label,
-            detail: model.provider,
-            disabled: providers?.model_health[model.model]?.fresh && providers.model_health[model.model].status === "unavailable"
-          }))}
-          onChange={(value) => setRouteModel(selectedPurpose, value)}
-          disabled={!models.length}
-          placeholder={uiText(uiLanguage, "模型加载中", "Loading models")}
-        />
-
         <IconToggle active={dark} onClick={() => setDark((value) => !value)} icon={dark ? Sun : Moon} label={uiText(uiLanguage, "切换主题", "Toggle theme")} />
 
         <div className="authUserMenu">
@@ -1932,7 +1922,7 @@ export default function WorkspaceClient() {
               chapters={chapters}
               plannedChapterCount={plannedChapterCount}
               minimumPlannedChapterCount={minimumPlannedChapterCount}
-              targetChapterLength={targetChapterLength}
+              minimumChapterLength={minimumChapterLength}
               chapterLengthUnit={chapterLengthUnit}
               endingTitle={endingTitle}
               roadmapVersion={roadmapVersion}
@@ -2051,7 +2041,6 @@ function LeftRail({
   stories,
   activeStoryId,
   world,
-  worlds,
   characters,
   loading,
   creatingStory,
@@ -2061,12 +2050,8 @@ function LeftRail({
   confirmDeleteStoryId,
   deletingStoryId,
   editingWorld,
-  creatingWorld,
   worldDraft,
   savingWorld,
-  switchingWorldId,
-  confirmDeleteWorldId,
-  deletingWorldId,
   editingCharacterId,
   creatingCharacter,
   characterDraft,
@@ -2083,12 +2068,9 @@ function LeftRail({
   onCancelDelete,
   onDeleteStory,
   onStartEditWorld,
-  onStartCreateWorld,
   onCancelEditWorld,
   onChangeWorldDraft,
   onSaveWorld,
-  onSelectWorld,
-  onDeleteWorld,
   onStartEditCharacter,
   onStartCreateCharacter,
   onCancelEditCharacter,
@@ -2252,14 +2234,9 @@ function LeftRail({
         icon={Globe2}
         action={
           editingWorld ? undefined : (
-            <span className="panelActions">
-              <button className="plainIcon" aria-label={uiText(uiLanguage, "创建世界", "Create world")} onClick={onStartCreateWorld}>
-                <Plus size={14} />
-              </button>
-              <button className="plainIcon" aria-label={uiText(uiLanguage, "编辑世界", "Edit world")} onClick={onStartEditWorld} disabled={!world.id}>
-                <PenLine size={14} />
-              </button>
-            </span>
+            <button className="plainIcon" aria-label={uiText(uiLanguage, "编辑小说世界观", "Edit story world")} onClick={onStartEditWorld} disabled={!world.id}>
+              <PenLine size={14} />
+            </button>
           )
         }
       >
@@ -2293,7 +2270,7 @@ function LeftRail({
             <div className="formActions">
               <button className="cmdButton primary" onClick={onSaveWorld} disabled={savingWorld || !worldDraft.name.trim()}>
                 {savingWorld ? <RefreshCw size={13} className="spinIcon" /> : <Check size={13} />}
-                {creatingWorld ? uiText(uiLanguage, "创建", "Create") : uiText(uiLanguage, "保存", "Save")}
+                {uiText(uiLanguage, "保存", "Save")}
               </button>
               <button className="cmdButton" onClick={onCancelEditWorld} disabled={savingWorld}>
                 <X size={13} />
@@ -2315,27 +2292,7 @@ function LeftRail({
                 <div><dd>{characters.length}</dd><dt>{uiText(uiLanguage, "角色", "Characters")}</dt></div>
               </dl>
             </div>
-            {worlds.length > 1 && (
-              <ul className="worldList" aria-label={uiText(uiLanguage, "可用世界", "Available worlds")}>
-                {worlds.map((item) => {
-                  const active = item.id === world.id;
-                  const confirming = item.id === confirmDeleteWorldId;
-                  return (
-                    <li key={item.id} className={active ? "active" : undefined}>
-                      <button className="worldSelect" onClick={() => onSelectWorld(item.id)} disabled={active || Boolean(switchingWorldId)}>
-                        <span>{item.name}</span>
-                        <small>{item.genre || uiText(uiLanguage, "未分类", "Uncategorized")} · {item.story_count} {uiText(uiLanguage, "部小说", item.story_count === 1 ? "story" : "stories")}</small>
-                      </button>
-                      {!active && (
-                        <button className={`plainIcon ${confirming ? "danger" : ""}`} aria-label={confirming ? uiText(uiLanguage, `确认删除世界 ${item.name}`, `Confirm delete world ${item.name}`) : uiText(uiLanguage, `删除世界 ${item.name}`, `Delete world ${item.name}`)} onClick={() => onDeleteWorld(item.id)} disabled={Boolean(deletingWorldId) || item.story_count > 0}>
-                          {item.id === deletingWorldId ? <RefreshCw size={13} className="spinIcon" /> : <Trash2 size={13} />}
-                        </button>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
+            <p className="worldOwnershipNote">{uiText(uiLanguage, "这套世界观仅属于当前小说。", "This world belongs only to the current novel.")}</p>
           </>
         )}
       </Panel>
@@ -2678,6 +2635,13 @@ function RightInspector({
         <ProgressiveControls uiLanguage={uiLanguage} collection="branches" total={branches.length} visible={visibleCounts.branches ?? 3} onMore={showMore} onCollapse={collapse} />
       </Panel>
 
+      <details className="inspectorArchive">
+        <summary>
+          <BookText size={14} />
+          <span>{uiText(uiLanguage, "故事档案与高级工具", "Story records and advanced tools")}</span>
+          <small>{uiText(uiLanguage, "关系、线索、导出、记忆与模型状态", "Relationships, threads, export, memory, and model status")}</small>
+        </summary>
+        <div className="inspectorArchiveBody">
       <Panel title={uiText(uiLanguage, "人物关系", "Relationships")} icon={HeartHandshake} count={relationships.length}>
         {relationships.length ? (
           <ul className="relationList">
@@ -2883,6 +2847,8 @@ function RightInspector({
         <p className="helperText">{uiText(uiLanguage, "用途：", "Purpose: ")}{purposeName}</p>
         <p className="helperText">{uiText(uiLanguage, "状态：", "Status: ")}{lastRun.dry_run ? uiText(uiLanguage, "模拟调用", "dry run") : uiText(uiLanguage, "真实服务调用", "live provider call")}</p>
       </Panel>
+        </div>
+      </details>
     </div>
   );
 }

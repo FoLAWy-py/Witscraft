@@ -2,7 +2,7 @@
 
 **Status:** Approved implementation baseline
 
-**Last updated:** 21 August 2026
+**Last updated:** 24 August 2026
 
 ## 1. Product Boundary
 
@@ -37,20 +37,11 @@ Plausible but difficult actions are not invalid. They should produce uncertain, 
 
 ## 3. Chapter Model
 
-Each successful narrative turn produces one titled novel chapter and then returns control to the player. Story creation requires a planned chapter count from 3 through 120, with 12 as the default.
+Each successful narrative turn produces one novel installment and returns control to the player; a turn is not automatically a new chapter. Story creation requires a planned chapter count from 3 through 120, with 12 as the default.
 
-The player selects a target length for each chapter:
+The player selects a language-aware minimum chapter-development guard: Compact 800, Natural 1,200, Expansive 2,000, or a custom 500–5,000 value. For Chinese, Japanese, and Korean prose, the unit is visible characters after whitespace normalization; for whitespace-delimited languages, it is words. This value only prevents premature ordinary chapter closure. It is not a target, maximum, per-response requirement, or instruction to pad or trim prose. Token limits remain internal output-safety controls and never define a chapter boundary.
 
-| Preset | Target |
-| --- | ---: |
-| Concise | 800 |
-| Standard | 1,800 |
-| Detailed | 3,000 |
-| Custom | 500–5,000 |
-
-For Chinese, Japanese, and Korean prose, the target unit is visible characters after whitespace normalization. For whitespace-delimited languages, the target unit is words. The generation acceptance band is ±15%. UI copy must name the active unit; token estimates remain an internal cost-control concern and are not presented as exact prose length.
-
-A normal chapter should resolve one meaningful scene movement and establish the next decision. It may advance minutes or hours. Longer travel, recovery, training, or waiting may be summarized only when the player's instruction or **Continue** delegation makes that transition reasonable. It must not skip an unresolved high-stakes decision or compress multiple irreversible events into one turn.
+The AI may close the active chapter only when cumulative assistant prose meets the minimum, the chapter objective has substantively resolved, and the current response forms a natural scene closure or strong transition. A story ending or fair irreversible failure may close earlier as an explicit exceptional break. Fallback extraction never closes a chapter. A normal installment may advance minutes or hours; longer travel, recovery, training, or waiting may be summarized only when the player's instruction or **Continue** delegation makes that transition reasonable. It must not skip an unresolved high-stakes decision or compress multiple irreversible events into one turn.
 
 ## 4. Roadmap and Endings
 
@@ -93,12 +84,12 @@ Style quality is measured against the abstract profile, not against author ident
 - narrative quality and coherence;
 - player-agency compliance;
 - world-rule and canon compliance;
-- roadmap and chapter-length compliance; and
+- narrative pacing and natural chapter-boundary compliance; and
 - reference-overlap safety.
 
 Model quality scores must come from bounded real-provider captures. Deterministic fixtures validate parsers, policies, and scorers but cannot be reported as provider quality. A capture is reusable while the provider/model, prompt version, evaluation corpus, style-analysis version, and post-processing contract remain unchanged. Generation and judging should use independent model routes where practical, and provider traffic must be sequential, capped, sanitized, and explicitly recorded without secrets.
 
-The approved 2026-08-21 v4 capture used a public-domain excerpt from [Project Gutenberg eBook 1342](https://www.gutenberg.org/ebooks/1342), DeepInfra `Qwen/Qwen3-Max` for authoring, OpenAI `gpt-5.5` for the mandatory agency edit and conditional length trim, and a separate OpenAI `gpt-5.5` judge call. The bounded end-to-end run used all eight permitted provider calls, reused the deterministic style profile with zero profiling calls, produced 573 words for a 500-word target, and scored 93 player agency, 84 narrative quality, 95 roadmap-length adherence, 86 world/canon consistency, 70 abstract-profile adherence, and 85 overall. The capture is bound to deployment revision `aeb100e3726ebb83081ce4aa6b262078eae01073`. This single-case capture is release evidence, not a general benchmark; a route, prompt, corpus, style-analysis, or post-processing contract change requires a new bounded capture. CI replays the reviewed capture without network traffic. Preceding overlength, omitted-authorized-action, and below-threshold style captures remain regression evidence rather than being hidden.
+The approved 2026-08-24 natural-pacing capture used a public-domain excerpt from [Project Gutenberg eBook 1342](https://www.gutenberg.org/ebooks/1342), DeepInfra `Qwen/Qwen3-Max` for authoring, OpenAI `gpt-5.5` for the mandatory agency edit, and a separate OpenAI `gpt-5.5` judge call. The bounded end-to-end run used five of eight permitted provider calls, reused the deterministic style profile with zero profiling calls, returned a completed 879-word installment above the 500-word minimum, and correctly kept the chapter active. It scored 94 player agency, 90 narrative quality, 92 narrative pacing, 91 world/canon consistency, 86 abstract-profile adherence, and 91 overall. This single-case capture is release evidence, not a general benchmark; a route, prompt, corpus, style-analysis, or post-processing contract change requires a new bounded capture. CI replays the reviewed capture without network traffic. Preceding captures remain regression evidence rather than being hidden.
 
 Initial style evaluation must use reviewed public-domain reference text with documented provenance. It must not use private user stories, living-author samples selected for imitation, or text with uncertain rights.
 
@@ -106,7 +97,7 @@ Initial style evaluation must use reviewed public-domain reference text with doc
 
 The implementation is not complete until automated tests demonstrate all of the following:
 
-1. Chapter counts below 3 or above 120 and custom lengths outside 500–5,000 are rejected.
+1. Chapter counts below 3 or above 120 and minimum-development values outside 500–5,000 are rejected.
 2. A normal turn cannot assign consequential protagonist speech, thought, or choice.
 3. **Continue** delegates exactly one turn and stops before an irreversible decision.
 4. A known impossible action creates no chapter, canon, usage-bearing model call, or branch-version advance.
@@ -118,6 +109,7 @@ The implementation is not complete until automated tests demonstrate all of the 
 10. Non-reproduction checks block seeded overlap cases before persistence.
 11. Player-visible quota remains percentage-only, while administrator policy retains token totals and the deterministic word estimate.
 12. Any published model score identifies a real-provider capture and cannot fall back to synthetic evidence.
+13. A turn cannot close a chapter merely because it reached the minimum, and provider length truncation cannot be persisted as a completed response.
 
 ## 9. Delivery Order
 

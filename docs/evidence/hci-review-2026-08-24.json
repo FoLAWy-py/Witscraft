@@ -1,0 +1,41 @@
+{
+  "schema_version": "hci-review-v1",
+  "review_date": "2026-08-24",
+  "environment": "local-area-network development; deterministic dry-run provider",
+  "method": "expert heuristic review with deterministic desktop and mobile task walkthrough",
+  "scale": {"minimum": 0, "maximum": 4},
+  "release_gate": {
+    "minimum_weighted_score": 85,
+    "minimum_core_dimension_rating": 3,
+    "prohibited_severities": [0, 1]
+  },
+  "dimensions": [
+    {"id": "visibility", "weight": 10, "core": true, "baseline": 2.5, "retest": 3.5},
+    {"id": "mental_model", "weight": 10, "core": true, "baseline": 2.0, "retest": 3.5},
+    {"id": "control", "weight": 10, "core": true, "baseline": 3.0, "retest": 3.5},
+    {"id": "error_prevention", "weight": 10, "core": true, "baseline": 2.5, "retest": 3.0},
+    {"id": "accessibility", "weight": 10, "core": true, "baseline": 3.0, "retest": 3.5},
+    {"id": "ai_trust", "weight": 10, "core": true, "baseline": 2.0, "retest": 3.5},
+    {"id": "consistency", "weight": 8, "core": false, "baseline": 3.0, "retest": 3.5},
+    {"id": "recovery", "weight": 8, "core": false, "baseline": 2.5, "retest": 3.0},
+    {"id": "recognition", "weight": 7, "core": false, "baseline": 2.0, "retest": 3.5},
+    {"id": "minimalism", "weight": 7, "core": false, "baseline": 1.5, "retest": 3.5},
+    {"id": "flexibility", "weight": 5, "core": false, "baseline": 3.0, "retest": 3.5},
+    {"id": "onboarding", "weight": 5, "core": false, "baseline": 2.0, "retest": 3.5}
+  ],
+  "expected_scores": {"baseline": 60.88, "retest": 85.25},
+  "critical_tasks": [
+    {"id": "sign_in", "passed": true, "evidence": "Clear interactive-novel language and labeled authentication controls."},
+    {"id": "create_story", "passed": true, "evidence": "AI interview remains primary; optional style-reference controls are collapsed."},
+    {"id": "begin_first_scene", "passed": true, "evidence": "Empty story presents a visible Continue and let AI open action plus an authority explanation."},
+    {"id": "player_action", "passed": true, "evidence": "Composer asks for the protagonist's next action and preserves choice/open modes."},
+    {"id": "continue_authority", "passed": true, "evidence": "UI states that Continue authorizes AI protagonist advancement for this turn."},
+    {"id": "responsive_story", "passed": true, "evidence": "Primary prose, actions, composer, and three-tab navigation verified at 390x844."},
+    {"id": "single_story_world", "passed": true, "evidence": "World switching/creation is absent from the story rail; current world is labeled as novel-owned."},
+    {"id": "advanced_disclosure", "passed": true, "evidence": "Model routing is in Settings; diagnostic and archive panels are collapsed behind one disclosure."}
+  ],
+  "open_issues": [
+    {"severity": 2, "id": "participant-validation", "summary": "Five-player task study and SUS are pending; expert scores must not be presented as participant evidence."}
+  ],
+  "participant_validation": {"status": "pending", "participants": 0}
+}

@@ -45,7 +45,7 @@ def test_chapter_roadmap_and_style_profile_database_contract() -> None:
                     title="The Planned Journey",
                     style_profile_id=profile.id,
                     planned_chapter_count=12,
-                    target_chapter_length=1800,
+                    minimum_chapter_length=1200,
                     chapter_length_unit="words",
                     prose_language="en",
                 )
@@ -98,10 +98,10 @@ def test_chapter_roadmap_and_style_profile_database_contract() -> None:
 
                 with pytest.raises(IntegrityError):
                     async with session.begin_nested():
-                        story.target_chapter_length = 499
+                        story.minimum_chapter_length = 499
                         await session.flush()
                 await session.refresh(story)
-                assert story.target_chapter_length == 1800
+                assert story.minimum_chapter_length == 1200
 
                 other_branch = StoryBranch(story_id=story.id, name="Other", roadmap_version=1)
                 session.add(other_branch)
@@ -130,19 +130,20 @@ def test_chapter_roadmap_and_style_profile_database_contract() -> None:
                         )
                         await session.flush()
 
+                chapter = await session.scalar(
+                    select(StoryChapter).where(StoryChapter.branch_id == branch.id)
+                )
+                assert chapter is not None
                 assistant = Message(
                     story_id=story.id,
                     branch_id=branch.id,
+                    chapter_id=chapter.id,
                     role="assistant",
                     content="A complete first chapter.",
                     meta={},
                 )
                 session.add(assistant)
                 await session.flush()
-                chapter = await session.scalar(
-                    select(StoryChapter).where(StoryChapter.branch_id == branch.id)
-                )
-                assert chapter is not None
                 chapter.status = "completed"
                 chapter.message_id = assistant.id
                 chapter.completed_at = datetime.now(timezone.utc)

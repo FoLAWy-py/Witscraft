@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "evaluation_version": "structured-extraction-v1",
-  "prompt_version": "state-extraction-v2",
-  "prompt_sha256": "28bd89b0ca092f2a7c105a16886cb3bea2984692df30cc0fb55b79b469e7da3b",
+  "prompt_version": "state-extraction-v3",
+  "prompt_sha256": "6fb22f568cc298d1eca4595b144d7cb50207b31aa2288ccfcbd4e0f70647655b",
   "data_classification": "synthetic-anonymized",
   "cases": [
     {

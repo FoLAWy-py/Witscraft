@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "evaluation_version": "structured-extraction-v1",
-  "prompt_version": "state-extraction-v2",
-  "case_set_sha256": "b3195a5b40ad4ff490e1ab0deb6264bad998d3ffbfdb10778cf8663940832c1e",
+  "prompt_version": "state-extraction-v3",
+  "case_set_sha256": "53cb6d2966923d13f1f45cd0534d52aaa213ea5c8f2ee911d002c6d46d52aaf4",
   "evidence_kind": "synthetic_contract",
   "provider": "synthetic",
   "model": "contract-reference-v1",

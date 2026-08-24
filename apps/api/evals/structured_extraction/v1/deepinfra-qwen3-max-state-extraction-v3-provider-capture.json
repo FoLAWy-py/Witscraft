@@ -1,0 +1,70 @@
+{
+  "call_limit": 8,
+  "capture_method": "bounded_live_provider",
+  "captured_at": "2026-08-24T03:16:52.180172Z",
+  "case_set_sha256": "53cb6d2966923d13f1f45cd0534d52aaa213ea5c8f2ee911d002c6d46d52aaf4",
+  "evaluation_version": "structured-extraction-v1",
+  "evidence_kind": "provider_capture",
+  "measurements": {
+    "abstract-perspective-is-not-location": {
+      "input_tokens": 718,
+      "latency_ms": 4420,
+      "output_tokens": 132
+    },
+    "explicit-arrival-and-stable-fact": {
+      "input_tokens": 739,
+      "latency_ms": 5520,
+      "output_tokens": 161
+    },
+    "explicit-kinship-inference": {
+      "input_tokens": 710,
+      "latency_ms": 7084,
+      "output_tokens": 187
+    },
+    "inventory-removal-and-addition": {
+      "input_tokens": 728,
+      "latency_ms": 5121,
+      "output_tokens": 154
+    },
+    "planned-destination-is-not-location": {
+      "input_tokens": 724,
+      "latency_ms": 4182,
+      "output_tokens": 128
+    },
+    "quiet-turn-preserves-state": {
+      "input_tokens": 717,
+      "latency_ms": 5084,
+      "output_tokens": 121
+    },
+    "resolved-thread-is-removed": {
+      "input_tokens": 730,
+      "latency_ms": 4074,
+      "output_tokens": 124
+    },
+    "title-alias-does-not-duplicate-character": {
+      "input_tokens": 756,
+      "latency_ms": 5222,
+      "output_tokens": 166
+    }
+  },
+  "model": "Qwen/Qwen3-Max",
+  "prompt_version": "state-extraction-v3",
+  "provider": "deepinfra",
+  "responses": {
+    "abstract-perspective-is-not-location": "{\n  \"location\": \"海底通信塔\",\n  \"time\": \"深夜\",\n  \"mood\": \"压抑\",\n  \"objective\": \"验证语音\",\n  \"inventory\": [],\n  \"open_threads\": [\"语音真伪\"],\n  \"relationships\": null,\n  \"chapter_phase\": \"rising\",\n  \"chapter_objective_resolved\": false,\n  \"natural_break\": false,\n  \"chapter_decision\": \"continue\",\n  \"chapter_decision_reason\": \"角色仍在原地未作出判断或行动，悬念未解\",\n  \"exceptional_break\": \"none\",\n  \"memories\": [],\n  \"canon_facts\": []\n}",
+    "explicit-arrival-and-stable-fact": "{\n  \"location\": \"废弃地铁站\",\n  \"time\": \"夜晚\",\n  \"mood\": \"警觉\",\n  \"objective\": \"调查站台广播的来源\",\n  \"inventory\": [\"铜钥匙\"],\n  \"open_threads\": [\"调查站台广播的来源\", \"废弃地铁站已经封锁\"],\n  \"relationships\": null,\n  \"chapter_phase\": \"rising\",\n  \"chapter_objective_resolved\": false,\n  \"natural_break\": false,\n  \"chapter_decision\": \"continue\",\n  \"chapter_decision_reason\": \"角色刚抵达新地点并开始调查，悬念未解。\",\n  \"exceptional_break\": \"none\",\n  \"memories\": [\"你们抵达废弃地铁站\"],\n  \"canon_facts\": [\"废弃地铁站已经封锁\"]\n}",
+    "explicit-kinship-inference": "{\n  \"location\": null,\n  \"time\": null,\n  \"mood\": null,\n  \"objective\": null,\n  \"inventory\": null,\n  \"open_threads\": [\"周墨留下了什么警告\", \"周墨为何失踪\"],\n  \"relationships\": [\n    {\n      \"from\": \"周砚\",\n      \"to\": \"周墨\",\n      \"bond\": \"兄弟\",\n      \"value\": 70\n    }\n  ],\n  \"chapter_phase\": \"setup\",\n  \"chapter_objective_resolved\": false,\n  \"natural_break\": false,\n  \"chapter_decision\": \"continue\",\n  \"chapter_decision_reason\": \"刚确认录音来源，核心谜题刚展开\",\n  \"exceptional_break\": \"none\",\n  \"memories\": [\"周砚确认失踪兄长周墨留下了警告。\"],\n  \"canon_facts\": [\"录音中的声音属于周墨。\"]\n}",
+    "inventory-removal-and-addition": "{\n  \"location\": \"石桥\",\n  \"time\": \"清晨\",\n  \"mood\": \"紧张\",\n  \"objective\": \"摆脱追踪\",\n  \"inventory\": [\"纸条\", \"铜币\"],\n  \"open_threads\": [],\n  \"relationships\": null,\n  \"chapter_phase\": null,\n  \"chapter_objective_resolved\": false,\n  \"natural_break\": false,\n  \"chapter_decision\": \"continue\",\n  \"chapter_decision_reason\": \"角色仍在执行摆脱追踪的目标，动作未完成且无场景闭合\",\n  \"exceptional_break\": \"none\",\n  \"memories\": [\"宁舟把旧钥匙丢进河里\"],\n  \"canon_facts\": [\"宁舟拿起桥栏上的铜币\"]\n}",
+    "planned-destination-is-not-location": "{\n  \"location\": null,\n  \"time\": null,\n  \"mood\": null,\n  \"objective\": null,\n  \"inventory\": null,\n  \"open_threads\": [\"是否前往废弃地铁站\"],\n  \"relationships\": null,\n  \"chapter_phase\": null,\n  \"chapter_objective_resolved\": null,\n  \"natural_break\": false,\n  \"chapter_decision\": \"continue\",\n  \"chapter_decision_reason\": \"角色尚未行动，仅讨论下一步计划，当前场景未闭合\",\n  \"exceptional_break\": \"none\",\n  \"memories\": [],\n  \"canon_facts\": []\n}",
+    "quiet-turn-preserves-state": "{\n  \"location\": null,\n  \"time\": null,\n  \"mood\": null,\n  \"objective\": null,\n  \"inventory\": null,\n  \"open_threads\": null,\n  \"relationships\": null,\n  \"chapter_phase\": null,\n  \"chapter_objective_resolved\": null,\n  \"natural_break\": true,\n  \"chapter_decision\": \"continue\",\n  \"chapter_decision_reason\": \"场景静止，无新进展，但等待尚未结束\",\n  \"exceptional_break\": \"none\",\n  \"memories\": [],\n  \"canon_facts\": []\n}",
+    "resolved-thread-is-removed": "{\n  \"location\": null,\n  \"time\": null,\n  \"mood\": null,\n  \"objective\": null,\n  \"inventory\": [\"铜钥匙\"],\n  \"open_threads\": [\"失踪兄长位置\"],\n  \"relationships\": null,\n  \"chapter_phase\": null,\n  \"chapter_objective_resolved\": null,\n  \"natural_break\": null,\n  \"chapter_decision\": null,\n  \"chapter_decision_reason\": null,\n  \"exceptional_break\": null,\n  \"memories\": [\"钥匙来源已经查明\"],\n  \"canon_facts\": [\"铜钥匙来自市政厅\"]\n}",
+    "title-alias-does-not-duplicate-character": "{\n  \"location\": null,\n  \"time\": null,\n  \"mood\": \"试探\",\n  \"objective\": \"确认橘猫身份\",\n  \"inventory\": [],\n  \"open_threads\": [\"橘猫身份\"],\n  \"relationships\": [{\"from\": \"罗小罗\", \"to\": \"橘猫\", \"bond\": \"初步信任\", \"value\": 40}],\n  \"chapter_phase\": \"setup\",\n  \"chapter_objective_resolved\": false,\n  \"natural_break\": false,\n  \"chapter_decision\": \"continue\",\n  \"chapter_decision_reason\": \"身份信息仅部分揭示，核心疑问未解\",\n  \"exceptional_break\": \"none\",\n  \"memories\": [],\n  \"canon_facts\": [\"‘烛尾’不是名字，是职阶。\"]\n}"
+  },
+  "schema_version": 1,
+  "totals": {
+    "calls": 8,
+    "input_tokens": 5822,
+    "latency_ms": 40707,
+    "output_tokens": 1173
+  }
+}

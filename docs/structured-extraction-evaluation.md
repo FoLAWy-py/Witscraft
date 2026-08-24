@@ -6,7 +6,7 @@
 
 Witscraft uses a structured model call to convert an AI-authored narrative turn into durable scene state, inventory, unresolved threads, relationships, memories, and canon facts. A cheaper or faster model must not become the default merely because it returns valid JSON in one demonstration. This gate measures recorded responses against a fixed, synthetic, anonymized corpus before a route change can be approved.
 
-The current corpus is `structured-extraction-v1` and is bound to prompt version `state-extraction-v2`, the exact system-prompt SHA-256, and the canonical case-set SHA-256. It covers quiet turns, explicit arrival, planned destinations, abstract perspective language, inventory removal and addition, resolved threads, explicit kinship, and title/alias canonicalization.
+The current corpus is `structured-extraction-v1` and is bound to prompt version `state-extraction-v3`, the exact system-prompt SHA-256, and the canonical case-set SHA-256. It covers quiet turns, explicit arrival, planned destinations, abstract perspective language, inventory removal and addition, resolved threads, explicit kinship, title/alias canonicalization, and conservative chapter-decision normalization.
 
 ## Evidence classes
 
@@ -78,15 +78,17 @@ Do not generate a new capture on every CI run or conversation. Reuse it while th
 
 ## Route approval lifecycle
 
-`route_approval.json` is checked against the registered `state_update` default on every CI run and release preflight. The current DeepInfra `Qwen/Qwen3-Max` route is approved by the reviewed `state-extraction-v2` provider capture. Model quality scores are calculated from those real provider responses. CI replays the immutable capture without new provider traffic and reports `score_source=provider_capture` plus the provider-evidence metrics; synthetic reference metrics test only the evaluator and can never be presented as the model's score. The gate fails if the prompt, corpus, route identity, thresholds, or deterministic post-processing changes incompatibly.
+`route_approval.json` is checked against the registered `state_update` default on every CI run and release preflight. The current DeepInfra `Qwen/Qwen3-Max` route is approved by the reviewed `state-extraction-v3` provider capture. Model quality scores are calculated from those real provider responses. CI replays the immutable capture without new provider traffic and reports `score_source=provider_capture` plus the provider-evidence metrics; synthetic reference metrics test only the evaluator and can never be presented as the model's score. The gate fails if the prompt, corpus, route identity, thresholds, or deterministic post-processing changes incompatibly.
 
 ## Current provider evidence
 
 The first bounded capture against `state-extraction-v1` used 3,782 input and 803 output tokens over eight calls. JSON parsing and critical assertions passed, but scalar accuracy was 90.6%, collection F1 was 73.4%, relationship F1 was 75%, and accepted hallucination rate was 27.6%; it was retained as failed evidence and never approved.
 
-The failure drove `state-extraction-v2` and stricter deterministic acceptance rules: mood and objectives require source grounding, planned actions cannot become open threads, unresolved threads survive unless explicitly resolved, relationship kinship overrides use source-exact labels, and memories/canon facts use bounded source-span and event-category rules. The alias case also stopped expecting a relationship label that the supplied text could not support.
+The failure drove `state-extraction-v2` and stricter deterministic acceptance rules: mood and objectives require source grounding, planned actions cannot become open threads, unresolved threads survive unless explicitly resolved, relationship kinship overrides use source-exact labels, and memories/canon facts use bounded source-span and event-category rules. Version 3 adds the chapter pacing decision to the same call, safely treats provider nulls as continue, and never permits deterministic fallback to close a chapter. The alias case also stopped expecting a relationship label that the supplied text could not support.
 
 The second bounded capture used 4,598 input and 670 output tokens over eight calls with 20,059 ms aggregate provider latency. Replaying the unchanged provider responses through the completed deterministic boundary achieved 100% parse success, scalar accuracy, collection F1, relationship F1, and critical assertions, with 0% accepted hallucinations. This capture approves only the exact current route, prompt, corpus, thresholds, and post-processing behavior.
+
+The current version 3 capture used 5,822 input and 1,173 output tokens over eight calls with 40,707 ms aggregate provider latency. It also achieves 100% parse success, scalar accuracy, collection F1, relationship F1, and critical assertions with 0% accepted hallucinations. The provider returned null for some new chapter-decision fields; the production parser conservatively normalized them to Continue, which is the approved fail-safe behavior.
 
 To change the default:
 

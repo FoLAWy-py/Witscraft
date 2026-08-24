@@ -189,11 +189,11 @@ if len(_ROLE_PURPOSES) != len(set(_ROLE_PURPOSES)) or set(_ROLE_PURPOSES) != set
 
 PURPOSE_BUDGETS: dict[StoryPurpose, PurposeBudget] = {
     "critical_story_generation": PurposeBudget(16000, 4800, 8192),
-    "normal_chat": PurposeBudget(10000, 2400, 4096),
+    "normal_chat": PurposeBudget(10000, 3200, 8192),
     "state_update": PurposeBudget(8000, 1000, 1800),
     "event_extraction": PurposeBudget(6000, 800, 1400),
     "summary_generation": PurposeBudget(12000, 1200, 1800),
-    "consistency_check": PurposeBudget(12000, 1200, 2400),
+    "consistency_check": PurposeBudget(12000, 1800, 4096),
 }
 
 

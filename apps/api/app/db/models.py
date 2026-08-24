@@ -183,8 +183,8 @@ class Story(Base, TimestampMixin):
             name="ck_stories_planned_chapter_count",
         ),
         CheckConstraint(
-            "target_chapter_length BETWEEN 500 AND 5000",
-            name="ck_stories_target_chapter_length",
+            "minimum_chapter_length BETWEEN 500 AND 5000",
+            name="ck_stories_minimum_chapter_length",
         ),
         CheckConstraint(
             "chapter_length_unit IN ('characters', 'words')",
@@ -211,8 +211,8 @@ class Story(Base, TimestampMixin):
     planned_chapter_count: Mapped[int] = mapped_column(
         Integer, default=12, server_default="12", nullable=False
     )
-    target_chapter_length: Mapped[int] = mapped_column(
-        Integer, default=1800, server_default="1800", nullable=False
+    minimum_chapter_length: Mapped[int] = mapped_column(
+        Integer, default=1200, server_default="1200", nullable=False
     )
     chapter_length_unit: Mapped[str] = mapped_column(
         String(20), default="characters", server_default="characters", nullable=False
@@ -267,6 +267,11 @@ class Message(Base):
             "id",
             name="uq_messages_story_branch_id",
         ),
+        ForeignKeyConstraint(
+            ["story_id", "branch_id", "chapter_id"],
+            ["story_chapters.story_id", "story_chapters.branch_id", "story_chapters.id"],
+            name="fk_messages_chapter_scope",
+        ),
         Index(
             "ix_messages_story_branch_created",
             "story_id",
@@ -274,11 +279,19 @@ class Message(Base):
             text("created_at DESC"),
             text("id DESC"),
         ),
+        Index(
+            "ix_messages_story_branch_chapter",
+            "story_id",
+            "branch_id",
+            "chapter_id",
+            "created_at",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     story_id: Mapped[UUID] = mapped_column(ForeignKey("stories.id", ondelete="CASCADE"), nullable=False)
     branch_id: Mapped[UUID] = mapped_column(ForeignKey("story_branches.id", ondelete="CASCADE"), nullable=False)
+    chapter_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
     role: Mapped[str] = mapped_column(String(20), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     token_count: Mapped[int | None] = mapped_column(Integer)
@@ -313,6 +326,12 @@ class StoryChapter(Base, TimestampMixin):
             "branch_id",
             "chapter_number",
             name="uq_story_chapters_branch_number",
+        ),
+        UniqueConstraint(
+            "story_id",
+            "branch_id",
+            "id",
+            name="uq_story_chapters_story_branch_id",
         ),
         UniqueConstraint("message_id", name="uq_story_chapters_message"),
         ForeignKeyConstraint(

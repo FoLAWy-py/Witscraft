@@ -1,0 +1,94 @@
+{
+  "abstract_profile": {
+    "analysis_method": "deterministic",
+    "descriptive_density": 0.0,
+    "dialogue_ratio": 0.412,
+    "figurative_density": 0.0,
+    "pacing": "fast",
+    "paragraph_rhythm": "compact",
+    "sentence_length_mean": 44.7,
+    "sentence_length_variation": "high",
+    "tense": "mixed",
+    "viewpoint": "third"
+  },
+  "author": {
+    "model": "Qwen/Qwen3-Max",
+    "provider": "deepinfra"
+  },
+  "calls": {
+    "call_limit": 8,
+    "judge_calls": 1,
+    "lifecycle_calls": 4,
+    "lifecycle_routes": [
+      "deepinfra:Qwen/Qwen3-Max:normal_chat",
+      "deepinfra:Qwen/Qwen3-Max:normal_chat",
+      "openai:gpt-5.5:consistency_check",
+      "deepinfra:Qwen/Qwen3-Max:state_update"
+    ],
+    "profiling_calls": 0
+  },
+  "capture_base_url_class": "loopback_http",
+  "capture_method": "bounded_live_provider_end_to_end",
+  "captured_at": "2026-08-24T03:25:47.385622Z",
+  "case_sha256": "a26a00815e4a3fae0dc96dfd105b1a202f2aa93d3b0cc6b4a3e929eac80a05db",
+  "chapter_transition": {
+    "chapter_number": 1,
+    "completed": false,
+    "exceptional_break": "none",
+    "length_unit": "words",
+    "measured_length": 895,
+    "minimum_length": 500,
+    "natural_break": true,
+    "objective_resolved": false,
+    "phase": "rising",
+    "reason": "The misdelivered letter has been removed from Eleanor’s reach, but its contents and implications remain unresolved; new tensions and movements suggest escalation."
+  },
+  "deployment_revision": "a97026a4b38d5f3ad7156893f0f298672abef9cf",
+  "evaluation_version": "interactive-fiction-natural-pacing-v2",
+  "evidence_kind": "provider_capture",
+  "generated_chapter": "Rain worked at the tall panes of Ashcombe House, and the breakfast tray still waited near the cold hearth with its silver cover askew.\n\nEleanor Vale remained by the window.\n\nMrs. Poole, the housekeeper, came in from the passage with a folded cloth over one arm. Her cap sat straight. Her keys made no sound. She stopped just inside the room, close enough to see the tray and far enough to deny any errand connected with it.\n\nEleanor Vale asked Mrs. Poole whether any letters arrived.\n\n“The post came early, miss,” Mrs. Poole said. “Earlier than common, with the lane half under water.”\n\nShe glanced toward the sideboard.\n\n“There were letters for Mr. Ashcombe. Two for Mrs. Lydgate. One circular for the steward, though why London printers think Ashcombe in need of patent roofing I cannot say.”\n\nA gust pressed rain against the glass.\n\nMrs. Poole folded the cloth once, then twice.\n\n“None addressed to you, miss.”\n\nEleanor Vale did not open or accept any letter.\n\nThe housekeeper’s eyes settled briefly on the breakfast tray.\n\n“There was, however, one piece put down where it should not have been. A mistake in the sorting belowstairs. Such things happen when the post-boy is wet through and Cook has the scullery door standing wide.”\n\nFrom the passage came the quick scrape of a maid’s shoe.\n\nMrs. Poole turned her head. “Betty, not in here.”\n\nThe maid froze beyond the threshold. “Beg pardon, Mrs. Poole. Mr. Ashcombe asked whether the west fire had been laid.”\n\n“It has not, because he ordered it not to be laid until noon.”\n\n“He says he ordered otherwise.”\n\n“He did not.”\n\nBetty’s voice lowered. “He says the room must be ready at once. And he asked if—”\n\nMrs. Poole’s hand tightened around the cloth.\n\n“If what?”\n\n“If anyone had come in here since breakfast.”\n\nRain filled the pause.\n\nMrs. Poole said, “You may tell Mr. Ashcombe the drawing room is being attended to.”\n\n“Yes, Mrs. Poole.”\n\n“And Betty.”\n\n“Yes?”\n\n“You may also tell him I do not keep a ledger of guests crossing thresholds in their host’s house.”\n\nThe maid gave a small, uncertain noise and vanished into the passage.\n\nMrs. Poole faced the room again. Her trained expression had returned, though not so smoothly as before.\n\n“The misdirected item has been taken up,” she said. “It is no longer on the tray.”\n\nA coal shifted in the hearth, though the fire was nearly spent.\n\n“Mr. Ashcombe has it now.”\n\nAbove, a door closed with care rather than force. A second door answered from farther along the landing. The old house carried both sounds clearly.\n\nMrs. Poole listened.\n\n“Mrs. Lydgate has been asking after her correspondence as well,” she said. “A great many people are particular about paper in bad weather. Damp alters ink. It also alters tempers.”\n\nAnother servant crossed the hall at speed. This time it was Palmer, the footman, with mud on one cuff and a riding coat over his arm.\n\n“Mrs. Poole,” he said from outside the room. “Mr. Ashcombe wants the carriage horse kept ready.”\n\n“In this rain?”\n\n“That was the instruction.”\n\n“For whom?”\n\nPalmer hesitated. “He did not say.”\n\n“Then you will ask him whether he means the bay mare or the black.”\n\n“He said no questions.”\n\nMrs. Poole’s mouth thinned.\n\n“Then take the bay, because the black will lame herself in the lower lane and I will not have the blame of it. And have Tom stand by the south gate, not the front sweep.”\n\nPalmer looked toward the stairs. “South gate?”\n\n“You heard me.”\n\nHe left, boots dull on the runner.\n\nThe housekeeper remained where she was, no longer pretending she had come for linen.\n\n“It is an inconvenience,” she said, “when a letter reaches the wrong hand. Worse when everyone behaves as though paper can bite.”\n\nAnother creak sounded overhead. This one stopped directly above the drawing room.\n\nMrs. Poole lowered her voice.\n\n“I have served here twenty-one years, miss. In that time, I have learned that letters belong to the person named upon them, not to the person most anxious to read them. But a house is not governed by what servants know.”\n\nAt the far end of the hall, Mr. Ashcombe’s voice cut through the ceiling and stairwell, controlled and sharp.\n\n“Poole.”\n\nThe housekeeper did not answer at once.\n\nHe called again. “Mrs. Poole.”\n\nShe looked toward the open door.\n\n“Coming, sir.”\n\nBefore leaving, she spoke in the same low, even tone.\n\n“If anyone asks, the morning post contained nothing for you. That much is true.”\n\nThe stable bell clanged outside, once, then again. Not the regular signal for feed. Not the church bell. Metal struck too fast, then stopped.\n\nMrs. Poole went to the doorway.\n\nOn the landing above, footsteps crossed from left to right. A man’s tread. Then a lighter one followed. A murmur passed between unseen voices and broke off as the housekeeper reached the stairs.\n\nThe drawing room was left with the cold tray, the rain, and the absence of the letter.\n\nFrom upstairs, Mr. Ashcombe said something too low to catch.\n\nMrs. Poole replied, clearer: “Yes, sir. I told her the truth.”\n\nA silence followed.\n\nThen Mr. Ashcombe said, “Send Miss Vale to me if she asks again.”\n\nThe floorboard above creaked.",
+  "generated_chapter_sha256": "a028ff15e538f9da657f2e51885b1cc963dbb698a11e6bbf0cbc619c9e63d7b7",
+  "generated_features": {
+    "analysis_method": "deterministic",
+    "descriptive_density": 0.0,
+    "dialogue_ratio": 0.392,
+    "figurative_density": 0.036,
+    "pacing": "fast",
+    "paragraph_rhythm": "compact",
+    "sentence_length_mean": 28.3,
+    "sentence_length_variation": "high",
+    "tense": "mixed",
+    "viewpoint": "third"
+  },
+  "judge": {
+    "input_tokens": 1728,
+    "latency_ms": 8069,
+    "model": "gpt-5.5",
+    "output_tokens": 400,
+    "prompt_version": "interactive-fiction-judge-v2",
+    "provider": "openai"
+  },
+  "narrative_completion": {
+    "continued_after_length_limit": false,
+    "finish_reason": "stop",
+    "status": "completed"
+  },
+  "profile_reused": true,
+  "reference_source_url": "https://www.gutenberg.org/ebooks/1342",
+  "schema_version": 1,
+  "scores": {
+    "narrative_pacing": 92,
+    "narrative_quality": 90,
+    "overall": 91,
+    "player_agency": 94,
+    "profile_adherence": 86,
+    "reasons": [
+      "Closely matches third-person, compact, dialogue-heavy, fast-paced profile, though sentence length is notably shorter than the supplied mean and there is a small amount of figurative phrasing despite a zero target.",
+      "Strong scene construction: the missing letter, servants' interruptions, and Ashcombe's offstage pressure create escalating tension with minimal exposition.",
+      "Player action is respected without adding unrequested protagonist speech, inner thought, consent, or further decisions beyond remaining by the window and asking about letters.",
+      "World details are internally consistent: household hierarchy, servant traffic, correspondence anxiety, and carriage preparations all support the setting and conflict.",
+      "Pacing develops naturally through successive interruptions and ends at a clear decision point concerning whether Miss Vale will ask again or respond to Ashcombe's summons."
+    ],
+    "world_canon": 91
+  }
+}

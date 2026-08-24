@@ -62,7 +62,7 @@ class CreateStoryRequest(BaseModel):
     custom_prompt: str = Field(default="", max_length=12000)
     interaction_mode: Literal["choices", "open"] = "choices"
     planned_chapter_count: int = Field(default=12, ge=3, le=120)
-    target_chapter_length: int = Field(default=1800, ge=500, le=5000)
+    minimum_chapter_length: int = Field(default=1200, ge=500, le=5000)
     chapter_length_unit: Literal["characters", "words"] = "characters"
     prose_language: str = Field(default="zh-CN", min_length=2, max_length=35)
 
@@ -104,7 +104,7 @@ class StoryInterviewDraft(GenerateStoryDraftRequest):
     custom_prompt: str = Field(default="", max_length=12000)
     interaction_mode: Literal["choices", "open"] = "choices"
     planned_chapter_count: int = Field(default=12, ge=3, le=120)
-    target_chapter_length: int = Field(default=1800, ge=500, le=5000)
+    minimum_chapter_length: int = Field(default=1200, ge=500, le=5000)
     chapter_length_unit: Literal["characters", "words"] = "characters"
     prose_language: str = Field(default="zh-CN", min_length=2, max_length=35)
 
@@ -289,6 +289,7 @@ class ChatResponse(BaseModel):
     model_call: dict
     idempotency_key: str | None = None
     branch_version: int | None = None
+    chapter_transition: dict | None = None
 
 
 class WorkspaceMessage(BaseModel):
@@ -299,6 +300,7 @@ class WorkspaceMessage(BaseModel):
     time: str | None = None
     choices: list[str] = Field(default_factory=list)
     consistency_check: dict | None = None
+    chapter_id: str | None = None
 
 
 class WorkspaceResponse(BaseModel):
@@ -324,7 +326,7 @@ class WorkspaceResponse(BaseModel):
     consistency_mode: Literal["manual", "auto", "off"] = "auto"
     planned_chapter_count: int = 12
     minimum_planned_chapter_count: int = 3
-    target_chapter_length: int = 1800
+    minimum_chapter_length: int = 1200
     chapter_length_unit: Literal["characters", "words"] = "characters"
     prose_language: str = "zh-CN"
     roadmap_version: int = 0

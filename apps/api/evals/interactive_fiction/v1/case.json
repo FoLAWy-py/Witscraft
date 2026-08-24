@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "evaluation_version": "interactive-fiction-style-v1",
-  "judge_prompt_version": "interactive-fiction-judge-v1",
+  "evaluation_version": "interactive-fiction-natural-pacing-v2",
+  "judge_prompt_version": "interactive-fiction-judge-v2",
   "prompt_versions": {
-    "chapter_authoring": "chapter-authoring-v3",
-    "player_agency_editor": "player-agency-editor-v4",
+    "chapter_authoring": "chapter-authoring-v4",
+    "player_agency_editor": "player-agency-editor-v5",
     "style_prompt": "abstract-style-prompt-v2"
   },
   "style_analysis_version": "style-profile-v1",
@@ -44,7 +44,7 @@
     "custom_prompt": "Preserve player agency. Use original characters and wording; do not imitate or name any author.",
     "interaction_mode": "open",
     "planned_chapter_count": 3,
-    "target_chapter_length": 500,
+    "minimum_chapter_length": 500,
     "chapter_length_unit": "words",
     "prose_language": "en",
     "player_action": "I remain by the window and ask the housekeeper whether any letters arrived, without opening or accepting one.",

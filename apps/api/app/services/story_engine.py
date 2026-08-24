@@ -48,15 +48,13 @@ from app.services.embeddings import (
 from app.services.memory_embedding_tasks import new_memory_embedding_task
 from app.services.player_agency import (
     agency_editor_instruction,
-    agency_trim_instruction,
-    chapter_needs_expansion,
+    chapter_prose,
     chapter_authoring_instruction,
     ensure_chapter_heading,
     measured_chapter_length,
-    prune_chapter_to_length_band,
     reject_known_impossible_action,
 )
-from app.services.state_extractor import extract_story_updates_with_llm
+from app.services.state_extractor import ChapterProgress, extract_story_updates_with_llm
 from app.services.story_roadmap import revise_roadmap_window
 from app.services.style_profiles import (
     assert_non_reproducing,
@@ -198,6 +196,24 @@ def visible_stream_story_text(text: str) -> str:
     return text[: max(0, len(text) - held_suffix)]
 
 
+def merge_story_continuation(first: str, continuation: str) -> str:
+    """Join one bounded provider continuation without duplicating its overlap."""
+    left = first.rstrip()
+    right = continuation.lstrip()
+    if not left:
+        return right
+    if not right:
+        return left
+    maximum = min(400, len(left), len(right))
+    overlap = 0
+    for size in range(maximum, 5, -1):
+        if left[-size:] == right[:size]:
+            overlap = size
+            break
+    separator = "" if overlap or left.endswith(("\n", " ")) else "\n\n"
+    return f"{left}{separator}{right[overlap:]}"
+
+
 class StoryEngine:
     def __init__(self, llm_gateway: LLMGateway, session: AsyncSession, user_id: UUID):
         self.llm_gateway = llm_gateway
@@ -219,6 +235,7 @@ class StoryEngine:
         )
         branch = await self._get_branch(story.id, branch_id)
         chapter = await self._preflight_player_turn(request, story, branch)
+        chapter_length, chapter_started = await self._chapter_runtime(story, branch, chapter)
         generation, replay = await self._claim_generation(request, story, branch)
         if replay is not None:
             return replay
@@ -239,6 +256,7 @@ class StoryEngine:
                 story_id=story.id,
                 branch_id=branch.id,
                 role="user",
+                chapter_id=chapter.id if chapter is not None else None,
                 content=request.message,
                 meta={"author": "你"},
                 created_at=datetime.now(timezone.utc),
@@ -257,7 +275,16 @@ class StoryEngine:
         )
         prompt_messages = context.prompt_messages
         if chapter is not None:
-            prompt_messages.insert(1, self._chapter_prompt(story, request, chapter))
+            prompt_messages.insert(
+                1,
+                self._chapter_prompt(
+                    story,
+                    request,
+                    chapter,
+                    current_chapter_length=chapter_length,
+                    chapter_started=chapter_started,
+                ),
+            )
         await self.session.commit()
 
         llm_request = self._routed_generation_request(
@@ -267,19 +294,13 @@ class StoryEngine:
             stream=generation_request.stream,
         )
         llm_response = await self.llm_gateway.generate(llm_request)
+        llm_response = await self._ensure_complete_narrative_response(
+            llm_request, llm_response
+        )
         response_content, response_choices = split_story_response(
             llm_response.text,
             story.interaction_mode or "choices",
         )
-        response_content, expanded_response = await self._expand_short_chapter(
-            response_content,
-            story=story,
-            request=request,
-            chapter=chapter,
-            llm_request=llm_request,
-        )
-        if expanded_response is not None:
-            llm_response = expanded_response.model_copy(update={"text": response_content})
         response_content, _ = await self._enforce_player_agency(
             response_content,
             story=story,
@@ -287,7 +308,7 @@ class StoryEngine:
             chapter=chapter,
             llm_request=llm_request,
         )
-        if chapter is not None:
+        if chapter is not None and not chapter_started:
             response_content = ensure_chapter_heading(
                 response_content, chapter.chapter_number, chapter.title
             )
@@ -308,7 +329,7 @@ class StoryEngine:
             context,
             story.consistency_mode or "auto",
         )
-        if chapter is not None:
+        if chapter is not None and not chapter_started:
             response_content = ensure_chapter_heading(
                 response_content, chapter.chapter_number, chapter.title
             )
@@ -324,16 +345,17 @@ class StoryEngine:
             llm_response.text,
             relationships=relationships,
             perspective_character=perspective_character,
+            chapter_context={
+                "chapter_number": chapter.chapter_number,
+                "chapter_title": chapter.title,
+                "chapter_objective": chapter.objective or "",
+                "minimum_length": story.minimum_chapter_length,
+                "length_unit": story.chapter_length_unit,
+                "length_before_turn": chapter_length,
+            }
+            if chapter is not None
+            else None,
         )
-        if target_message is None and chapter is not None:
-            await self._revise_future_roadmap(
-                story,
-                branch,
-                chapter,
-                source_user_text,
-                llm_response.text,
-                extraction.state,
-            )
         prepared_memories, prepared_canon_facts = await self._prepare_extracted_knowledge(
             story,
             branch,
@@ -350,6 +372,7 @@ class StoryEngine:
             story_id=story.id,
             branch_id=branch.id,
             role="assistant",
+            chapter_id=chapter.id if chapter is not None else None,
             content=llm_response.text,
             token_count=llm_response.output_tokens,
             meta={"author": "叙事引擎", "time": state.time, "choices": response_choices},
@@ -363,8 +386,25 @@ class StoryEngine:
             assistant_message.token_count = llm_response.output_tokens
         await self.session.flush()
 
+        chapter_transition = None
         if target_message is None and chapter is not None:
-            await self._complete_story_chapter(story, branch, chapter, assistant_message)
+            chapter_transition = await self._apply_chapter_progress(
+                story,
+                branch,
+                chapter,
+                assistant_message,
+                extraction.chapter_progress,
+                llm_response.completion_status,
+            )
+            if chapter_transition["completed"]:
+                await self._revise_future_roadmap(
+                    story,
+                    branch,
+                    chapter,
+                    source_user_text,
+                    llm_response.text,
+                    extraction.state,
+                )
 
         assistant_message.meta = {
             "author": "叙事引擎",
@@ -372,6 +412,8 @@ class StoryEngine:
             "choices": response_choices,
             "consistency_check": consistency_check,
             "consistency_revision": consistency_revision,
+            "chapter_progress": extraction.chapter_progress.model_dump(),
+            "chapter_transition": chapter_transition,
         }
         state_snapshot = StoryStateSnapshot(
             story_id=story.id,
@@ -430,12 +472,18 @@ class StoryEngine:
                 "input_tokens": llm_response.input_tokens,
                 "output_tokens": llm_response.output_tokens,
                 "cost_estimate": llm_response.cost_estimate,
+                "completion_status": llm_response.completion_status,
+                "finish_reason": llm_response.finish_reason,
+                "continued_after_length_limit": bool(
+                    llm_response.raw.get("continued_after_length_limit")
+                ),
                 "dry_run": llm_response.raw.get("dry_run", False),
                 "consistency_check": consistency_check,
                 "consistency_revision": consistency_revision,
             },
             idempotency_key=generation.idempotency_key,
             branch_version=generation.expected_branch_version + 1,
+            chapter_transition=chapter_transition,
         )
         await self._complete_generation(generation, branch, assistant_message, response)
         await self.session.commit()
@@ -459,6 +507,9 @@ class StoryEngine:
         branch = await self._get_branch(story.id, branch_id)
         try:
             chapter = await self._preflight_player_turn(request, story, branch)
+            chapter_length, chapter_started = await self._chapter_runtime(
+                story, branch, chapter
+            )
         except HTTPException as error:
             yield {"type": "error", "status": error.status_code, "detail": error.detail}
             return
@@ -477,6 +528,7 @@ class StoryEngine:
             story_id=story.id,
             branch_id=branch.id,
             role="user",
+            chapter_id=chapter.id if chapter is not None else None,
             content=request.message,
             meta={"author": "你"},
             created_at=datetime.now(timezone.utc),
@@ -494,7 +546,16 @@ class StoryEngine:
         )
         prompt_messages = context.prompt_messages
         if chapter is not None:
-            prompt_messages.insert(1, self._chapter_prompt(story, request, chapter))
+            prompt_messages.insert(
+                1,
+                self._chapter_prompt(
+                    story,
+                    request,
+                    chapter,
+                    current_chapter_length=chapter_length,
+                    chapter_started=chapter_started,
+                ),
+            )
         await self.session.commit()
 
         llm_request = self._routed_generation_request(
@@ -542,6 +603,7 @@ class StoryEngine:
                         branch,
                         stream_message,
                         visible_text,
+                        chapter,
                     )
                     last_checkpoint_at = now
                     last_checkpoint_characters = len(visible_text)
@@ -560,20 +622,29 @@ class StoryEngine:
                             partial_text,
                             int((time.perf_counter() - started) * 1000),
                             stream_message,
+                            chapter,
                         )
             raise
 
         raw_response_text = "".join(chunks)
+        streamed_response = LLMResponse(
+            provider=self.llm_gateway.last_stream_provider or llm_request.provider,
+            model=self.llm_gateway.last_stream_model or llm_request.model,
+            text=raw_response_text,
+            raw={"stream": True, "dry_run": False},
+            latency_ms=int((time.perf_counter() - started) * 1000),
+            call_id=self.llm_gateway.last_stream_call_id,
+            cost_estimate=self.llm_gateway.last_stream_cost_estimate,
+            completion_status=self.llm_gateway.last_stream_completion_status,
+            finish_reason=self.llm_gateway.last_stream_finish_reason,
+        )
+        llm_response = await self._ensure_complete_narrative_response(
+            llm_request, streamed_response
+        )
+        raw_response_text = llm_response.text
         response_content, response_choices = split_story_response(
             raw_response_text,
             story.interaction_mode or "choices",
-        )
-        response_content, _ = await self._expand_short_chapter(
-            response_content,
-            story=story,
-            request=request,
-            chapter=chapter,
-            llm_request=llm_request,
         )
         response_content, _ = await self._enforce_player_agency(
             response_content,
@@ -582,7 +653,7 @@ class StoryEngine:
             chapter=chapter,
             llm_request=llm_request,
         )
-        if chapter is not None:
+        if chapter is not None and not chapter_started:
             titled_content = ensure_chapter_heading(
                 response_content, chapter.chapter_number, chapter.title
             )
@@ -590,7 +661,7 @@ class StoryEngine:
                 response_content = titled_content
                 if not requires_buffered_stream:
                     stream_message = await self._save_stream_partial(
-                        story, branch, stream_message, response_content
+                        story, branch, stream_message, response_content, chapter
                     )
                     delivered_text = response_content
                     yield {"type": "replace", "content": response_content}
@@ -614,6 +685,7 @@ class StoryEngine:
                     branch,
                     stream_message,
                     response_content,
+                    chapter,
                 )
             if not requires_buffered_stream:
                 yield {"type": "delta", "content": remaining_text}
@@ -627,7 +699,7 @@ class StoryEngine:
             context,
             story.consistency_mode or "auto",
         )
-        if chapter is not None:
+        if chapter is not None and not chapter_started:
             final_content = ensure_chapter_heading(
                 final_content, chapter.chapter_number, chapter.title
             )
@@ -639,6 +711,7 @@ class StoryEngine:
                     branch,
                     stream_message,
                     response_content,
+                    chapter,
                 )
             if not requires_buffered_stream:
                 yield {"type": "replace", "content": response_content}
@@ -650,15 +723,7 @@ class StoryEngine:
             )
         if requires_buffered_stream:
             yield {"type": "replace", "content": response_content}
-        llm_response = LLMResponse(
-            provider=self.llm_gateway.last_stream_provider or llm_request.provider,
-            model=self.llm_gateway.last_stream_model or llm_request.model,
-            text=response_content,
-            raw={"stream": True, "dry_run": False},
-            latency_ms=int((time.perf_counter() - started) * 1000),
-            call_id=self.llm_gateway.last_stream_call_id,
-            cost_estimate=self.llm_gateway.last_stream_cost_estimate,
-        )
+        llm_response = llm_response.model_copy(update={"text": response_content})
         response = await self._persist_completed_stream(
             story,
             branch,
@@ -674,6 +739,7 @@ class StoryEngine:
             consistency_revision,
             generation,
             chapter,
+            chapter_length,
         )
         yield {"type": "done", "response": response.model_dump()}
 
@@ -708,87 +774,63 @@ class StoryEngine:
         updates: dict = {"stream": stream}
         if request.max_output_tokens is not None:
             updates["max_output_tokens"] = request.max_output_tokens
-        elif story is not None:
-            unit_multiplier = 1.6 if story.chapter_length_unit == "words" else 1.15
-            updates["max_output_tokens"] = max(
-                routed.max_output_tokens,
-                math.ceil(story.target_chapter_length * unit_multiplier) + 256,
-            )
         return self.llm_gateway.normalize_request(routed.model_copy(update=updates))
 
-    async def _expand_short_chapter(
+    async def _ensure_complete_narrative_response(
         self,
-        content: str,
-        *,
-        story: Story,
-        request: ChatRequest,
-        chapter: StoryChapter | None,
-        llm_request: LLMRequest,
-    ) -> tuple[str, LLMResponse | None]:
-        if chapter is None or not chapter_needs_expansion(
-            content,
-            story.target_chapter_length,
-            story.chapter_length_unit,
-        ):
-            return content, None
-        measured = measured_chapter_length(content, story.chapter_length_unit)
-        minimum = math.ceil(story.target_chapter_length * 0.85)
-        unit = (
-            "visible CJK characters"
-            if story.chapter_length_unit == "characters"
-            else "whitespace-delimited words"
+        request: LLMRequest,
+        response: LLMResponse,
+    ) -> LLMResponse:
+        if response.completion_status == "completed":
+            return response
+        if response.completion_status != "length_limited" or not response.text.strip():
+            raise RuntimeError(
+                f"Narrative provider returned an incomplete response ({response.finish_reason or response.completion_status})"
+            )
+        continuation_request = request.model_copy(
+            update={
+                "messages": [
+                    *request.messages,
+                    ChatMessage(role="assistant", content=response.text),
+                    ChatMessage(
+                        role="user",
+                        content=(
+                            "The provider stopped only because its output-token limit was reached. "
+                            "Continue the exact same narrative installment from the final sentence. "
+                            "Do not recap, restart, add a heading, change established events, or add "
+                            "new protagonist behavior. Finish at the next natural player decision "
+                            "point and return continuation prose only."
+                        ),
+                    ),
+                ],
+                "stream": False,
+                "temperature": min(request.temperature, 0.72),
+            }
         )
-        best_content = content
-        best_response: LLMResponse | None = None
-        best_measure = measured
-        for _attempt in range(2):
-            paragraph_guidance = (
-                "For CJK prose, use 5–7 developed paragraphs and do not stop before the hard "
-                f"minimum of {minimum} visible characters. "
-                if story.chapter_length_unit == "characters"
-                else f"Do not stop before the hard minimum of {minimum} words. "
-            )
-            expansion_instruction = ChatMessage(
-                role="user",
-                content=(
-                    "The draft above is materially shorter than the player's chapter-length "
-                    f"setting. Rewrite it as one complete replacement chapter of approximately "
-                    f"{story.target_chapter_length} {unit} (acceptable range ±15%); the current "
-                    f"draft measures only {best_measure}. {paragraph_guidance}Preserve its "
-                    "established events and the player's explicit action, deepen concrete "
-                    "consequence, atmosphere, dialogue from other characters, and sensory detail, "
-                    "but do not invent any additional protagonist speech, private thought, "
-                    "decision, consent, or action unless this turn used Continue "
-                    f"({request.control_mode == 'continue'}). For a player-action turn, silently "
-                    "delete every protagonist detail not present in this exhaustive whitelist: "
-                    f"{request.message.strip()} Return prose only, with no chapter "
-                    "heading, commentary, or story-choice list."
+        continuation = await self.llm_gateway.generate(continuation_request)
+        if continuation.completion_status != "completed" or not continuation.text.strip():
+            raise RuntimeError("Narrative continuation was still incomplete and was not persisted")
+        return continuation.model_copy(
+            update={
+                "text": merge_story_continuation(response.text, continuation.text),
+                "input_tokens": (
+                    (response.input_tokens or 0) + (continuation.input_tokens or 0)
+                    if response.input_tokens is not None or continuation.input_tokens is not None
+                    else None
                 ),
-            )
-            expansion_request = llm_request.model_copy(
-                update={
-                    "messages": [
-                        *llm_request.messages,
-                        ChatMessage(role="assistant", content=best_content),
-                        expansion_instruction,
-                    ],
-                    "stream": False,
-                    "temperature": min(llm_request.temperature, 0.72),
-                }
-            )
-            try:
-                response = await self.llm_gateway.generate(expansion_request)
-            except Exception:
-                break
-            expanded, _ = split_story_response(response.text, "open")
-            expanded_measure = measured_chapter_length(expanded, story.chapter_length_unit)
-            if expanded_measure > best_measure:
-                best_content = expanded
-                best_response = response
-                best_measure = expanded_measure
-            if best_measure >= minimum:
-                break
-        return best_content, best_response
+                "output_tokens": (
+                    (response.output_tokens or 0) + (continuation.output_tokens or 0)
+                    if response.output_tokens is not None or continuation.output_tokens is not None
+                    else None
+                ),
+                "raw": {
+                    "continued_after_length_limit": True,
+                    "primary_finish_reason": response.finish_reason,
+                    "continuation": continuation.raw,
+                },
+                "completion_status": "completed",
+            }
+        )
 
     async def _enforce_player_agency(
         self,
@@ -801,8 +843,6 @@ class StoryEngine:
     ) -> tuple[str, LLMResponse | None]:
         if chapter is None or request.control_mode != "player_action":
             return content, None
-        minimum = math.ceil(story.target_chapter_length * 0.85)
-        maximum = math.floor(story.target_chapter_length * 1.15)
         profile = await self._load_style_profile(story)
         protagonist_name = await self._main_character_name(story)
         abstract_style_profile = style_prompt(profile.features) if profile is not None else ""
@@ -811,8 +851,6 @@ class StoryEngine:
             content=agency_editor_instruction(
                 player_action=request.message,
                 protagonist_name=protagonist_name or "",
-                target_length=story.target_chapter_length,
-                length_unit=story.chapter_length_unit,
                 abstract_style_profile=abstract_style_profile,
             ),
         )
@@ -825,7 +863,7 @@ class StoryEngine:
                 ],
                 "stream": False,
                 "temperature": min(llm_request.temperature, 0.35),
-                "max_output_tokens": min(llm_request.max_output_tokens, 1600),
+                "max_output_tokens": min(llm_request.max_output_tokens, 4096),
                 "purpose": "consistency_check",
                 "provider": "openai",
                 "model": "gpt-5.5",
@@ -833,50 +871,10 @@ class StoryEngine:
             }
         )
         response = await self.llm_gateway.generate(agency_request)
+        response = await self._ensure_complete_narrative_response(agency_request, response)
         revised, _ = split_story_response(response.text, "open")
         if not revised.strip():
             raise RuntimeError("Player-agency editor returned empty prose")
-        measured = measured_chapter_length(revised, story.chapter_length_unit)
-        if measured > maximum:
-            trim_instruction = ChatMessage(
-                role="user",
-                content=agency_trim_instruction(
-                    measured_length=measured,
-                    target_length=story.target_chapter_length,
-                    length_unit=story.chapter_length_unit,
-                    abstract_style_profile=abstract_style_profile,
-                ),
-            )
-            trim_request = agency_request.model_copy(
-                update={
-                    "messages": [
-                        *agency_request.messages,
-                        ChatMessage(role="assistant", content=revised),
-                        trim_instruction,
-                    ],
-                    "max_output_tokens": agency_request.max_output_tokens,
-                    "reasoning_effort": "low",
-                }
-            )
-            candidate = revised
-            candidate_response = response
-            try:
-                trimmed_response = await self.llm_gateway.generate(trim_request)
-                trimmed, _ = split_story_response(trimmed_response.text, "open")
-                trimmed_measure = measured_chapter_length(trimmed, story.chapter_length_unit)
-                if trimmed.strip() and minimum <= trimmed_measure < measured:
-                    candidate = trimmed
-                    candidate_response = trimmed_response
-            except Exception:
-                pass
-            pruned = prune_chapter_to_length_band(
-                candidate,
-                story.target_chapter_length,
-                story.chapter_length_unit,
-            )
-            if pruned is None:
-                raise RuntimeError("Player-agency editor could not satisfy chapter length")
-            return pruned, candidate_response
         return revised, response
 
     async def _preflight_player_turn(
@@ -926,6 +924,9 @@ class StoryEngine:
         story: Story,
         request: ChatRequest,
         chapter: StoryChapter,
+        *,
+        current_chapter_length: int,
+        chapter_started: bool,
     ) -> ChatMessage:
         return ChatMessage(
             role="developer",
@@ -934,20 +935,74 @@ class StoryEngine:
                 chapter_number=chapter.chapter_number,
                 chapter_title=chapter.title,
                 chapter_objective=chapter.objective or "Advance the current dramatic pressure.",
-                target_length=story.target_chapter_length,
+                minimum_chapter_length=story.minimum_chapter_length,
+                current_chapter_length=current_chapter_length,
+                chapter_started=chapter_started,
                 length_unit=story.chapter_length_unit,
                 prose_language=story.prose_language,
                 player_action=request.message,
             ),
         )
 
-    async def _complete_story_chapter(
+    async def _chapter_runtime(
+        self,
+        story: Story,
+        branch: StoryBranch,
+        chapter: StoryChapter | None,
+    ) -> tuple[int, bool]:
+        if chapter is None:
+            return 0, False
+        result = await self.session.execute(
+            select(Message.content)
+            .where(
+                Message.story_id == story.id,
+                Message.branch_id == branch.id,
+                Message.chapter_id == chapter.id,
+                Message.role == "assistant",
+            )
+            .order_by(Message.created_at.asc(), Message.id.asc())
+        )
+        prose = [chapter_prose(content) for content in result.scalars().all()]
+        return (
+            sum(measured_chapter_length(content, story.chapter_length_unit) for content in prose),
+            bool(prose),
+        )
+
+    async def _apply_chapter_progress(
         self,
         story: Story,
         branch: StoryBranch,
         chapter: StoryChapter,
         assistant_message: Message,
-    ) -> None:
+        progress: ChapterProgress,
+        completion_status: str,
+    ) -> dict:
+        total_length, _ = await self._chapter_runtime(story, branch, chapter)
+        exceptional = progress.exceptional_break in {
+            "story_ending",
+            "irreversible_failure",
+        }
+        completed = bool(
+            completion_status == "completed"
+            and progress.decision == "complete"
+            and progress.natural_break
+            and (progress.objective_resolved or exceptional)
+            and (total_length >= story.minimum_chapter_length or exceptional)
+        )
+        transition = {
+            "completed": completed,
+            "chapter_number": chapter.chapter_number,
+            "measured_length": total_length,
+            "minimum_length": story.minimum_chapter_length,
+            "length_unit": story.chapter_length_unit,
+            "phase": progress.phase,
+            "objective_resolved": progress.objective_resolved,
+            "natural_break": progress.natural_break,
+            "exceptional_break": progress.exceptional_break,
+            "reason": progress.reason,
+        }
+        if not completed:
+            return transition
         current = await self.session.scalar(
             select(StoryChapter)
             .where(
@@ -976,6 +1031,9 @@ class StoryEngine:
             story.status = "completed"
         else:
             next_chapter.status = "active"
+            transition["next_chapter_number"] = next_chapter.chapter_number
+            transition["next_chapter_title"] = next_chapter.title
+        return transition
 
     async def _revise_future_roadmap(
         self,
@@ -1379,12 +1437,14 @@ class StoryEngine:
         branch: StoryBranch,
         assistant_message: Message | None,
         partial_text: str,
+        chapter: StoryChapter | None = None,
     ) -> Message:
         if assistant_message is None:
             assistant_message = Message(
                 story_id=story.id,
                 branch_id=branch.id,
                 role="assistant",
+                chapter_id=chapter.id if chapter is not None else None,
                 content=partial_text,
                 meta={"author": "叙事引擎", "partial": True, "stream": True},
                 created_at=datetime.now(timezone.utc),
@@ -1393,6 +1453,7 @@ class StoryEngine:
             await self.session.flush()
         else:
             assistant_message.content = partial_text
+            assistant_message.chapter_id = chapter.id if chapter is not None else None
             assistant_message.meta = {"author": "叙事引擎", "partial": True, "stream": True}
         try:
             await self.session.commit()
@@ -1410,12 +1471,14 @@ class StoryEngine:
         partial_text: str,
         latency_ms: int,
         assistant_message: Message | None = None,
+        chapter: StoryChapter | None = None,
     ) -> None:
         if assistant_message is None:
             assistant_message = Message(
                 story_id=story.id,
                 branch_id=branch.id,
                 role="assistant",
+                chapter_id=chapter.id if chapter is not None else None,
                 content=partial_text,
                 meta={"author": "叙事引擎", "partial": True, "stream": True},
                 created_at=datetime.now(timezone.utc),
@@ -1424,6 +1487,7 @@ class StoryEngine:
             await self.session.flush()
         else:
             assistant_message.content = partial_text
+            assistant_message.chapter_id = chapter.id if chapter is not None else None
             assistant_message.meta = {"author": "叙事引擎", "partial": True, "stream": True}
         await self.session.commit()
 
@@ -1443,6 +1507,7 @@ class StoryEngine:
         consistency_revision: dict | None = None,
         generation: GenerationRequest | None = None,
         chapter: StoryChapter | None = None,
+        chapter_length_before_turn: int = 0,
     ) -> ChatResponse:
         choices = response_choices or []
         perspective_character = await self._main_character_name(story)
@@ -1454,16 +1519,17 @@ class StoryEngine:
             llm_response.text,
             relationships=relationships,
             perspective_character=perspective_character,
+            chapter_context={
+                "chapter_number": chapter.chapter_number,
+                "chapter_title": chapter.title,
+                "chapter_objective": chapter.objective or "",
+                "minimum_length": story.minimum_chapter_length,
+                "length_unit": story.chapter_length_unit,
+                "length_before_turn": chapter_length_before_turn,
+            }
+            if chapter is not None
+            else None,
         )
-        if generation is not None and chapter is not None:
-            await self._revise_future_roadmap(
-                story,
-                branch,
-                chapter,
-                request.message,
-                llm_response.text,
-                extraction.state,
-            )
         prepared_memories, prepared_canon_facts = await self._prepare_extracted_knowledge(
             story,
             branch,
@@ -1481,6 +1547,7 @@ class StoryEngine:
                 story_id=story.id,
                 branch_id=branch.id,
                 role="assistant",
+                chapter_id=chapter.id if chapter is not None else None,
                 content=llm_response.text,
                 meta={"author": "叙事引擎", "time": state.time, "stream": True, "choices": choices},
                 created_at=datetime.now(timezone.utc),
@@ -1489,6 +1556,7 @@ class StoryEngine:
             await self.session.flush()
         else:
             assistant_message.content = llm_response.text
+            assistant_message.chapter_id = chapter.id if chapter is not None else None
             assistant_message.meta = {
                 "author": "叙事引擎",
                 "time": state.time,
@@ -1496,8 +1564,26 @@ class StoryEngine:
                 "choices": choices,
             }
 
+        chapter_transition = None
         if generation is not None and chapter is not None:
-            await self._complete_story_chapter(story, branch, chapter, assistant_message)
+            await self.session.flush()
+            chapter_transition = await self._apply_chapter_progress(
+                story,
+                branch,
+                chapter,
+                assistant_message,
+                extraction.chapter_progress,
+                llm_response.completion_status,
+            )
+            if chapter_transition["completed"]:
+                await self._revise_future_roadmap(
+                    story,
+                    branch,
+                    chapter,
+                    request.message,
+                    llm_response.text,
+                    extraction.state,
+                )
 
         consistency_check = consistency_check or self._check_consistency(
             llm_response.text, state, context
@@ -1514,6 +1600,8 @@ class StoryEngine:
             "choices": choices,
             "consistency_check": consistency_check,
             "consistency_revision": consistency_revision,
+            "chapter_progress": extraction.chapter_progress.model_dump(),
+            "chapter_transition": chapter_transition,
         }
         state_snapshot = StoryStateSnapshot(
             story_id=story.id,
@@ -1572,6 +1660,11 @@ class StoryEngine:
                 "input_tokens": llm_response.input_tokens,
                 "output_tokens": llm_response.output_tokens,
                 "cost_estimate": llm_response.cost_estimate,
+                "completion_status": llm_response.completion_status,
+                "finish_reason": llm_response.finish_reason,
+                "continued_after_length_limit": bool(
+                    llm_response.raw.get("continued_after_length_limit")
+                ),
                 "dry_run": False,
                 "consistency_check": consistency_check,
                 "consistency_revision": consistency_revision,
@@ -1580,6 +1673,7 @@ class StoryEngine:
             branch_version=(generation.expected_branch_version + 1)
             if generation
             else branch.version,
+            chapter_transition=chapter_transition,
         )
         if generation is not None:
             await self._complete_generation(generation, branch, assistant_message, response)

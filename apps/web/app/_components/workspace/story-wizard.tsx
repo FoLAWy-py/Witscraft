@@ -46,7 +46,7 @@ function initialStoryDraft(uiLanguage: UiLanguage = "zh-CN"): CreateStoryInput {
     customPrompt: "",
     interactionMode: "choices",
     plannedChapterCount: 12,
-    targetChapterLength: 1800,
+    minimumChapterLength: 1200,
     chapterLengthUnit: uiLanguage === "zh-CN" ? "characters" : "words",
     proseLanguage: uiLanguage
   };
@@ -108,8 +108,8 @@ export function StoryWizard({
   }
   const chapterSettingsValid = draft.plannedChapterCount >= 3
     && draft.plannedChapterCount <= 120
-    && draft.targetChapterLength >= 500
-    && draft.targetChapterLength <= 5000;
+    && draft.minimumChapterLength >= 500
+    && draft.minimumChapterLength <= 5000;
   const readyToCreate = missingFields.length === 0 && chapterSettingsValid;
 
   useEffect(() => {
@@ -372,23 +372,26 @@ export function StoryWizard({
               </div>
               <div className="wizardFieldGrid">
                 <label>
-                  <span>{uiText(uiLanguage, "每章目标长度", "Target length per chapter")}</span>
-                  <select value={[800, 1800, 3000].includes(draft.targetChapterLength) ? String(draft.targetChapterLength) : "custom"} onChange={(event) => { if (event.target.value !== "custom") updateDraft({ targetChapterLength: Number(event.target.value) }); }}>
-                    <option value="800">{uiText(uiLanguage, "精简 · 800", "Concise · 800")}</option>
-                    <option value="1800">{uiText(uiLanguage, "标准 · 1,800", "Standard · 1,800")}</option>
-                    <option value="3000">{uiText(uiLanguage, "细致 · 3,000", "Detailed · 3,000")}</option>
+                  <span>{uiText(uiLanguage, "章节最低展开量", "Minimum chapter development")}</span>
+                  <select value={[800, 1200, 2000].includes(draft.minimumChapterLength) ? String(draft.minimumChapterLength) : "custom"} onChange={(event) => { if (event.target.value !== "custom") updateDraft({ minimumChapterLength: Number(event.target.value) }); }}>
+                    <option value="800">{uiText(uiLanguage, "紧凑 · 至少 800", "Compact · at least 800")}</option>
+                    <option value="1200">{uiText(uiLanguage, "自然 · 至少 1,200", "Natural · at least 1,200")}</option>
+                    <option value="2000">{uiText(uiLanguage, "充分 · 至少 2,000", "Expansive · at least 2,000")}</option>
                     <option value="custom">{uiText(uiLanguage, "自定义", "Custom")}</option>
                   </select>
                 </label>
                 <label>
-                  <span>{uiText(uiLanguage, "自定义长度", "Custom length")}</span>
-                  <input type="number" min={500} max={5000} step={100} value={draft.targetChapterLength} onChange={(event) => updateDraft({ targetChapterLength: Number(event.target.value) })} />
-                  <small>{draft.chapterLengthUnit === "characters" ? uiText(uiLanguage, "按可见字符估算，允许约 ±15%。", "Measured in visible characters, approximately ±15%.") : uiText(uiLanguage, "按英文单词估算，允许约 ±15%。", "Measured in words, approximately ±15%.")}</small>
+                  <span>{uiText(uiLanguage, "自定义最低量", "Custom minimum")}</span>
+                  <input type="number" min={500} max={5000} step={100} value={draft.minimumChapterLength} onChange={(event) => updateDraft({ minimumChapterLength: Number(event.target.value) })} />
+                  <small>{draft.chapterLengthUnit === "characters" ? uiText(uiLanguage, "仅防止过早断章；AI 按剧情节奏决定何时换章，不设目标或上限。", "Only prevents an early break; AI follows narrative rhythm with no target or maximum.") : uiText(uiLanguage, "仅防止过早断章；AI 按剧情节奏决定何时换章，不设目标或上限。", "Only prevents an early break; AI follows narrative rhythm with no target or maximum.")}</small>
                 </label>
               </div>
-              {!chapterSettingsValid && <p className="fieldError">{uiText(uiLanguage, "章节数需为 3–120，每章长度需为 500–5,000。", "Use 3–120 chapters and a per-chapter length of 500–5,000.")}</p>}
-              <div className="draftPromptField">
-                <span className="draftPromptHeader"><span>{uiText(uiLanguage, "可选参考文风", "Optional style reference")}</span></span>
+              {!chapterSettingsValid && <p className="fieldError">{uiText(uiLanguage, "章节数需为 3–120，最低展开量需为 500–5,000。", "Use 3–120 chapters and a minimum chapter development of 500–5,000.")}</p>}
+              <details className="draftPromptField wizardOptionalDisclosure">
+                <summary className="draftPromptHeader">
+                  <span>{uiText(uiLanguage, "可选：导入参考文风", "Optional: import a style reference")}</span>
+                  <small>{uiText(uiLanguage, "展开", "Expand")}</small>
+                </summary>
                 <small>{uiText(uiLanguage, "原文仅用于本地抽象画像和非复现指纹；不会保存、生成 embedding 或作为作者模仿指令。", "Raw text is used only for local abstract profiling and a non-reproduction fingerprint; it is not retained, embedded, or turned into author-imitation instructions.")}</small>
                 <div className="wizardFieldGrid">
                   <label><span>{uiText(uiLanguage, "画像名称", "Profile name")}</span><input value={referenceName} onChange={(event) => { setReferenceName(event.target.value); resetStyleSelection(); }} maxLength={180} placeholder={uiText(uiLanguage, "例如：克制的海港叙事", "For example: restrained harbor prose")} /></label>
@@ -403,7 +406,7 @@ export function StoryWizard({
                 <button className="cmdButton" type="button" onClick={() => void handleAnalyzeStyle()} disabled={stylePending || referenceText.replace(/\s/g, "").length < 500 || !referenceName.trim() || !referenceRightsAttested || (referenceSourceType !== "user_owned" && !referenceSourceLabel.trim())}>
                   {stylePending ? <RefreshCw size={13} className="spinIcon" /> : <Sparkles size={13} />}{stylePending ? uiText(uiLanguage, "正在提取画像", "Profiling") : uiText(uiLanguage, "提取并绑定抽象画像", "Profile and attach")}
                 </button>
-              </div>
+              </details>
               <label><span>{uiText(uiLanguage, "世界名称", "World name")}</span><input value={draft.worldName} onChange={(event) => updateDraft({ worldName: event.target.value })} maxLength={180} /></label>
               <label><span>{uiText(uiLanguage, "故事前提", "Premise")}</span><textarea value={draft.premise} onChange={(event) => updateDraft({ premise: event.target.value })} maxLength={4000} rows={4} /></label>
               <div className="wizardFieldGrid">
