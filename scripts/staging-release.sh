@@ -472,6 +472,9 @@ start() {
   done
 
   compose up --detach --wait
+  # Bind-mounted pg_hba.conf changes do not recreate an already running
+  # container. Reload deterministically before any host-side database client.
+  compose kill --signal HUP postgres >/dev/null
   cd "$ROOT/apps/api"
   runtime_env_command uv run alembic upgrade head
   runtime_env_command uv run alembic check

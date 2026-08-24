@@ -64,6 +64,7 @@ def test_staging_release_script_is_syntactically_valid_and_isolated() -> None:
         "trusted_origins_json",
         "configure_lan_database_access",
         "witscraft_lan_access",
+        "compose kill --signal HUP postgres",
     ):
         assert required in content or required in (ROOT / "ops/staging/compose.yml").read_text()
     assert "myunsw.witsqua.com" not in content
