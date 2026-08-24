@@ -48,3 +48,13 @@ Review this policy whenever a new provider, telemetry sink, backup system, analy
 The current SLO evaluator runs on the application host and writes private local state. It does not
 send telemetry to another party. Connecting a remote metrics, tracing, dashboard, or paging service
 is a new transfer boundary and requires this review before deployment.
+
+## HCI participant research
+
+Target-player HCI research uses anonymous random participant codes and structured
+task metrics only. The repository and private study JSON must not contain identity,
+contact details, IP addresses, cookies, credentials, prompts, story prose,
+participant quotations, screen/audio/video recordings, or transcripts. Consent is
+confirmed before observation but stored separately from the study data and outside
+the repository. Raw study input remains under ignored `.runtime/hci/` with mode
+`0600`; only the evaluator's sanitized aggregate report may be committed.

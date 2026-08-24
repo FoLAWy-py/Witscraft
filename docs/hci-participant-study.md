@@ -1,14 +1,14 @@
 # Target-Player HCI Participant Study
 
-**Status:** Protocol ready; participant results pending
+**Status:** Protocol and execution kit ready; participant results pending
 
 This protocol validates whether target players—not authors or developers—can understand and control Witscraft as an AI-authored interactive novel. Expert review and automated checks cannot satisfy this gate, and no participant result may be inferred or fabricated.
 
 ## Participants and ethics
 
-Recruit at least five adults who read fiction and have used at least one interactive story, narrative game, or conversational AI product. Exclude current Witscraft contributors and anyone who has seen the task script. Record only a random participant code, broad prior-experience band, task metrics, ratings, and observation notes.
+Recruit at least five adults who read fiction and have used at least one interactive story, narrative game, or conversational AI product. Exclude current Witscraft contributors and anyone who has seen the task script. Record only a random participant code, broad prior-experience band, task metrics, ratings, predefined observation codes, and aggregated issue titles.
 
-Before the session, explain that the build is experimental, AI output may be unexpected, participation is voluntary, the participant may stop at any time, and no sensitive personal information or private writing should be entered. Obtain explicit consent for observation and screen/audio recording separately. If recording is declined, use timestamped facilitator notes. Store consent separately from study data and follow `docs/data-privacy.md` for deletion and retention.
+Before the session, explain that the build is experimental, AI output may be unexpected, participation is voluntary, the participant may stop at any time, and no sensitive personal information or private writing should be entered. Obtain explicit consent for observation. Do not make screen, audio, video, transcript, or raw-prose recordings. Store the consent record separately from study data and outside the repository, then delete it according to the agreed research retention period. The study JSON records only that consent was confirmed.
 
 ## Environment
 
@@ -29,7 +29,7 @@ The facilitator must not teach the interface. Use the neutral prompt “Please c
 9. Find the current chapter and explain whether reaching the displayed minimum forces a chapter ending.
 10. Find weekly AI usage and explain what the percentage covers without seeing raw token counts.
 
-The facilitator records task start/end, success without help, recoverable and unrecoverable errors, requests for help, backtracking, authority-boundary statements, and notable confusion. Do not interpret literary preference as an interface error unless it prevents a decision or recovery.
+The facilitator records task duration, success without help, recoverable and unrecoverable error counts, requests for help, backtracking, structured authority-boundary results, and predefined confusion codes. Do not enter participant quotations, story prose, free-text session notes, or identifying details. Aggregate a recurring problem into a short issue title only after checking that it contains no participant or story content. Do not interpret literary preference as an interface error unless it prevents a decision or recovery.
 
 ## Measures
 
@@ -66,3 +66,8 @@ A failed criterion produces a versioned issue list and another participant round
 ## Evidence template
 
 Store a sanitized, versioned report under `docs/evidence/` containing the tested Git revision, staging candidate schema, session dates, device/viewport classes, aggregate task metrics, de-identified per-participant SUS scores, severity-ranked findings, remediation decisions, and protocol deviations. Never include names, email addresses, raw story prose, recordings, IP addresses, cookies, provider prompts, or credentials.
+
+The private input record and sanitized report are created and validated with
+`scripts/evaluate-hci-participant-study.py`. Follow
+`docs/hci-participant-study-operations.md`; a rehearsal or incomplete study can
+never produce a passing status.

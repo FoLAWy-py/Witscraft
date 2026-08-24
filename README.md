@@ -29,6 +29,7 @@ apps/
 - [`docs/interactive-fiction-evaluation.md`](./docs/interactive-fiction-evaluation.md): versioned public-domain corpus, bounded live capture, provider scores, and offline release gate
 - [`docs/hci-evaluation.md`](./docs/hci-evaluation.md): independent HCI rubric, expert walkthrough, issue severity, and participant-validation gate
 - [`docs/hci-participant-study.md`](./docs/hci-participant-study.md): target-player recruitment, task script, SUS scoring, privacy, and acceptance protocol
+- [`docs/hci-participant-study-operations.md`](./docs/hci-participant-study-operations.md): private session records, sanitized evidence generation, and participant-gate operations
 - [`docs/staging-release-candidate.md`](./docs/staging-release-candidate.md): isolated PostgreSQL 18 LAN staging topology, operations, resilience, and acceptance gates
 - [`docs/security-checks.md`](./docs/security-checks.md): dependency, secret, and production artifact security gates
 - [`docs/release-process.md`](./docs/release-process.md): executable preflight, release manifest, smoke checks, and rollback contract
