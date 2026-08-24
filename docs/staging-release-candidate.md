@@ -22,6 +22,26 @@ process remain loopback-only; LAN clients must use the TLS gateway. Override the
 aliases before first preparation with the comma-separated
 `WITSCRAFT_STAGING_ADDITIONAL_HOSTS` setting when automatic detection is unsuitable.
 
+### Trusting the LAN certificate on a client
+
+The gateway uses a 30-day, staging-only self-signed certificate. A new client can
+reach the server immediately, but its browser will reject the certificate until
+the public certificate is trusted. Transfer only
+`.runtime/staging/tls/server.crt` to the client through a trusted LAN channel;
+never copy `server.key`. Before trusting it, compare the SHA-256 fingerprint shown
+on the server:
+
+```bash
+openssl x509 -in .runtime/staging/tls/server.crt -noout -fingerprint -sha256
+```
+
+On macOS, import the certificate into the login keychain with Keychain Access and
+set it to **Always Trust** only for this staging environment. On Windows, import it
+for the current user into **Trusted Root Certification Authorities**. Remove the
+old certificate when staging is retired or the certificate rotates. Client URLs
+are `https://<LAN-address>:19473/witscraft/`; both the ordinary LAN address and
+detected private-VPN aliases are valid certificate identities.
+
 The database uses a PostgreSQL 18 parent-directory volume mount at `/var/lib/postgresql`, allowing major-version-specific cluster directories and future `pg_upgrade` workflows. The previous PG17 staging volume is not attached or deleted by the upgrade.
 
 ## Operator workflow
