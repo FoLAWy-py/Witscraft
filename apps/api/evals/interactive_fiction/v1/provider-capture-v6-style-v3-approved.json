@@ -1,0 +1,95 @@
+{
+  "abstract_profile": {
+    "analysis_method": "deterministic",
+    "descriptive_density": 0.0,
+    "dialogue_ratio": 0.412,
+    "figurative_density": 0.0,
+    "pacing": "fast",
+    "paragraph_rhythm": "compact",
+    "sentence_length_mean": 44.7,
+    "sentence_length_variation": "high",
+    "tense": "mixed",
+    "viewpoint": "third"
+  },
+  "author": {
+    "model": "Qwen/Qwen3-Max",
+    "provider": "deepinfra"
+  },
+  "calls": {
+    "call_limit": 8,
+    "judge_calls": 1,
+    "lifecycle_calls": 4,
+    "lifecycle_routes": [
+      "deepinfra:Qwen/Qwen3-Max:normal_chat",
+      "deepinfra:Qwen/Qwen3-Max:normal_chat",
+      "openai:gpt-5.5:consistency_check",
+      "deepinfra:Qwen/Qwen3-Max:state_update"
+    ],
+    "profiling_calls": 0
+  },
+  "capture_base_url_class": "public_https",
+  "capture_method": "bounded_live_provider_end_to_end",
+  "captured_at": "2026-08-24T05:20:14.486552Z",
+  "case_sha256": "453642e260eda5e8bd471b3701dc4cb4cd95fc36376013b0a4398b2e8f6b438d",
+  "chapter_transition": {
+    "chapter_number": 1,
+    "completed": false,
+    "exceptional_break": "none",
+    "length_unit": "words",
+    "measured_length": 459,
+    "minimum_length": 500,
+    "natural_break": false,
+    "objective_resolved": false,
+    "phase": "setup",
+    "reason": "The letter has been discovered but not read; its coded content and intended recipient remain unknown, and new questions about household dynamics have emerged."
+  },
+  "deployment_revision": "7af78a1bdc720685951512f357657c49bb1b2b22",
+  "evaluation_version": "interactive-fiction-natural-pacing-v2",
+  "evidence_kind": "provider_capture",
+  "generated_chapter": "Rain detained the breakfast room in a grey half-light. The unsigned envelope still lay on the tray, plain against the silver.\n\nEleanor Vale remained by the window and asked the housekeeper whether any letters had arrived, without opening or accepting any letter.\n\nMrs. Croft, who had been setting a teaspoon into the sideboard drawer, paused with the drawer still open.\n\n“Letters, miss?”\n\nThe question seemed to pass through the room before she answered it. Her eyes went first to the hall door, then to the breakfast tray.\n\n“Post was delayed,” she said. “That is what we were told below stairs.”\n\nThe teaspoon clicked down among the others. Mrs. Croft shut the drawer with unnecessary care.\n\n“No ordinary delivery came in by the front,” she added. “Not after dawn.”\n\nA footman crossing the passage slowed, then found urgent business elsewhere. Mrs. Croft noticed him noticing and raised her voice.\n\n“James, if the fire in the library has failed again, you may explain to Sir Edmund why his newspapers are damp.”\n\n“Yes, Mrs. Croft.”\n\nHis steps withdrew at once.\n\nMrs. Croft crossed to the table. She did not hurry, but the room changed with each step she took. At the tray, she stopped.\n\n“Well,” she said.\n\nThe envelope remained where it had been, unsealed, unaddressed, its paper of better quality than the household stationery stacked near the writing desk.\n\nMrs. Croft picked it up between two fingers. She turned it over once. She did not open it.\n\n“This was not put here by my order.”\n\nShe glanced toward the service door.\n\n“And it was not to be left in view.”\n\nFrom the corridor came the low clatter of crockery, then a sharp whisper cut off too late.\n\nMrs. Croft’s mouth hardened.\n\n“Someone has been careless.”\n\nShe slipped the envelope into the pocket of her black apron. No invitation accompanied the motion. No explanation followed it.\n\nAfter a moment, she said, “If anyone asks, there were no letters.”\n\nThe rain pressed at the glass. Somewhere above, a door closed with a muffled thud.\n\nMrs. Croft lowered her voice.\n\n“For your comfort, miss, breakfast-room curiosities are best left to the family. Guests who mistake them for conversation often find Ashcombe less hospitable than it appears.”\n\nThe service bell rang once from the wall, though no hand in the room had touched it.\n\nMrs. Croft looked toward the bell-board. The little brass marker trembled beneath the label: *Blue Room*.\n\nHer face altered by a fraction.\n\n“Mr. Harrow,” she said. “At last.”\n\nThe envelope remained in her pocket. The tray remained bare. Mrs. Croft stood between the table and the door, waiting to see whether the matter ended there.",
+  "generated_chapter_sha256": "9c4fc64c07e41044f0b4fcc53670eae1067aa27435b80390af21f12c782147b9",
+  "generated_features": {
+    "analysis_method": "deterministic",
+    "descriptive_density": 0.069,
+    "dialogue_ratio": 0.237,
+    "figurative_density": 0.0,
+    "pacing": "moderate",
+    "paragraph_rhythm": "compact",
+    "sentence_length_mean": 33.2,
+    "sentence_length_variation": "high",
+    "tense": "mixed",
+    "viewpoint": "third"
+  },
+  "judge": {
+    "input_tokens": 1207,
+    "latency_ms": 8983,
+    "model": "gpt-5.5",
+    "output_tokens": 503,
+    "prompt_version": "interactive-fiction-judge-v4",
+    "provider": "openai"
+  },
+  "narrative_completion": {
+    "continued_after_length_limit": false,
+    "finish_reason": "stop",
+    "status": "completed"
+  },
+  "profile_reused": true,
+  "reference_source_url": "https://www.gutenberg.org/ebooks/1342",
+  "schema_version": 1,
+  "scores": {
+    "narrative_pacing": 89,
+    "narrative_quality": 88,
+    "overall": 86,
+    "player_agency": 91,
+    "profile_adherence": 76,
+    "reasons": [
+      "Maintains third-person mixed-tense presentation, compact paragraphs, low figurative language, and a restrained household-mystery tone.",
+      "Dialogue ratio and sentence length are notably lower than the abstract profile, and the measured stylistic pacing is more moderate than fast.",
+      "The installment respects the player action without adding unrequested protagonist speech, thoughts, consent, or decisions.",
+      "Strong dramatic escalation from a simple question: Mrs. Croft's evasiveness, the hidden envelope, staff unease, and the Blue Room bell all deepen intrigue.",
+      "Ending returns control at a natural decision point with Mrs. Croft blocking the matter and the envelope still inaccessible.",
+      "World continuity is preserved: the letter remains unread, its purpose remains unclear, and household dynamics become more suspicious without resolving the setup."
+    ],
+    "world_canon": 86
+  }
+}

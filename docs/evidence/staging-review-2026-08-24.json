@@ -1,0 +1,88 @@
+{
+  "schema_version": "staging-review-v1",
+  "reviewed_revision": "7af78a1bdc720685951512f357657c49bb1b2b22",
+  "environment_class": "isolated_lan_staging_https",
+  "public_deployment_changed": false,
+  "database": {
+    "postgresql_version": "18.6",
+    "pgvector_version": "0.8.6",
+    "migration_revision": "0022",
+    "lan_exposed": false,
+    "empty_database_upgrade_passed": true
+  },
+  "deterministic_validation": {
+    "backend_tests_passed": 259,
+    "frontend_lint_passed": true,
+    "frontend_typecheck_passed": true,
+    "frontend_production_build_passed": true,
+    "browser_e2e_passed": 2,
+    "known_dependency_vulnerabilities": 0,
+    "staged_secret_findings": 0
+  },
+  "resilience": {
+    "api_unavailable_normalized_to_503": true,
+    "upstream_timeout_normalized_to_503": true,
+    "api_supervisor_restart_passed": true,
+    "database_outage_readiness_failed_closed": true,
+    "post_recovery_readiness_passed": true
+  },
+  "backup_restore": {
+    "encrypted_backup_verified": true,
+    "restored_revision": "0022",
+    "isolated_restore_verified": true,
+    "isolated_restore_removed": true,
+    "offsite_replication_enabled": false
+  },
+  "provider_validation": {
+    "single_installment": {
+      "calls_used": 5,
+      "call_limit": 8,
+      "profile_adherence": 76,
+      "narrative_quality": 88,
+      "player_agency": 91,
+      "world_canon": 86,
+      "narrative_pacing": 89,
+      "overall": 86,
+      "chapter_completed": false
+    },
+    "three_turn_experience": {
+      "calls_used": 10,
+      "call_limit": 12,
+      "profile_adherence": 82,
+      "narrative_quality": 88,
+      "player_agency": 96,
+      "world_canon": 91,
+      "narrative_pacing": 90,
+      "overall": 89,
+      "chapter_transitions": 0,
+      "account_week_quota_percentage_after": 3.89,
+      "temporary_account_cleanup_verified": true
+    }
+  },
+  "observation": {
+    "requested_seconds": 1800,
+    "observed_seconds": 1800.04,
+    "samples": 61,
+    "ui_failures": 0,
+    "readiness_failures": 0,
+    "ui_p95_ms": 11.9,
+    "readiness_p95_ms": 19.86,
+    "worktree_clean": true,
+    "passed": true
+  },
+  "slo_evaluation": {
+    "passed": true,
+    "active_alerts": 0,
+    "insufficient_low_traffic_dimensions": [
+      "http_availability",
+      "http_latency",
+      "model_success"
+    ]
+  },
+  "hci": {
+    "expert_score": 85.25,
+    "participant_protocol_ready": true,
+    "participant_sessions_completed": 0,
+    "participant_gate": "pending"
+  }
+}

@@ -38,13 +38,13 @@ The current installment-aware capture passed every version 2 threshold. It prove
 
 | Measurement | Result |
 | --- | ---: |
-| Abstract-profile adherence | 83 |
-| Narrative quality | 86 |
-| Player agency | 96 |
-| World and canon | 91 |
-| Narrative pacing | 88 |
-| Overall | 88 |
-| Prose length | 275-word installment / 500 chapter minimum |
+| Abstract-profile adherence | 76 |
+| Narrative quality | 88 |
+| Player agency | 91 |
+| World and canon | 86 |
+| Narrative pacing | 89 |
+| Overall | 86 |
+| Prose length | 443-word installment / 500 chapter minimum |
 | Provider completion | completed |
 | Chapter transition | remained active |
 | Reference overlap | 0 blocked overlap |
