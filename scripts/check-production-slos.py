@@ -5,6 +5,7 @@ import argparse
 import asyncio
 import json
 import os
+import ssl
 import sys
 import tempfile
 from collections import Counter, defaultdict
@@ -54,13 +55,17 @@ def _safe_base_url(value: str, allow_http_loopback: bool) -> str:
     raise ValueError("SLO target must use HTTPS; HTTP requires explicit loopback approval")
 
 
-def _readiness(base_url: str, timeout: float) -> dict[str, Any]:
+def _readiness(
+    base_url: str,
+    timeout: float,
+    tls_context: ssl.SSLContext | None = None,
+) -> dict[str, Any]:
     request = Request(
         f"{base_url}/health/ready",
         headers={"Accept": "application/json", "User-Agent": "witscraft-slo-monitor/1"},
     )
     try:
-        with urlopen(request, timeout=timeout) as response:  # noqa: S310
+        with urlopen(request, timeout=timeout, context=tls_context) as response:  # noqa: S310
             payload = json.load(response)
             return {
                 "ready": response.status == 200 and payload.get("status") == "ready",
@@ -272,7 +277,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             _access_events(args.api_log, settings.operational_metrics_log_backup_count, since)
         ),
         "observed_at": now.isoformat(),
-        "readiness": _readiness(args.base_url, args.timeout),
+        "readiness": _readiness(args.base_url, args.timeout, args.tls_context),
         "schema_version": "operational-slo-snapshot-v1",
         "window_started_at": since.isoformat(),
     }
@@ -316,9 +321,20 @@ def main() -> int:
     parser.add_argument("--window-minutes", type=int, default=30, choices=range(5, 1441))
     parser.add_argument("--timeout", type=float, default=10.0)
     parser.add_argument("--allow-http-loopback", action="store_true")
+    parser.add_argument(
+        "--ca-file",
+        type=Path,
+        help="Trust this private CA/certificate for an isolated HTTPS staging target.",
+    )
     args = parser.parse_args()
     try:
         args.base_url = _safe_base_url(args.base_url, args.allow_http_loopback)
+        if args.ca_file is not None:
+            if not args.ca_file.is_file():
+                raise ValueError("CA file does not exist")
+            args.tls_context = ssl.create_default_context(cafile=args.ca_file)
+        else:
+            args.tls_context = None
         report = asyncio.run(_run(args))
     except Exception as error:
         print(json.dumps({"event": "slo_monitor_error", "error": type(error).__name__}))

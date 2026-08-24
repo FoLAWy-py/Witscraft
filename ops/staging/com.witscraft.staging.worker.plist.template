@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.witscraft.staging.worker</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>__UV_PATH__</string>
+    <string>run</string>
+    <string>python</string>
+    <string>__WORKER_SCRIPT__</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>__API_DIRECTORY__</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>APP_ENVIRONMENT</key>
+    <string>production</string>
+    <key>PATH</key>
+    <string>__EXECUTABLE_PATH__</string>
+    <key>UV_CACHE_DIR</key>
+    <string>__UV_CACHE_DIRECTORY__</string>
+    <key>WITSCRAFT_SECRETS_FILE</key>
+    <string>__STAGING_SECRETS_FILE__</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>5</integer>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>StandardOutPath</key>
+  <string>__LOG_DIRECTORY__/worker.log</string>
+  <key>StandardErrorPath</key>
+  <string>__LOG_DIRECTORY__/worker.log</string>
+</dict>
+</plist>

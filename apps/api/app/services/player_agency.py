@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass
 
 
-CHAPTER_AUTHORING_PROMPT_VERSION = "chapter-authoring-v4"
+CHAPTER_AUTHORING_PROMPT_VERSION = "chapter-authoring-v6"
 PLAYER_AGENCY_EDITOR_PROMPT_VERSION = "player-agency-editor-v5"
 
 
@@ -84,9 +84,29 @@ def chapter_authoring_instruction(
         "scene closure, conflict movement, and the next meaningful player decision determine the break."
     )
     continuity = (
-        "Continue the active chapter without repeating its title or recapping prior prose."
+        "Continue the active chapter from the exact final beat of the latest assistant installment in Recent "
+        "Conversation, without repeating its title, replaying discoveries, or recapping prior "
+        "prose. Treat the last-known location and custody of every object, the present characters, "
+        "open dialogue, injuries, and immediate time as binding physical continuity. Never teleport "
+        "an object or character, expose something previously secured, or change what was already "
+        "observed unless this installment visibly supplies the causal bridge."
         if chapter_started
-        else "Open the active chapter cleanly."
+        else "Open the active chapter cleanly and establish concrete physical positions before "
+        "moving characters or important objects."
+    )
+    rhythm = (
+        "A chapter may span many player turns. Make this installment one focused interactive "
+        "scene beat proportionate to the supplied action: move the current conflict through a "
+        "causal sequence of action, reaction, and consequence, then return control. Do not try to "
+        "finish the chapter, exhaust the scene, or compensate for limited protagonist authority by "
+        "bundling multiple major revelations, arrivals, reversals, or NPC disclosures into one reply. "
+        "Give revelations enough connective tissue to be understood without rushing toward the "
+        "chapter objective. Vary scene turns and stopping devices; do not repeatedly introduce a "
+        "new arrival, knock, interruption, message, threat, or artificial cliffhanger merely to "
+        "create momentum. End this installment at the next meaningful player decision, which may "
+        "be quiet, relational, investigative, or dangerous. The abstract style profile and story "
+        "custom instructions—not a default preference for atmospheric description—govern dialogue "
+        "share, sentence rhythm, descriptive density, and narrative speed."
     )
     return (
         "[Chapter Contract]\n"
@@ -94,7 +114,7 @@ def chapter_authoring_instruction(
         f"Provisional objective: {chapter_objective}\n"
         f"Language: {prose_language}\n"
         f"{pacing}\n"
-        f"{continuity} Write a substantial novel-prose installment, not writing advice. "
+        f"{continuity} {rhythm} Write a focused novel-prose installment, not writing advice. "
         "Do not output a chapter heading; the application supplies the canonical title.\n"
         f"{agency}"
     )

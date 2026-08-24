@@ -118,13 +118,13 @@ def test_reviewed_real_provider_capture_passes_current_gate() -> None:
     report = evaluate_provider_capture(
         case,
         reference,
-        _load("provider-capture-v5-natural-pacing-approved.json"),
+        _load("provider-capture-v6-style-v3-approved.json"),
         thresholds,
     )
 
     assert report.passed is True
     assert report.score_source == "provider_capture"
-    captured_scores = _load("provider-capture-v5-natural-pacing-approved.json")["scores"]
+    captured_scores = _load("provider-capture-v6-style-v3-approved.json")["scores"]
     assert report.scores == {name: captured_scores[name] for name in report.scores}
     assert report.measurements["measured_installment_length"] > 0
     assert report.measurements["provider_calls"] <= 8
@@ -148,7 +148,13 @@ def test_evaluator_rejects_synthetic_or_tampered_model_score_evidence() -> None:
 def test_judge_contract_uses_only_abstract_profile_and_generated_prose() -> None:
     case = _load("case.json")
     abstract_profile = case["reference"]["expected_abstract_features"]
-    request = build_judge_request(case, abstract_profile, abstract_profile, "Original prose.")
+    request = build_judge_request(
+        case,
+        abstract_profile,
+        abstract_profile,
+        "Original prose.",
+        {"completed": False},
+    )
 
     assert request.provider == "openai"
     assert request.model == "gpt-5.5"
@@ -156,6 +162,8 @@ def test_judge_contract_uses_only_abstract_profile_and_generated_prose() -> None
     assert "json" in request.messages[0].content
     payload = json.loads(request.messages[1].content)
     assert payload["abstract_profile"] == abstract_profile
-    assert payload["generated_chapter"] == "Original prose."
+    assert payload["generated_installment"] == "Original prose."
+    assert payload["chapter_transition"] == {"completed": False}
+    assert "never penalize a shorter installment" in request.messages[0].content
     assert "Pride and Prejudice" not in request.model_dump_json()
     assert case["reference"]["source_url"] not in request.model_dump_json()

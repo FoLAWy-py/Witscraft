@@ -28,6 +28,8 @@ apps/
 - [`docs/interactive-fiction-contract.md`](./docs/interactive-fiction-contract.md): player-agency, chapter, roadmap, revision, reference-text, and provider-evaluation acceptance rules
 - [`docs/interactive-fiction-evaluation.md`](./docs/interactive-fiction-evaluation.md): versioned public-domain corpus, bounded live capture, provider scores, and offline release gate
 - [`docs/hci-evaluation.md`](./docs/hci-evaluation.md): independent HCI rubric, expert walkthrough, issue severity, and participant-validation gate
+- [`docs/hci-participant-study.md`](./docs/hci-participant-study.md): target-player recruitment, task script, SUS scoring, privacy, and acceptance protocol
+- [`docs/staging-release-candidate.md`](./docs/staging-release-candidate.md): isolated PostgreSQL 18 LAN staging topology, operations, resilience, and acceptance gates
 - [`docs/security-checks.md`](./docs/security-checks.md): dependency, secret, and production artifact security gates
 - [`docs/release-process.md`](./docs/release-process.md): executable preflight, release manifest, smoke checks, and rollback contract
 

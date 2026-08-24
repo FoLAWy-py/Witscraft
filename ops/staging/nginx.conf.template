@@ -1,0 +1,70 @@
+worker_processes 1;
+pid nginx.pid;
+error_log logs/nginx-error.log notice;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    access_log logs/nginx-access.log;
+    server_tokens off;
+
+    server {
+        listen __STAGING_GATEWAY_PORT__ ssl;
+        listen [::]:__STAGING_GATEWAY_PORT__ ssl;
+        server_name _;
+
+        ssl_certificate tls/server.crt;
+        ssl_certificate_key tls/server.key;
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_session_cache shared:WITSCRAFT_STAGING_TLS:1m;
+        ssl_session_timeout 10m;
+
+        client_max_body_size 10m;
+        add_header Strict-Transport-Security "max-age=300" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "same-origin" always;
+
+        location = /witscraft {
+            proxy_pass http://127.0.0.1:__STAGING_WEB_PORT__;
+            include proxy-web.conf;
+        }
+
+        location = /witscraft/health {
+            proxy_pass http://127.0.0.1:__STAGING_API_PORT__/health;
+            include proxy-api.conf;
+        }
+
+        location ^~ /witscraft/health/ {
+            proxy_pass http://127.0.0.1:__STAGING_API_PORT__/health/;
+            include proxy-api.conf;
+        }
+
+        location ^~ /witscraft/api/ {
+            proxy_pass http://127.0.0.1:__STAGING_API_PORT__/api/;
+            include proxy-api.conf;
+            proxy_intercept_errors on;
+            error_page 502 504 = @api_unavailable;
+        }
+
+        location /witscraft/ {
+            proxy_pass http://127.0.0.1:__STAGING_WEB_PORT__;
+            include proxy-web.conf;
+        }
+
+        location @api_unavailable {
+            default_type application/json;
+            add_header Cache-Control "no-store" always;
+            add_header Retry-After "5" always;
+            return 503 '{"detail":"Service temporarily unavailable. Your story was not changed; retry after recovery."}';
+        }
+
+        location @web_unavailable {
+            default_type text/html;
+            add_header Cache-Control "no-store" always;
+            add_header Retry-After "5" always;
+            return 503 '<!doctype html><html lang="en"><meta charset="utf-8"><title>Witscraft temporarily unavailable</title><body><main><h1>Witscraft is recovering</h1><p>Your story has not been changed. Please retry in a moment.</p></main></body></html>';
+        }
+    }
+}

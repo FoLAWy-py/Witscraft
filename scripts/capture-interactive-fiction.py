@@ -7,6 +7,7 @@ import hashlib
 import json
 import re
 import secrets
+import ssl
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -141,6 +142,7 @@ async def _capture(args: argparse.Namespace) -> dict[str, Any]:
             base_url=args.base_url,
             timeout=httpx.Timeout(args.timeout, connect=20.0),
             headers=headers,
+            verify=args.tls_context,
         ) as client:
             login = await client.post(
                 "api/auth/login",
@@ -262,6 +264,7 @@ async def _capture(args: argparse.Namespace) -> dict[str, Any]:
             profile_payload["features"],
             generated_features,
             generated_chapter,
+            generated_payload.get("chapter_transition"),
         )
         judged = await OpenAIAdapter(settings).generate(judge_request)
         scores = json.loads(judged.text)
@@ -337,6 +340,11 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--deployment-revision", required=True)
     parser.add_argument("--timeout", type=float, default=300.0)
+    parser.add_argument(
+        "--ca-file",
+        type=Path,
+        help="Optional private CA bundle used to verify an isolated HTTPS staging gateway.",
+    )
     parser.add_argument("--allow-http-loopback", action="store_true")
     parser.add_argument("--confirm-live-provider", action="store_true")
     args = parser.parse_args()
@@ -346,6 +354,11 @@ def main() -> int:
         parser.error("output already exists; captures are immutable")
     if not re.fullmatch(r"[0-9a-f]{40}", args.deployment_revision):
         parser.error("--deployment-revision must be one full lowercase Git SHA")
+    args.tls_context = True
+    if args.ca_file is not None:
+        if not args.ca_file.is_file():
+            parser.error("--ca-file does not exist")
+        args.tls_context = ssl.create_default_context(cafile=args.ca_file)
     args.base_url = _safe_base_url(args.base_url, args.allow_http_loopback)
     payload = asyncio.run(_capture(args))
     args.output.parent.mkdir(parents=True, exist_ok=True)

@@ -10,7 +10,7 @@ from dataclasses import dataclass
 
 STYLE_ANALYSIS_VERSION = "style-profile-v1"
 STYLE_SAFETY_VERSION = "overlap-bloom-v1"
-STYLE_PROMPT_VERSION = "abstract-style-prompt-v2"
+STYLE_PROMPT_VERSION = "abstract-style-prompt-v3"
 MIN_REFERENCE_CHARACTERS = 500
 MAX_REFERENCE_CHARACTERS = 30_000
 _BLOOM_BITS = 262_144
@@ -207,7 +207,10 @@ def style_prompt(features: object) -> str:
     pacing = public.get("pacing")
     if pacing in {"fast", "moderate", "slow"}:
         pacing_detail = {
-            "fast": "advance through frequent social or physical beats rather than static atmosphere",
+            "fast": (
+                "make each paragraph change information, relationship pressure, or physical "
+                "position, and remove repeated atmospheric beats"
+            ),
             "moderate": "balance scene movement with reflection and description",
             "slow": "allow sustained observation while still changing the external situation",
         }[pacing]
@@ -229,9 +232,14 @@ def style_prompt(features: object) -> str:
         )
     dialogue_ratio = public.get("dialogue_ratio")
     if isinstance(dialogue_ratio, int | float):
+        dialogue_instruction = (
+            "realize this as sustained back-and-forth NPC exchanges with quoted speech in "
+            "standalone dialogue paragraphs; do not replace intended dialogue with narrated reports"
+            if dialogue_ratio >= 0.3
+            else "use NPC speech whenever protagonist dialogue is not player-authorized"
+        )
         instructions.append(
-            f"aim for roughly {round(dialogue_ratio * 100):d}% dialogue, using NPC speech to meet "
-            "the target whenever protagonist dialogue is not player-authorized"
+            f"aim for roughly {round(dialogue_ratio * 100):d}% dialogue and {dialogue_instruction}"
         )
     descriptive_density = public.get("descriptive_density")
     if isinstance(descriptive_density, int | float):

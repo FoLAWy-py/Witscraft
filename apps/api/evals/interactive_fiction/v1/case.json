@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "evaluation_version": "interactive-fiction-natural-pacing-v2",
-  "judge_prompt_version": "interactive-fiction-judge-v2",
+  "judge_prompt_version": "interactive-fiction-judge-v3",
   "prompt_versions": {
-    "chapter_authoring": "chapter-authoring-v4",
+    "chapter_authoring": "chapter-authoring-v6",
     "player_agency_editor": "player-agency-editor-v5",
-    "style_prompt": "abstract-style-prompt-v2"
+    "style_prompt": "abstract-style-prompt-v3"
   },
   "style_analysis_version": "style-profile-v1",
   "style_safety_version": "overlap-bloom-v1",

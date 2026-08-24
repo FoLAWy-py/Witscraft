@@ -2,6 +2,8 @@
 
 **Status:** Executable preflight and non-mutating smoke baseline
 
+The repeatable non-public release-candidate environment and its 30-minute observation command are documented in `docs/staging-release-candidate.md`.
+
 ## Release Evidence
 
 Run releases only from a clean commit that has a successful `Security` GitHub Actions workflow.
@@ -20,7 +22,7 @@ Archive the manifest beside the immutable application artifact in the approved d
 
 ## Deployment Sequence
 
-The target PostgreSQL 17 installation must provide the pgvector extension before migration `0017` is applied, and the deployment role must be allowed to run `CREATE EXTENSION vector`. Verify this in staging before approving a production release. A missing extension is a deployment blocker; do not bypass the migration or fall back to schema creation from ORM metadata.
+The target PostgreSQL 18 installation must provide pinned pgvector 0.8.6 support before migration `0017` is applied, and the deployment role must be allowed to run `CREATE EXTENSION vector`. Verify this in staging before approving a production release. A missing extension is a deployment blocker; do not bypass the migration or fall back to schema creation from ORM metadata.
 
 1. Confirm the commit and its remote Security workflow are successful.
 2. Run `scripts/release-preflight.sh` and retain its manifest.

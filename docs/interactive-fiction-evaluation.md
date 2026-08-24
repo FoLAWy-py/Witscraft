@@ -19,7 +19,7 @@ The canonical files are under `apps/api/evals/interactive_fiction/v1/`:
 - `reference.txt` is the normalized public-domain input;
 - `case.json` binds its hash, scenario, prompt versions, expected abstract profile, and provider routes;
 - `thresholds.json` defines the release minimums;
-- `provider-capture-v5-natural-pacing-approved.json` is the current sanitized real-provider evidence;
+- `provider-capture-v6-style-v3-approved.json` is the current sanitized real-provider evidence;
 - `provider-capture-v4-approved.json` preserves the previous target-length contract evidence;
 - `provider-capture-v4.json` preserves the first v4 run, which passed agency but missed style and roadmap/length thresholds;
 - `provider-capture-v3.json` preserves the preceding approved v3 evidence;
@@ -34,17 +34,17 @@ Live capture is sequential, requires both configured provider credentials, refus
 
 ## Approved evidence
 
-The current natural-pacing capture passed every version 2 threshold. It proves that a completed provider response may exceed the minimum without forcing a chapter transition, while the agency editor still binds first-person player instructions to the named protagonist:
+The current installment-aware capture passed every version 2 threshold. It proves that a completed provider installment can return control below the chapter minimum without closing the chapter, while the agency editor still binds first-person player instructions to the named protagonist. The minimum applies only to an actual chapter transition; it is not a per-turn target:
 
 | Measurement | Result |
 | --- | ---: |
-| Abstract-profile adherence | 86 |
-| Narrative quality | 90 |
-| Player agency | 94 |
+| Abstract-profile adherence | 83 |
+| Narrative quality | 86 |
+| Player agency | 96 |
 | World and canon | 91 |
-| Narrative pacing | 92 |
-| Overall | 91 |
-| Prose length | 879 words / 500 minimum |
+| Narrative pacing | 88 |
+| Overall | 88 |
+| Prose length | 275-word installment / 500 chapter minimum |
 | Provider completion | completed |
 | Chapter transition | remained active |
 | Reference overlap | 0 blocked overlap |

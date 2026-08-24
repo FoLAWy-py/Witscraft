@@ -25,7 +25,7 @@ from app.services.style_profiles import (
 )
 
 
-JUDGE_PROMPT_VERSION = "interactive-fiction-judge-v2"
+JUDGE_PROMPT_VERSION = "interactive-fiction-judge-v3"
 SCORE_NAMES = (
     "profile_adherence",
     "narrative_quality",
@@ -70,6 +70,7 @@ def build_judge_request(
     abstract_profile: dict[str, Any],
     generated_profile: dict[str, Any],
     generated_chapter: str,
+    chapter_transition: dict[str, Any] | None = None,
 ) -> LLMRequest:
     scenario = _required_dict(case_payload, "scenario")
     payload = {
@@ -77,7 +78,8 @@ def build_judge_request(
         "measured_generated_profile": generated_profile,
         "player_action": _required_string(scenario, "player_action"),
         "minimum_chapter_words": int(scenario["minimum_chapter_length"]),
-        "generated_chapter": generated_chapter,
+        "generated_installment": generated_chapter,
+        "chapter_transition": chapter_transition or {"completed": False},
     }
     return LLMRequest(
         provider="openai",
@@ -93,15 +95,18 @@ def build_judge_request(
                 role="system",
                 content=(
                     "You are an independent interactive-fiction evaluator. Score only the supplied "
-                    "generated chapter against the abstract style profile and explicit product "
+                    "generated installment against the abstract style profile and explicit product "
                     "contract. Do not infer or reward resemblance to any named author. Return json "
                     "only with integer scores from 0 to 100 for profile_adherence, "
                     "narrative_quality, player_agency, world_canon, narrative_pacing, and overall, "
                     "plus a concise reasons array. The player action must not be expanded into "
                     "unrequested protagonist speech, thought, consent, or decisions. Judge pacing "
-                    "by dramatic development and the natural player decision point, never by "
-                    "proximity to a target word count. The supplied minimum is only an anti-premature "
-                    "chapter-break gate; there is no target or maximum chapter length."
+                    "by dramatic development, proportionality to the supplied player action, and "
+                    "the natural player decision point, never by proximity to a target word count. "
+                    "An installment ending returns control to the player and is not a chapter ending. "
+                    "A chapter may span many installments. Apply the supplied minimum only when "
+                    "chapter_transition.completed is true; never penalize a shorter installment when "
+                    "it is false. There is no target or maximum chapter or installment length."
                 ),
             ),
             ChatMessage(

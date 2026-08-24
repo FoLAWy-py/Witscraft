@@ -21,3 +21,12 @@ def test_live_interactive_fiction_capture_has_a_hard_call_cap_and_safe_url_bound
         assert str(client.base_url.join("api/auth/login")) == (
             "https://example.com/witscraft/api/auth/login"
         )
+
+
+def test_live_capture_supports_a_private_staging_ca_without_disabling_tls() -> None:
+    source = CAPTURE_SCRIPT.read_text(encoding="utf-8")
+
+    assert 'parser.add_argument(\n        "--ca-file"' in source
+    assert "ssl.create_default_context(cafile=args.ca_file)" in source
+    assert "verify=args.tls_context" in source
+    assert "verify=False" not in source

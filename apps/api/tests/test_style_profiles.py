@@ -71,3 +71,24 @@ def test_overlap_normalization_survives_spacing_punctuation_and_case_changes() -
         evaluate_reference_overlap(common_short_phrase, content_hash, features["_safety"]).blocked
         is False
     )
+
+
+def test_fast_dialogue_profile_becomes_an_observable_scene_contract() -> None:
+    prompt = style_prompt(
+        {
+            "viewpoint": "third",
+            "pacing": "fast",
+            "paragraph_rhythm": "compact",
+            "sentence_length_variation": "high",
+            "sentence_length_mean": 44.7,
+            "dialogue_ratio": 0.412,
+            "descriptive_density": 0.0,
+            "figurative_density": 0.0,
+        }
+    )
+
+    assert "each paragraph change information, relationship pressure, or physical position" in prompt
+    assert "remove repeated atmospheric beats" in prompt
+    assert "sustained back-and-forth NPC exchanges" in prompt
+    assert "standalone dialogue paragraphs" in prompt
+    assert "do not replace intended dialogue with narrated reports" in prompt

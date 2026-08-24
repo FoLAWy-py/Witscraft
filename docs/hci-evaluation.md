@@ -50,4 +50,4 @@ Participant validation is a separate gate: at least five target players, scenari
 
 The versioned evidence is in `docs/evidence/hci-review-2026-08-24.json`. The first expert baseline scored 60.88. The revised expert pass scores 85.25 after making first-scene entry explicit, moving model routing out of the reading header, binding the visible world model to the current novel, collapsing optional style-reference input and advanced inspector data, aligning the product logo with the favicon, and verifying the core path at desktop and 390×844 mobile viewports.
 
-Participant validation remains intentionally pending and must be run with real target users before claiming human-subject usability validation.
+Participant validation remains intentionally pending and must be run with real target users before claiming human-subject usability validation. The approved recruitment, facilitator, task, SUS, privacy, and acceptance protocol is defined in `docs/hci-participant-study.md`.

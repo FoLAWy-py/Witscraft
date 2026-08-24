@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import ssl
 import sys
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -27,9 +28,9 @@ def _safe_base_url(value: str, allow_http_loopback: bool) -> str:
     raise ValueError("Smoke target must use HTTPS; HTTP is allowed only for explicit loopback checks")
 
 
-def _get_json(url: str, timeout: float) -> dict:
+def _get_json(url: str, timeout: float, tls_context: ssl.SSLContext | None = None) -> dict:
     request = Request(url, headers={"Accept": "application/json", "User-Agent": "witscraft-smoke/1"})
-    with urlopen(request, timeout=timeout) as response:
+    with urlopen(request, timeout=timeout, context=tls_context) as response:
         if response.status != 200:
             raise RuntimeError(f"unexpected HTTP status {response.status}")
         content_type = response.headers.get_content_type()
@@ -44,12 +45,22 @@ def main() -> int:
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--timeout", type=float, default=5.0)
     parser.add_argument("--allow-http-loopback", action="store_true")
+    parser.add_argument(
+        "--ca-file",
+        type=Path,
+        help="Trust this private CA/certificate for an isolated HTTPS staging target.",
+    )
     args = parser.parse_args()
     try:
         base_url = _safe_base_url(args.base_url, args.allow_http_loopback)
         manifest = json.loads(args.manifest.read_text())
-        live = _get_json(f"{base_url}/health/live", args.timeout)
-        ready = _get_json(f"{base_url}/health/ready", args.timeout)
+        tls_context = None
+        if args.ca_file is not None:
+            if not args.ca_file.is_file():
+                raise ValueError("CA file does not exist")
+            tls_context = ssl.create_default_context(cafile=args.ca_file)
+        live = _get_json(f"{base_url}/health/live", args.timeout, tls_context)
+        ready = _get_json(f"{base_url}/health/ready", args.timeout, tls_context)
         if live.get("status") != "alive":
             raise RuntimeError("liveness response is not alive")
         if ready.get("status") != "ready":

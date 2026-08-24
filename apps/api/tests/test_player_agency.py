@@ -66,6 +66,17 @@ def test_normal_turn_preserves_protagonist_control() -> None:
     assert "minimum pacing gate is 1200" in instruction
     assert "never a target or maximum" in instruction
     assert "Continue the active chapter" in instruction
+    assert "exact final beat" in instruction
+    assert "custody of every object" in instruction
+    assert "visibly supplies the causal bridge" in instruction
+    assert "Vary scene turns and stopping devices" in instruction
+    assert "artificial cliffhanger" in instruction
+    assert "next meaningful player decision" in instruction
+    assert "chapter may span many player turns" in instruction
+    assert "one focused interactive scene beat" in instruction
+    assert "bundling multiple major revelations" in instruction
+    assert "abstract style profile" in instruction
+    assert "focused novel-prose installment" in instruction
 
 
 def test_agency_editor_must_retain_every_explicit_player_action() -> None:

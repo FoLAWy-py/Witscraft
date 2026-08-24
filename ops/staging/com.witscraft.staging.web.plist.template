@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.witscraft.staging.web</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>__NPM_PATH__</string>
+    <string>run</string>
+    <string>start</string>
+    <string>--</string>
+    <string>--hostname</string>
+    <string>127.0.0.1</string>
+    <string>--port</string>
+    <string>__STAGING_WEB_PORT__</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>__WEB_DIRECTORY__</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>NEXT_PUBLIC_API_BASE_URL</key>
+    <string>/witscraft</string>
+    <key>NEXT_PUBLIC_BASE_PATH</key>
+    <string>/witscraft</string>
+    <key>PATH</key>
+    <string>__EXECUTABLE_PATH__</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>5</integer>
+  <key>StandardOutPath</key>
+  <string>__LOG_DIRECTORY__/web.log</string>
+  <key>StandardErrorPath</key>
+  <string>__LOG_DIRECTORY__/web.log</string>
+</dict>
+</plist>

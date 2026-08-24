@@ -409,7 +409,7 @@ Failures use bounded exponential retry and sanitized error storage. Exhausted ta
 
 ## 13. Quality Gates
 
-For every pull request and push to `main`, GitHub Actions provisions PostgreSQL 17 with pinned pgvector 0.8.6 support. It proves the `0017` compatible-vector backfill and downgrade restoration on synthetic data, returns the database to migration head, rejects ORM-to-migration drift, and runs the full backend test suite. The same workflow runs Ruff, TypeScript type checking, ESLint, reproducible production builds, dependency vulnerability audits, full-history offline secret scanning, and production browser-artifact inspection. External model traffic is disabled in CI.
+For every pull request and push to `main`, GitHub Actions provisions PostgreSQL 18 with pinned pgvector 0.8.6 support. It proves the `0017` compatible-vector backfill and downgrade restoration on synthetic data, returns the database to migration head, rejects ORM-to-migration drift, and runs the full backend test suite. The same workflow runs Ruff, TypeScript type checking, ESLint, reproducible production builds, dependency vulnerability audits, full-history offline secret scanning, and production browser-artifact inspection. External model traffic is disabled in CI.
 
 Database authorization and lifecycle behavior use real PostgreSQL integration tests. The main API journey logs in through a real session cookie, creates an interactive novel, proves an explicit impossible action has zero narrative or generation writes, performs regular and SSE dry-run chapter completion, verifies regeneration does not advance a chapter, cancels a blocked stream and verifies its durable checkpoint, creates and activates a branch, and exports the narrative. A separate Playwright gate runs the production client in Chromium with deterministic API fixtures and verifies login UI, workspace hydration, explicit player-action/Continue control modes, SSE consumption, narrative rendering, and the final synchronized story state. Provider adapters use deterministic fake-client contracts that exercise OpenAI Responses and DeepInfra Chat Completions parameter mapping, structured output options, token usage, stream filtering, split timeout configuration, disabled SDK retries, and exception propagation. Gateway tests separately prove transient and permanent HTTP status classification. Controlled live validation remains optional when API expenditure is explicitly permitted; CI never requires provider credentials.
 
@@ -427,14 +427,14 @@ The following constraints are known and accepted for the current deployment:
 - Memory embedding is the first durable background-job class; other auxiliary work still executes within request orchestration.
 - Legacy embeddings with non-current dimensions remain in JSONB until an operator runs the bounded, cost-reviewed re-index workflow.
 - Daily encrypted local backup and application-level restoration drills are operational; approved off-site replication and independent recovery-key escrow remain P0 work.
-- A production-equivalent staging environment has not yet been established.
+- An isolated single-host staging release candidate now reproduces the production Nginx, supervised API/web/worker, PostgreSQL 18 + pgvector, Alembic, encrypted restore, resilience, and observation boundaries on the LAN. It deliberately excludes public exposure, off-site backup replication, and recovered user data.
 - Versioned metadata-only SLO evaluation and persistent host alert state are operational; metrics, tracing, dashboards, and paging are not yet connected to a dedicated observability platform.
 - Database query plans are benchmarked locally, but production slow-query telemetry and tenant-skew analysis are not yet available.
 - Weekly quotas use provider-call preflight checks without durable concurrent token reservations.
 
 Evolution should occur in this order:
 
-1. Complete backup, restoration, staging, and release automation.
+1. Complete approved off-site backup replication and preserve the operational LAN staging/release workflow.
 2. Add browser end-to-end coverage and production-equivalent staging validation to the existing CI baseline.
 3. Add approved live-provider captures and production tenant/concurrency latency evidence before enabling HNSW.
 4. Move additional retry-sensitive auxiliary work to the proven durable-job pattern when evidence justifies it.

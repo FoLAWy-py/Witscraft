@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.witscraft.staging.api</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>__UV_PATH__</string>
+    <string>run</string>
+    <string>uvicorn</string>
+    <string>app.main:app</string>
+    <string>--proxy-headers</string>
+    <string>--forwarded-allow-ips</string>
+    <string>127.0.0.1</string>
+    <string>--host</string>
+    <string>127.0.0.1</string>
+    <string>--port</string>
+    <string>__STAGING_API_PORT__</string>
+    <string>--timeout-graceful-shutdown</string>
+    <string>30</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>__API_DIRECTORY__</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>APP_ENVIRONMENT</key>
+    <string>production</string>
+    <key>PATH</key>
+    <string>__EXECUTABLE_PATH__</string>
+    <key>UV_CACHE_DIR</key>
+    <string>__UV_CACHE_DIRECTORY__</string>
+    <key>WITSCRAFT_SECRETS_FILE</key>
+    <string>__STAGING_SECRETS_FILE__</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>5</integer>
+  <key>StandardOutPath</key>
+  <string>__LOG_DIRECTORY__/api.log</string>
+  <key>StandardErrorPath</key>
+  <string>__LOG_DIRECTORY__/api.log</string>
+</dict>
+</plist>
