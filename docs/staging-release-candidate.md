@@ -21,6 +21,9 @@ Host allowlist, CORS origins, and CSRF origins. PostgreSQL, the API, and the web
 process remain loopback-only; LAN clients must use the TLS gateway. Override the
 aliases before first preparation with the comma-separated
 `WITSCRAFT_STAGING_ADDITIONAL_HOSTS` setting when automatic detection is unsuitable.
+Nginx additionally enforces a client source allowlist: `192.168.31.0/24`,
+`10.0.0.0/24`, IPv4 loopback, and IPv6 loopback. Requests arriving from any other
+source address receive HTTP 403 before reaching the application.
 
 ### Trusting the LAN certificate on a client
 

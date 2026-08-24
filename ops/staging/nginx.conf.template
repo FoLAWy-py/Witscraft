@@ -15,6 +15,15 @@ http {
         listen [::]:__STAGING_GATEWAY_PORT__ ssl;
         server_name _;
 
+        # Staging is reachable only from the two approved private LANs and
+        # loopback. Keep this source boundary independent from application Host,
+        # CORS, and CSRF validation, which protect different trust boundaries.
+        allow 127.0.0.1;
+        allow ::1;
+        allow 192.168.31.0/24;
+        allow 10.0.0.0/24;
+        deny all;
+
         ssl_certificate tls/server.crt;
         ssl_certificate_key tls/server.key;
         ssl_protocols TLSv1.2 TLSv1.3;

@@ -80,6 +80,9 @@ def test_staging_nginx_normalizes_upstream_failures_without_buffering_sse() -> N
     assert "proxy_buffering off" in proxy
     assert "proxy_read_timeout 900s" in proxy
     assert "Strict-Transport-Security" in template
+    assert "allow 192.168.31.0/24" in template
+    assert "allow 10.0.0.0/24" in template
+    assert "deny all" in template
     assert "return 308 /witscraft/" not in template
     assert "location = /witscraft" in template
     assert "error_page 502 504 = @web_unavailable" in web_proxy
