@@ -198,3 +198,17 @@ def test_synthetic_credentials_cannot_leave_private_runtime(tmp_path) -> None:
         module._participant_credentials_path(
             "P-A1B2C3D4", module.RUNTIME_ACCOUNTS / "P-FFFFFFFF.env"
         )
+
+
+def test_runtime_rehearsal_report_is_private(monkeypatch, tmp_path) -> None:
+    module = _load_module()
+    runtime = tmp_path / ".runtime"
+    monkeypatch.setattr(module, "RUNTIME", runtime)
+    output = runtime / "hci" / "report.json"
+
+    module._write_sanitized_report(output, {"status": "rehearsal"})
+
+    assert output.stat().st_mode & 0o777 == 0o600
+    assert output.parent.stat().st_mode & 0o777 == 0o700
+    with pytest.raises(module.StudyValidationError, match="already exists"):
+        module._write_sanitized_report(output, {"status": "rehearsal"})

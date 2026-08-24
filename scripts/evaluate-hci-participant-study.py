@@ -584,6 +584,17 @@ def _write_private_json(path: Path, payload: dict[str, Any]) -> None:
     temporary.replace(path)
 
 
+def _write_sanitized_report(path: Path, payload: dict[str, Any]) -> None:
+    if path.exists():
+        raise StudyValidationError("sanitized report output already exists")
+    private_runtime_output = path.is_relative_to(RUNTIME.resolve())
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700 if private_runtime_output else 0o755)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    temporary.chmod(0o600 if private_runtime_output else 0o644)
+    temporary.replace(path)
+
+
 def _initial_payload(manifest_path: Path, study_id: str, mode: str, round_number: int) -> dict[str, Any]:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     revision = _git_revision()
@@ -652,11 +663,7 @@ def main() -> None:
         report = evaluate_study(payload)
         if args.output:
             output = args.output.expanduser().resolve()
-            _require(not output.exists(), "sanitized report output already exists")
-            output.parent.mkdir(parents=True, exist_ok=True)
-            temporary = output.with_suffix(output.suffix + ".tmp")
-            temporary.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
-            temporary.replace(output)
+            _write_sanitized_report(output, report)
             print(f"Sanitized HCI report written: {output}")
         print(f"HCI participant gate: {report['status']}")
         print(f"Valid sessions: {report['counts']['valid_sessions']}")
