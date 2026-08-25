@@ -2,9 +2,9 @@
 
 **Document status:** Production baseline
 
-**Architecture version:** 3.30
+**Architecture version:** 3.31
 
-**Last updated:** 21 August 2026
+**Last updated:** 25 August 2026
 
 **System owner:** Witscraft Engineering
 
@@ -134,7 +134,7 @@ FastAPI routers define six principal API areas:
 | `quota` | Authenticated personal weekly usage and reset boundary |
 | `admin` | Role-protected account usage overview and global quota reset |
 
-Routers perform protocol validation and authorization entry checks. Domain coordination remains in services so persistence and generation rules are not duplicated across endpoints.
+Routers perform protocol validation and authorization entry checks. Domain coordination remains in services so persistence and generation rules are not duplicated across endpoints. The public `workspace` API remains one stable router and URL namespace, but its onboarding boundary is implemented by `workspace_onboarding.py`: story interviews, inspiration drafts, rights-safe style-profile analysis, and narrative preferences are registered through a child router. The aggregator retains workspace hydration and the remaining story-resource routes. This is an internal modular-monolith boundary; paths, methods, response schemas, tags, rate-limit templates, and OpenAPI operation identifiers remain unchanged. Further workspace domains may move behind child routers only with the same contract gate.
 
 ### 5.3 Story Engine
 

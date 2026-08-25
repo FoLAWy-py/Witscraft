@@ -8,7 +8,7 @@ Ordinary player-action responses are buffered until a fail-closed OpenAI agency 
 
 ```text
 apps/
-  api/    FastAPI backend, story engine, prompt builder, LLM gateway
+  api/    FastAPI backend with domain routers, story engine, prompt builder, and LLM gateway
   web/    Next.js interactive novel experience with route-private UI and domain API modules
 ```
 
