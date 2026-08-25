@@ -330,6 +330,12 @@ test("player signs in and directs the next scene", async ({ page }) => {
   await expect(activeCharacters).toContainText("Mira");
   await expect(activeCharacters).toContainText("investigator");
   await expect(activeCharacters).toContainText("主角");
+  const currentScene = page.getByRole("region", { name: "当前场景" });
+  await expect(currentScene).toContainText("Archive");
+  await expect(currentScene).toContainText("Find the key");
+  const branches = page.getByRole("region", { name: "分支" });
+  await expect(branches).toContainText("main");
+  await expect(branches).toContainText("当前");
   await expect(page.getByText("The clockwork archive waits for your decision.")).toBeVisible();
   const roadmap = page.getByText("章节路线图", { exact: true });
   await expect(roadmap).toBeVisible();
