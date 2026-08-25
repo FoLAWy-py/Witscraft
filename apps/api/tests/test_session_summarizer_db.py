@@ -19,12 +19,12 @@ from app.db.models import (
 from app.db.session import AsyncSessionLocal, engine as db_engine
 from app.schemas.llm import LLMRequest, LLMResponse
 from app.services.branch_manager import clone_story_branch
+from app.services.story_context_repository import StoryContextRepository
 from app.services.session_summarizer import (
     SUMMARY_PROMPT_VERSION,
     SUMMARY_TRIGGER_USER_REQUESTED,
     generate_session_summary,
 )
-from app.services.story_engine import StoryEngine
 
 
 class FakeSummaryGateway:
@@ -135,9 +135,8 @@ def test_cumulative_summary_lineage_is_branch_scoped_and_idempotent() -> None:
                 session.add(new_message)
                 await session.commit()
 
-                engine = StoryEngine.__new__(StoryEngine)
-                engine.session = session
-                recent = await engine._load_recent_messages(
+                repository = StoryContextRepository(session, user.id)
+                recent = await repository.load_recent_messages(
                     story.id,
                     main_branch.id,
                     after_message_id=first_messages[-1].id,

@@ -13,14 +13,13 @@ from uuid import UUID, uuid4
 
 import anyio
 from fastapi import HTTPException
-from sqlalchemy import and_, case, delete, desc, or_, select, update
+from sqlalchemy import case, delete, desc, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.bootstrap import DEFAULT_BRANCH_ID, DEFAULT_STORY_ID
 from app.db.models import (
     CanonFact,
-    Character,
     GenerationRequest,
     MemoryItem,
     Message,
@@ -31,7 +30,6 @@ from app.db.models import (
     StoryStateSnapshot,
     StorySummary,
     StyleProfile,
-    UserPreference,
     World,
 )
 from app.llm.router import LLMGateway
@@ -39,6 +37,7 @@ from app.schemas.chat import ChatRequest, ChatResponse, StoryState
 from app.schemas.llm import ChatMessage, LLMRequest, LLMResponse
 from app.services.consistency_checker import check_response_consistency
 from app.services.context_assembler import ContextAssembly, assemble_story_context
+from app.services.story_context_repository import StoryContextRepository
 from app.services.embeddings import (
     EmbeddingService,
     cosine_similarity,
@@ -219,6 +218,7 @@ class StoryEngine:
         self.llm_gateway = llm_gateway
         self.session = session
         self.user_id = user_id
+        self.context_repository = StoryContextRepository(session, user_id)
         self.embedding_service = EmbeddingService(
             llm_gateway.settings,
             auditor=llm_gateway.auditor,
@@ -1853,14 +1853,7 @@ class StoryEngine:
         self._active_generation_id = None
 
     async def _get_story(self, story_id: UUID) -> Story:
-        result = await self.session.execute(
-            select(Story).where(Story.id == story_id, Story.user_id == self.user_id).limit(1)
-        )
-        story = result.scalar_one_or_none()
-        if story is not None:
-            return story
-
-        raise HTTPException(status_code=404, detail="Story not found")
+        return await self.context_repository.get_story(story_id)
 
     def _begin_audit_turn(self, story_id: UUID) -> None:
         self.turn_context = TurnContext()
@@ -2210,21 +2203,7 @@ class StoryEngine:
         return cache[normalized]
 
     async def _load_canon_facts(self, story_id: UUID, branch_id: UUID) -> list[str]:
-        result = await self.session.execute(
-            select(CanonFact)
-            .where(
-                CanonFact.story_id == story_id,
-                CanonFact.branch_id == branch_id,
-                CanonFact.is_active.is_(True),
-            )
-            .order_by(
-                case((CanonFact.fact_type == "llm_state_extraction", 0), else_=1),
-                desc(CanonFact.importance),
-                desc(CanonFact.created_at),
-            )
-            .limit(12)
-        )
-        return [fact.content for fact in result.scalars().all()]
+        return await self.context_repository.load_canon_facts(story_id, branch_id)
 
     async def _prepare_extracted_knowledge(
         self,
@@ -2483,43 +2462,13 @@ class StoryEngine:
         return result.scalar_one_or_none() is not None
 
     async def _load_world_context(self, story: Story) -> dict:
-        if story.world_id is None:
-            return {}
-        world = await self.session.get(World, story.world_id)
-        if world is None:
-            return {}
-        return {
-            "name": world.name,
-            "description": world.description or "",
-            "genre": world.genre or "",
-            "rules": world.rules,
-        }
+        return await self.context_repository.load_world_context(story)
 
     async def _load_character_context(self, story: Story) -> dict:
-        if story.main_character_id is None:
-            return {}
-        character = await self.session.get(Character, story.main_character_id)
-        if character is None:
-            return {}
-        persona = character.persona or {}
-        return {
-            "name": character.name,
-            "identity": persona.get("identity", character.description or ""),
-            "personality": persona.get("personality", ["冷静", "戒备", "慢热"]),
-            "goal": persona.get("goal", ""),
-            "secret": persona.get("secret", ""),
-            "speaking_style": character.speaking_style.get("tone", ""),
-            "relationship": character.relationship_to_user.get("status", ""),
-        }
+        return await self.context_repository.load_character_context(story)
 
     async def _load_user_preferences(self, user_id: UUID) -> list[str]:
-        result = await self.session.execute(
-            select(UserPreference)
-            .where(UserPreference.user_id == user_id, UserPreference.is_active.is_(True))
-            .order_by(desc(UserPreference.strength), UserPreference.created_at.asc())
-            .limit(8)
-        )
-        return [preference.content for preference in result.scalars().all()]
+        return await self.context_repository.load_user_preferences()
 
     async def _load_recent_messages(
         self,
@@ -2528,44 +2477,15 @@ class StoryEngine:
         exclude_message_ids: set[UUID] | None = None,
         after_message_id: UUID | None = None,
     ) -> list[dict]:
-        query = select(Message).where(Message.story_id == story_id, Message.branch_id == branch_id)
-        if exclude_message_ids:
-            query = query.where(Message.id.notin_(exclude_message_ids))
-        if after_message_id is not None:
-            covered_message = await self.session.get(Message, after_message_id)
-            if covered_message is not None:
-                query = query.where(
-                    or_(
-                        Message.created_at > covered_message.created_at,
-                        and_(
-                            Message.created_at == covered_message.created_at,
-                            Message.id > covered_message.id,
-                        ),
-                    )
-                )
-        result = await self.session.execute(
-            query.order_by(
-                desc(Message.created_at),
-                desc(Message.id),
-            ).limit(10)
+        return await self.context_repository.load_recent_messages(
+            story_id, branch_id, exclude_message_ids, after_message_id
         )
-        messages = list(reversed(result.scalars().all()))
-        return [{"role": message.role, "content": message.content} for message in messages]
 
     async def _load_latest_summary(self, story_id: UUID, branch_id: UUID) -> StorySummary | None:
-        result = await self.session.execute(
-            select(StorySummary)
-            .where(StorySummary.story_id == story_id, StorySummary.branch_id == branch_id)
-            .order_by(desc(StorySummary.created_at))
-            .limit(1)
-        )
-        return result.scalar_one_or_none()
+        return await self.context_repository.load_latest_summary(story_id, branch_id)
 
     async def _main_character_name(self, story: Story) -> str | None:
-        if story.main_character_id is None:
-            return None
-        character = await self.session.get(Character, story.main_character_id)
-        return character.name if character is not None else None
+        return await self.context_repository.main_character_name(story)
 
     @staticmethod
     def _parse_uuid(value: str | UUID | None, fallback: UUID) -> UUID:

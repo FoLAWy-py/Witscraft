@@ -2,7 +2,7 @@
 
 **Document status:** Production baseline
 
-**Architecture version:** 3.32
+**Architecture version:** 3.33
 
 **Last updated:** 25 August 2026
 
@@ -161,6 +161,8 @@ Context construction is separated into deterministic stages:
 3. Allocate a shared section pool dynamically using conservative token estimation.
 4. Deduplicate current input and previously represented information.
 5. Render a provider-neutral message sequence.
+
+`StoryContextRepository` is the read boundary used by the Story Engine for authenticated story lookup, canon, world and character context, narrative preferences, recent-message windows, latest summaries, and protagonist identity. The engine retains thin private delegates so orchestration tests can replace a context source without mocking SQLAlchemy. Branch fallback remains in the engine because it can create and flush a missing main branch; request-scoped snapshot and memory caches also remain there until their cache lifecycle is extracted with the context service. Generation claims and all other writes remain outside the repository. This separation does not add queries or provider calls to a normal turn.
 
 The current user message appears exactly once as the final user message. Context sections share a deterministic 5,460-token ceiling beneath a 9,000-token input target and fixed render reserve. The allocator protects minimum continuity budgets, redistributes unused capacity up to per-section maxima, and shrinks the pool for a large player message. World, character, state, canon, preferences, custom instructions, cumulative summary, memories, and recent messages all enforce the resulting allocation. Preview evidence includes estimator identity, demand, allocation, selected tokens, authoritative source, dropped counts, and truncation reason for each section.
 

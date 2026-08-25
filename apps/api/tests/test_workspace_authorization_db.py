@@ -16,6 +16,7 @@ from app.db.models import (
     Story,
     StoryBranch,
     User,
+    UserPreference,
     World,
 )
 from app.db.session import AsyncSessionLocal, engine as db_engine
@@ -35,7 +36,7 @@ from app.schemas.chat import (
 from app.embedding_config import EMBEDDING_VECTOR_DIMENSIONS, LOCAL_EMBEDDING_MODEL
 from app.services.embeddings import embedding_content_hash, stored_embedding
 from app.services.memory_embedding_tasks import process_memory_embedding_batch
-from app.services.story_engine import StoryEngine
+from app.services.story_context_repository import StoryContextRepository
 
 
 async def _expect_not_found(awaitable) -> None:
@@ -120,6 +121,16 @@ def test_cross_user_workspace_resource_matrix_is_denied() -> None:
                     for index, (story, branch) in enumerate(zip(stories, branches, strict=True))
                 ]
                 session.add_all(facts)
+                preferences = [
+                    UserPreference(
+                        user_id=user.id,
+                        preference_type="style",
+                        content=f"private-preference-{index}",
+                        strength=5 + index,
+                    )
+                    for index, user in enumerate(users)
+                ]
+                session.add_all(preferences)
                 await session.commit()
 
                 attacker_id = users[0].id
@@ -216,10 +227,11 @@ def test_cross_user_workspace_resource_matrix_is_denied() -> None:
                 assert "private-memory-1" not in response.retrieved_memories
                 assert "private-fact-1" not in response.canon_facts
 
-                engine = object.__new__(StoryEngine)
-                engine.session = session
-                engine.user_id = attacker_id
-                await _expect_not_found(engine._get_story(victim_story.id))
+                repository = StoryContextRepository(session, attacker_id)
+                await _expect_not_found(repository.get_story(victim_story.id))
+                assert await repository.load_user_preferences() == [
+                    "private-preference-0"
+                ]
 
                 await session.refresh(victim_story)
                 await session.refresh(victim_world)
