@@ -31,7 +31,6 @@ from app.db.models import (
 from app.llm.router import LLMGateway
 from app.schemas.chat import ChatRequest, ChatResponse, StoryState
 from app.schemas.llm import ChatMessage, LLMRequest, LLMResponse
-from app.services.consistency_checker import check_response_consistency
 from app.services.context_assembler import ContextAssembly, assemble_story_context
 from app.services.embeddings import EmbeddingService
 from app.services.story_context_repository import StoryContextRepository
@@ -40,6 +39,7 @@ from app.services.story_memory_retrieval import (
     MEMORY_VECTOR_SEARCH_MIN_ITEMS as MEMORY_VECTOR_SEARCH_MIN_ITEMS,
     StoryMemoryRetrievalService,
 )
+from app.services.story_response_post_processor import StoryResponsePostProcessor
 from app.services.story_turn_repository import StoryTurnRepository
 from app.services.player_agency import (
     agency_editor_instruction,
@@ -154,6 +154,10 @@ class StoryEngine:
             session,
             self.embedding_service,
             self.turn_context,
+        )
+        self.response_post_processor = StoryResponsePostProcessor(
+            llm_gateway,
+            _parse_story_choices,
         )
         self._active_generation_id: UUID | None = None
 
@@ -1162,16 +1166,20 @@ class StoryEngine:
         if profile is not None:
             assert_non_reproducing(text, profile.content_hash, profile.features)
 
+    def _response_post_processor(self) -> StoryResponsePostProcessor:
+        service = getattr(self, "response_post_processor", None)
+        if service is None:
+            service = StoryResponsePostProcessor(self.llm_gateway, _parse_story_choices)
+            self.response_post_processor = service
+        return service
+
     def _check_consistency(
         self, response_text: str, state: StoryState, context: ContextAssembly
     ) -> dict:
-        sections = context.preview.get("sections", {})
-        return check_response_consistency(
+        return self._response_post_processor().check_consistency(
             response_text,
             state,
-            sections.get("canon_facts", []),
-            sections.get("character", {}),
-            sections.get("world", {}),
+            context,
         )
 
     async def _ensure_story_choices(
@@ -1181,42 +1189,12 @@ class StoryEngine:
         choices: list[str],
         context: ContextAssembly,
     ) -> list[str]:
-        if interaction_mode != "choices" or len(choices) >= 2:
-            return choices
-        sections = context.preview.get("sections", {})
-        messages = [
-            ChatMessage(
-                role="system",
-                content=(
-                    "你是互动小说选项编辑。根据已经完成的正文生成 3 个简短、具体、互斥的下一步行动选项。"
-                    "选项必须由用户作出决定，不得替用户执行，不得包含自定义、Custom、Other。"
-                    '只返回 JSON 对象：{"choices":["...","...","..."]}。'
-                ),
-            ),
-            ChatMessage(
-                role="developer",
-                content=(
-                    f"用户偏好：{sections.get('user_preferences', [])}\n"
-                    f"小说 Prompt：{sections.get('story_prompt', '')}\n"
-                    f"当前状态：{sections.get('state', {})}"
-                ),
-            ),
-            ChatMessage(role="user", content=f"正文：\n{response_text[-5000:]}"),
-        ]
-        request = self.llm_gateway.request_for_purpose("normal_chat", messages).model_copy(
-            update={
-                "max_output_tokens": 500,
-                "temperature": 0.55,
-                "top_p": 0.88,
-                "response_format": "json",
-                "stream": False,
-            }
+        return await self._response_post_processor().ensure_story_choices(
+            interaction_mode,
+            response_text,
+            choices,
+            context,
         )
-        try:
-            response = await self.llm_gateway.generate(self.llm_gateway.normalize_request(request))
-            return _parse_story_choices(response.text)
-        except Exception:
-            return []
 
     async def _apply_consistency_policy(
         self,
@@ -1225,124 +1203,13 @@ class StoryEngine:
         context: ContextAssembly,
         mode: str,
     ) -> tuple[str, dict, dict]:
-        if mode == "off":
-            check = {
-                "status": "off",
-                "issue_count": 0,
-                "error_count": 0,
-                "warning_count": 0,
-                "highest_severity": None,
-                "issues": [],
-            }
-            return (
-                response_text,
-                check,
-                {
-                    "attempted": False,
-                    "accepted": False,
-                    "reason": "checking_disabled",
-                },
-            )
-
-        initial_check = self._check_consistency(response_text, state, context)
-        initial_error_count = self._consistency_error_count(initial_check)
-        if mode != "auto" or initial_error_count == 0:
-            return (
-                response_text,
-                initial_check,
-                {
-                    "attempted": False,
-                    "accepted": False,
-                    "reason": "manual_review" if initial_error_count else "check_passed",
-                },
-            )
-
-        revision_request = self.llm_gateway.request_for_purpose(
-            "consistency_check",
-            self._build_consistency_revision_messages(response_text, initial_check, context),
+        return await self._response_post_processor().apply_consistency_policy(
+            response_text,
+            state,
+            context,
+            mode,
+            consistency_checker=self._check_consistency,
         )
-        revision_request = self.llm_gateway.normalize_request(
-            revision_request.model_copy(
-                update={
-                    "max_output_tokens": min(max(revision_request.max_output_tokens, 1024), 4096),
-                    "temperature": min(revision_request.temperature, 0.35),
-                    "top_p": min(revision_request.top_p, 0.85),
-                    "stream": False,
-                }
-            )
-        )
-        try:
-            revised_response = await self.llm_gateway.generate(revision_request)
-        except Exception:
-            return (
-                response_text,
-                initial_check,
-                {
-                    "attempted": True,
-                    "accepted": False,
-                    "reason": "revision_failed",
-                    "provider": revision_request.provider,
-                    "model": revision_request.model,
-                    "trigger": "high_severity_local_rule",
-                    "initial_error_count": initial_error_count,
-                    "initial_check": initial_check,
-                },
-            )
-        revised_text = revised_response.text.strip()
-        revised_check = self._check_consistency(revised_text, state, context)
-        final_error_count = self._consistency_error_count(revised_check)
-        accepted = bool(revised_text) and final_error_count == 0
-        return (
-            revised_text if accepted else response_text,
-            revised_check if accepted else initial_check,
-            {
-                "attempted": True,
-                "accepted": accepted,
-                "reason": "accepted_revision" if accepted else "kept_original",
-                "provider": revision_request.provider,
-                "model": revision_request.model,
-                "trigger": "high_severity_local_rule",
-                "initial_error_count": initial_error_count,
-                "final_error_count": final_error_count,
-                "initial_check": initial_check,
-            },
-        )
-
-    @staticmethod
-    def _consistency_error_count(check: dict) -> int:
-        error_count = check.get("error_count")
-        if isinstance(error_count, int) and not isinstance(error_count, bool):
-            return max(error_count, 0)
-        issues = check.get("issues")
-        if not isinstance(issues, list):
-            return 0
-        return sum(isinstance(issue, dict) and issue.get("severity") == "error" for issue in issues)
-
-    def _build_consistency_revision_messages(
-        self,
-        response_text: str,
-        consistency_check: dict,
-        context: ContextAssembly,
-    ) -> list[ChatMessage]:
-        sections = context.preview.get("sections", {})
-        return [
-            ChatMessage(
-                role="system",
-                content="你是小说连续性修订器。只输出修订后的正文，不解释修改过程，不输出 Markdown 标题。",
-            ),
-            ChatMessage(
-                role="developer",
-                content=(
-                    "保留原文的叙事风格、段落节奏和剧情意图，仅修复列出的参数、人物、剧情或世界设定冲突。\n"
-                    f"冲突：{consistency_check['issues']}\n"
-                    f"场景状态：{sections.get('state', {})}\n"
-                    f"角色档案：{sections.get('character', {})}\n"
-                    f"世界规则：{sections.get('world', {})}\n"
-                    f"既定事实：{sections.get('canon_facts', [])}"
-                ),
-            ),
-            ChatMessage(role="user", content=response_text),
-        ]
 
     async def _save_stream_partial(
         self,

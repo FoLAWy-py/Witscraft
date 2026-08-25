@@ -2,7 +2,7 @@
 
 **Document status:** Production baseline
 
-**Architecture version:** 3.40
+**Architecture version:** 3.41
 
 **Last updated:** 26 August 2026
 
@@ -169,6 +169,8 @@ Context construction is separated into deterministic stages:
 `StoryKnowledgeRepository` owns deterministic filtering, normalization, entity tagging, near-duplicate refresh, existence queries, and staging for memories and canon facts extracted after a turn. Every accepted memory and its durable embedding task are added to the same SQLAlchemy transaction; the repository neither calls an embedding provider nor commits or rolls back. The Story Engine commits duplicate refreshes at the existing orchestration boundary and later commits newly staged knowledge together with the completed turn. This preserves authorization preconditions, retry behavior, and account-wide cost accounting while isolating persistence policy from generation orchestration.
 
 `StoryMemoryRetrievalService` owns read-only branch memory retrieval: bounded candidate loading, embedding-contract checks, exact PostgreSQL cosine scores for fixed pgvector rows, legacy-vector fallback, hybrid keyword/entity/importance/recency ranking, and turn-scoped result caching. Query embeddings are created only when the configured candidate threshold and a compatible stored contract both permit semantic retrieval. A normalized query is embedded at most once per turn; direct cache reuse is still reported to the embedding auditor. The Story Engine retains thin delegates for context assembly and evaluation compatibility, but it does not implement ranking or vector-query policy. The service performs no writes and has no commit or rollback authority.
+
+`StoryResponsePostProcessor` owns provider-backed response repair after primary prose generation. Choice repair is skipped for open interaction mode and for any response that already contains at least two valid choices; otherwise it makes one bounded non-streaming `normal_chat` request with a 500-token ceiling and strict JSON output. Consistency remains local-first: off and manual modes make no revision call, warnings remain local, and auto mode makes at most one bounded `consistency_check` request only after a high-severity local error. A typed `ConsistencyPolicyResult` tuple carries the final text, check evidence, and revision evidence back to the orchestrator. The service has no database session or persistence authority; the Story Engine retains provider-call ordering, style-safety rechecks, global per-turn call enforcement, and all transaction boundaries.
 
 The bidirectional chapter/message schema uses named composite foreign keys for tenant and branch scope. `fk_story_chapters_message_scope` is marked `use_alter` in ORM metadata so SQLAlchemy can deterministically sort the otherwise cyclic `messages` and `story_chapters` dependency graph. This is metadata-level DDL ordering only: it does not change the existing PostgreSQL constraint, delete behavior, migration revision, or runtime relationship semantics.
 

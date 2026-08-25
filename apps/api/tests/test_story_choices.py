@@ -3,9 +3,14 @@ import asyncio
 from app.schemas.llm import LLMRequest, LLMResponse
 from app.services.context_assembler import ContextAssembly
 from app.services.story_engine import StoryEngine, split_story_response, visible_stream_story_text
+from app.services.story_response_post_processor import StoryResponsePostProcessor
 
 
 class ChoiceRepairGateway:
+    def __init__(self):
+        self.generate_calls = 0
+        self.last_request = None
+
     def request_for_purpose(self, purpose, messages):
         return LLMRequest(
             provider="deepinfra",
@@ -18,6 +23,8 @@ class ChoiceRepairGateway:
         return request
 
     async def generate(self, request):
+        self.generate_calls += 1
+        self.last_request = request
         return LLMResponse(
             provider="deepinfra",
             model=request.model,
@@ -72,7 +79,8 @@ def test_stream_holds_back_partial_choice_marker() -> None:
 
 def test_choice_mode_repairs_missing_model_options() -> None:
     engine = object.__new__(StoryEngine)
-    engine.llm_gateway = ChoiceRepairGateway()
+    gateway = ChoiceRepairGateway()
+    engine.llm_gateway = gateway
     context = ContextAssembly(
         prompt_messages=[],
         preview={
@@ -89,3 +97,26 @@ def test_choice_mode_repairs_missing_model_options() -> None:
     )
 
     assert choices == ["检查断续语音的时间戳", "联系岸上的信号分析员"]
+    assert isinstance(engine.response_post_processor, StoryResponsePostProcessor)
+    assert gateway.generate_calls == 1
+    assert gateway.last_request.max_output_tokens == 500
+    assert gateway.last_request.response_format == "json"
+    assert gateway.last_request.stream is False
+
+
+def test_choice_repair_skips_provider_for_open_mode_or_existing_choices() -> None:
+    engine = object.__new__(StoryEngine)
+    gateway = ChoiceRepairGateway()
+    engine.llm_gateway = gateway
+    context = ContextAssembly(prompt_messages=[], preview={"sections": {}})
+
+    open_choices = asyncio.run(
+        engine._ensure_story_choices("open", "正文", [], context)
+    )
+    existing = asyncio.run(
+        engine._ensure_story_choices("choices", "正文", ["检查门锁", "退回走廊"], context)
+    )
+
+    assert open_choices == []
+    assert existing == ["检查门锁", "退回走廊"]
+    assert gateway.generate_calls == 0
