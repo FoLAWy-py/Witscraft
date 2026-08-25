@@ -2,7 +2,7 @@
 
 **Document status:** Production baseline
 
-**Architecture version:** 3.34
+**Architecture version:** 3.35
 
 **Last updated:** 25 August 2026
 
@@ -165,6 +165,8 @@ Context construction is separated into deterministic stages:
 `StoryContextRepository` is the read boundary used by the Story Engine for authenticated story lookup, canon, world and character context, narrative preferences, recent-message windows, latest summaries, and protagonist identity. The engine retains thin private delegates so orchestration tests can replace a context source without mocking SQLAlchemy. Branch fallback remains in the engine because it can create and flush a missing main branch; request-scoped snapshot and memory caches also remain there until their cache lifecycle is extracted with the context service. Generation claims and all other writes remain outside the repository. This separation does not add queries or provider calls to a normal turn.
 
 `StoryTurnRepository` stages message lifecycle changes: it creates player messages, creates or updates partial streamed assistant messages, and deletes state, memory, and canon derivatives before regeneration. It deliberately never commits or rolls back. The Story Engine continues to own transaction boundaries, cancellation shielding, generation claims, chapter transitions, post-processing, and provider calls, preserving the ordering guarantees shared by buffered and streamed turns.
+
+`StoryKnowledgeRepository` owns deterministic filtering, normalization, entity tagging, near-duplicate refresh, existence queries, and staging for memories and canon facts extracted after a turn. Every accepted memory and its durable embedding task are added to the same SQLAlchemy transaction; the repository neither calls an embedding provider nor commits or rolls back. The Story Engine commits duplicate refreshes at the existing orchestration boundary and later commits newly staged knowledge together with the completed turn. This preserves authorization preconditions, retry behavior, and account-wide cost accounting while isolating persistence policy from generation orchestration.
 
 The current user message appears exactly once as the final user message. Context sections share a deterministic 5,460-token ceiling beneath a 9,000-token input target and fixed render reserve. The allocator protects minimum continuity budgets, redistributes unused capacity up to per-section maxima, and shrinks the pool for a large player message. World, character, state, canon, preferences, custom instructions, cumulative summary, memories, and recent messages all enforce the resulting allocation. Preview evidence includes estimator identity, demand, allocation, selected tokens, authoritative source, dropped counts, and truncation reason for each section.
 

@@ -10,7 +10,11 @@ from app.config import Settings
 from app.db.models import GenerationRequest, MemoryEmbeddingTask, MemoryItem
 from app.routers.chat import _with_idempotency_header
 from app.schemas.chat import ChatRequest, ChatResponse, StoryState
-from app.services.story_engine import PreparedMemory, StoryEngine
+from app.services.story_engine import StoryEngine
+from app.services.story_knowledge_repository import (
+    PreparedMemory,
+    StoryKnowledgeRepository,
+)
 
 
 class CommitTrackingSession:
@@ -201,12 +205,32 @@ def test_conflicting_idempotency_header_and_body_is_rejected() -> None:
     assert caught.value.status_code == 409
 
 
+def test_knowledge_repository_does_not_own_commit() -> None:
+    session = CommitTrackingSession()
+    repository = StoryKnowledgeRepository(session, embedding_task_max_attempts=3)
+
+    prepared = asyncio.run(
+        repository.prepare_extracted_knowledge(
+            SimpleNamespace(id=uuid4()),
+            SimpleNamespace(id=uuid4()),
+            [],
+            [],
+        )
+    )
+
+    assert prepared == ([], [])
+    assert session.commits == 0
+
+
 def test_knowledge_preparation_does_not_call_embedding_provider() -> None:
     engine = object.__new__(StoryEngine)
     session = CommitTrackingSession()
     embeddings = TransactionCheckingEmbeddings(session)
     engine.session = session
     engine.embedding_service = embeddings
+    engine.knowledge_repository = StoryKnowledgeRepository(
+        session, embedding_task_max_attempts=3
+    )
 
     async def memory_exists(_story_id, _branch_id, content: str) -> bool:
         return content == "already known"
@@ -217,9 +241,9 @@ def test_knowledge_preparation_does_not_call_embedding_provider() -> None:
     async def recent_memories(_story_id, _branch_id):
         return []
 
-    engine._memory_exists = memory_exists
-    engine._canon_fact_exists = fact_exists
-    engine._load_recent_memory_candidates = recent_memories
+    engine.knowledge_repository.memory_exists = memory_exists
+    engine.knowledge_repository.canon_fact_exists = fact_exists
+    engine.knowledge_repository.load_recent_memory_candidates = recent_memories
 
     prepared_memories, prepared_facts = asyncio.run(
         engine._prepare_extracted_knowledge(
@@ -241,6 +265,7 @@ def test_knowledge_preparation_does_not_call_embedding_provider() -> None:
     assert prepared_memories[0].entity_tags == ("Mira", "sealed archive")
     assert prepared_facts == ["new fact"]
     assert embeddings.calls == 0
+    assert session.commits == 1
 
 
 def test_low_value_and_near_duplicate_memories_skip_embedding() -> None:
@@ -249,6 +274,9 @@ def test_low_value_and_near_duplicate_memories_skip_embedding() -> None:
     embeddings = TransactionCheckingEmbeddings(session)
     engine.session = session
     engine.embedding_service = embeddings
+    engine.knowledge_repository = StoryKnowledgeRepository(
+        session, embedding_task_max_attempts=3
+    )
 
     async def memory_exists(_story_id, _branch_id, _content: str) -> bool:
         return False
@@ -267,9 +295,9 @@ def test_low_value_and_near_duplicate_memories_skip_embedding() -> None:
     async def recent_memories(_story_id, _branch_id):
         return [existing]
 
-    engine._memory_exists = memory_exists
-    engine._canon_fact_exists = fact_exists
-    engine._load_recent_memory_candidates = recent_memories
+    engine.knowledge_repository.memory_exists = memory_exists
+    engine.knowledge_repository.canon_fact_exists = fact_exists
+    engine.knowledge_repository.load_recent_memory_candidates = recent_memories
 
     prepared_memories, _ = asyncio.run(
         engine._prepare_extracted_knowledge(
@@ -298,6 +326,9 @@ def test_near_duplicate_filter_preserves_similar_events_for_different_entities()
     embeddings = TransactionCheckingEmbeddings(session)
     engine.session = session
     engine.embedding_service = embeddings
+    engine.knowledge_repository = StoryKnowledgeRepository(
+        session, embedding_task_max_attempts=3
+    )
 
     async def never_exists(_story_id, _branch_id, _content: str) -> bool:
         return False
@@ -310,9 +341,9 @@ def test_near_duplicate_filter_preserves_similar_events_for_different_entities()
             )
         ]
 
-    engine._memory_exists = never_exists
-    engine._canon_fact_exists = never_exists
-    engine._load_recent_memory_candidates = recent_memories
+    engine.knowledge_repository.memory_exists = never_exists
+    engine.knowledge_repository.canon_fact_exists = never_exists
+    engine.knowledge_repository.load_recent_memory_candidates = recent_memories
 
     prepared_memories, _ = asyncio.run(
         engine._prepare_extracted_knowledge(
@@ -347,6 +378,12 @@ def test_prepared_memory_quality_metadata_is_persisted() -> None:
         entity_tags=("Mira", "sealed archive"),
     )
     engine.embedding_service = SimpleNamespace(settings=Settings(dry_run_llm=True))
+    engine.knowledge_repository = StoryKnowledgeRepository(
+        session,
+        embedding_task_max_attempts=(
+            engine.embedding_service.settings.memory_embedding_task_max_attempts
+        ),
+    )
 
     added = engine._add_prepared_memories(
         story,
