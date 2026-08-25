@@ -15,6 +15,7 @@ from app.services.embeddings import (
     stored_embedding,
 )
 from app.services.story_engine import MEMORY_VECTOR_SEARCH_MIN_ITEMS, StoryEngine
+from app.services.story_memory_retrieval import StoryMemoryRetrievalService
 from app.services.turn_context import TurnContext
 
 
@@ -94,7 +95,22 @@ def _engine(memories, *, threshold=MEMORY_VECTOR_SEARCH_MIN_ITEMS) -> tuple[Stor
     embedding_service = CountingEmbeddingService(threshold=threshold)
     engine.embedding_service = embedding_service
     engine.turn_context = TurnContext()
+    engine.memory_retrieval_service = StoryMemoryRetrievalService(
+        engine.session,
+        embedding_service,
+        engine.turn_context,
+    )
     return engine, embedding_service
+
+
+def test_engine_memory_delegate_uses_extracted_read_service() -> None:
+    engine, _embedding_service = _engine([])
+
+    result = asyncio.run(engine._load_memories(uuid4(), uuid4(), "寻找钥匙"))
+
+    assert result == []
+    assert isinstance(engine.memory_retrieval_service, StoryMemoryRetrievalService)
+    assert engine.session.execute_calls == 1
 
 
 def _memory(index: int, embedding=None):

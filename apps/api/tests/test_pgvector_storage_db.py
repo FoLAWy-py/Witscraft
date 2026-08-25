@@ -8,7 +8,7 @@ from app.config import Settings
 from app.db.models import MemoryItem, Story, StoryBranch, User, World
 from app.db.session import AsyncSessionLocal, engine as db_engine
 from app.embedding_config import EMBEDDING_VECTOR_DIMENSIONS
-from app.services import story_engine as story_engine_module
+from app.services import story_memory_retrieval as memory_retrieval_module
 from app.services.embeddings import EmbeddingService, stored_embedding
 from app.services.story_engine import StoryEngine
 from app.services.turn_context import TurnContext
@@ -153,7 +153,7 @@ def test_hybrid_retrieval_uses_exact_database_cosine(monkeypatch) -> None:
                     raise AssertionError("fixed pgvector rows must not use Python cosine")
 
                 monkeypatch.setattr(
-                    story_engine_module,
+                    memory_retrieval_module,
                     "cosine_similarity",
                     reject_python_vector_scoring,
                 )

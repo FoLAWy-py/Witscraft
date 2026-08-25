@@ -2,9 +2,9 @@
 
 **Document status:** Production baseline
 
-**Architecture version:** 3.39
+**Architecture version:** 3.40
 
-**Last updated:** 25 August 2026
+**Last updated:** 26 August 2026
 
 **System owner:** Witscraft Engineering
 
@@ -167,6 +167,8 @@ Context construction is separated into deterministic stages:
 `StoryTurnRepository` stages message lifecycle changes: it creates player messages, creates or updates partial streamed assistant messages, and deletes state, memory, and canon derivatives before regeneration. It deliberately never commits or rolls back. The Story Engine continues to own transaction boundaries, cancellation shielding, generation claims, chapter transitions, post-processing, and provider calls, preserving the ordering guarantees shared by buffered and streamed turns.
 
 `StoryKnowledgeRepository` owns deterministic filtering, normalization, entity tagging, near-duplicate refresh, existence queries, and staging for memories and canon facts extracted after a turn. Every accepted memory and its durable embedding task are added to the same SQLAlchemy transaction; the repository neither calls an embedding provider nor commits or rolls back. The Story Engine commits duplicate refreshes at the existing orchestration boundary and later commits newly staged knowledge together with the completed turn. This preserves authorization preconditions, retry behavior, and account-wide cost accounting while isolating persistence policy from generation orchestration.
+
+`StoryMemoryRetrievalService` owns read-only branch memory retrieval: bounded candidate loading, embedding-contract checks, exact PostgreSQL cosine scores for fixed pgvector rows, legacy-vector fallback, hybrid keyword/entity/importance/recency ranking, and turn-scoped result caching. Query embeddings are created only when the configured candidate threshold and a compatible stored contract both permit semantic retrieval. A normalized query is embedded at most once per turn; direct cache reuse is still reported to the embedding auditor. The Story Engine retains thin delegates for context assembly and evaluation compatibility, but it does not implement ranking or vector-query policy. The service performs no writes and has no commit or rollback authority.
 
 The bidirectional chapter/message schema uses named composite foreign keys for tenant and branch scope. `fk_story_chapters_message_scope` is marked `use_alter` in ORM metadata so SQLAlchemy can deterministically sort the otherwise cyclic `messages` and `story_chapters` dependency graph. This is metadata-level DDL ordering only: it does not change the existing PostgreSQL constraint, delete behavior, migration revision, or runtime relationship semantics.
 
