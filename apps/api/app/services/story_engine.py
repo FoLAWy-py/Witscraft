@@ -13,7 +13,7 @@ from uuid import UUID, uuid4
 
 import anyio
 from fastapi import HTTPException
-from sqlalchemy import case, delete, desc, or_, select, update
+from sqlalchemy import case, desc, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -38,6 +38,7 @@ from app.schemas.llm import ChatMessage, LLMRequest, LLMResponse
 from app.services.consistency_checker import check_response_consistency
 from app.services.context_assembler import ContextAssembly, assemble_story_context
 from app.services.story_context_repository import StoryContextRepository
+from app.services.story_turn_repository import StoryTurnRepository
 from app.services.embeddings import (
     EmbeddingService,
     cosine_similarity,
@@ -219,6 +220,7 @@ class StoryEngine:
         self.session = session
         self.user_id = user_id
         self.context_repository = StoryContextRepository(session, user_id)
+        self.turn_repository = StoryTurnRepository(session)
         self.embedding_service = EmbeddingService(
             llm_gateway.settings,
             auditor=llm_gateway.auditor,
@@ -252,17 +254,12 @@ class StoryEngine:
         )
         user_message: Message | None = None
         if target_message is None:
-            user_message = Message(
-                story_id=story.id,
-                branch_id=branch.id,
-                role="user",
-                chapter_id=chapter.id if chapter is not None else None,
-                content=request.message,
-                meta={"author": "你"},
-                created_at=datetime.now(timezone.utc),
+            user_message = await self.turn_repository.create_user_message(
+                story.id,
+                branch.id,
+                request.message,
+                chapter.id if chapter is not None else None,
             )
-            self.session.add(user_message)
-            await self.session.flush()
             generation.user_message_id = user_message.id
             await self.session.commit()
 
@@ -524,17 +521,12 @@ class StoryEngine:
             return
         self._begin_audit_turn(story.id)
 
-        user_message = Message(
-            story_id=story.id,
-            branch_id=branch.id,
-            role="user",
-            chapter_id=chapter.id if chapter is not None else None,
-            content=request.message,
-            meta={"author": "你"},
-            created_at=datetime.now(timezone.utc),
+        user_message = await self.turn_repository.create_user_message(
+            story.id,
+            branch.id,
+            request.message,
+            chapter.id if chapter is not None else None,
         )
-        self.session.add(user_message)
-        await self.session.flush()
         generation.user_message_id = user_message.id
         await self.session.commit()
 
@@ -1180,15 +1172,7 @@ class StoryEngine:
         )
 
     async def _delete_message_derivatives(self, message_id: UUID) -> None:
-        await self.session.execute(
-            delete(StoryStateSnapshot).where(StoryStateSnapshot.message_id == message_id)
-        )
-        await self.session.execute(
-            delete(MemoryItem).where(MemoryItem.source_message_id == message_id)
-        )
-        await self.session.execute(
-            delete(CanonFact).where(CanonFact.source_message_id == message_id)
-        )
+        await self.turn_repository.delete_message_derivatives(message_id)
 
     async def _assemble_context(
         self,
@@ -1439,22 +1423,13 @@ class StoryEngine:
         partial_text: str,
         chapter: StoryChapter | None = None,
     ) -> Message:
-        if assistant_message is None:
-            assistant_message = Message(
-                story_id=story.id,
-                branch_id=branch.id,
-                role="assistant",
-                chapter_id=chapter.id if chapter is not None else None,
-                content=partial_text,
-                meta={"author": "叙事引擎", "partial": True, "stream": True},
-                created_at=datetime.now(timezone.utc),
-            )
-            self.session.add(assistant_message)
-            await self.session.flush()
-        else:
-            assistant_message.content = partial_text
-            assistant_message.chapter_id = chapter.id if chapter is not None else None
-            assistant_message.meta = {"author": "叙事引擎", "partial": True, "stream": True}
+        assistant_message = await self.turn_repository.upsert_partial_assistant_message(
+            story.id,
+            branch.id,
+            partial_text,
+            assistant_message,
+            chapter.id if chapter is not None else None,
+        )
         try:
             await self.session.commit()
         except asyncio.CancelledError:
@@ -1473,22 +1448,13 @@ class StoryEngine:
         assistant_message: Message | None = None,
         chapter: StoryChapter | None = None,
     ) -> None:
-        if assistant_message is None:
-            assistant_message = Message(
-                story_id=story.id,
-                branch_id=branch.id,
-                role="assistant",
-                chapter_id=chapter.id if chapter is not None else None,
-                content=partial_text,
-                meta={"author": "叙事引擎", "partial": True, "stream": True},
-                created_at=datetime.now(timezone.utc),
-            )
-            self.session.add(assistant_message)
-            await self.session.flush()
-        else:
-            assistant_message.content = partial_text
-            assistant_message.chapter_id = chapter.id if chapter is not None else None
-            assistant_message.meta = {"author": "叙事引擎", "partial": True, "stream": True}
+        await self.turn_repository.upsert_partial_assistant_message(
+            story.id,
+            branch.id,
+            partial_text,
+            assistant_message,
+            chapter.id if chapter is not None else None,
+        )
         await self.session.commit()
 
     async def _persist_completed_stream(
