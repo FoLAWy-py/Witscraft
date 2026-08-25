@@ -4,36 +4,8 @@ from app.routers.workspace_onboarding import (
     _finalize_story_interview,
     _story_interview_missing_fields,
 )
-from app.main import app
 from app.schemas.chat import StoryInterviewDraft, StoryInterviewResponse, StoryState
 from app.services.context_assembler import assemble_story_context
-
-
-def test_onboarding_router_preserves_public_openapi_contract() -> None:
-    schema = app.openapi()
-    expected_operations = {
-        "/api/workspace/style-profiles": {
-            "post": "analyze_style_profile_api_workspace_style_profiles_post"
-        },
-        "/api/workspace/story-draft": {
-            "post": "generate_story_draft_api_workspace_story_draft_post"
-        },
-        "/api/workspace/story-interview": {
-            "post": "continue_story_interview_api_workspace_story_interview_post"
-        },
-        "/api/workspace/story-interview/stream": {
-            "post": "stream_story_interview_api_workspace_story_interview_stream_post"
-        },
-        "/api/workspace/preferences": {
-            "get": "get_user_preferences_api_workspace_preferences_get",
-            "put": "update_user_preferences_api_workspace_preferences_put",
-        },
-    }
-
-    for path, methods in expected_operations.items():
-        assert {
-            method: schema["paths"][path][method]["operationId"] for method in methods
-        } == methods
 
 
 def _complete_draft(**overrides) -> StoryInterviewDraft:

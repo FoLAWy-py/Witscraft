@@ -19,16 +19,11 @@ from app.db.models import (
     World,
 )
 from app.db.session import AsyncSessionLocal, engine as db_engine
-from app.routers.workspace import (
-    export_story,
-    update_branch,
-    update_canon_fact,
-    update_character,
-    update_memory,
-    update_story,
-    update_world,
-    workspace,
-)
+from app.routers.workspace_branches import export_story, update_branch
+from app.routers.workspace_entities import update_character, update_world
+from app.routers.workspace_memory import update_canon_fact, update_memory
+from app.routers.workspace_stories import update_story
+from app.routers.workspace_support import workspace
 from app.schemas.chat import (
     UpdateBranchRequest,
     UpdateCanonFactRequest,

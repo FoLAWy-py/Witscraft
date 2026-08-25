@@ -6,7 +6,8 @@ from fastapi import HTTPException
 from starlette.requests import Request
 
 from app.config import Settings
-from app.routers.workspace import create_story, create_world, set_story_world
+from app.routers.workspace_entities import create_world, set_story_world
+from app.routers.workspace_stories import create_story
 from app.schemas.chat import CreateStoryRequest, SetStoryWorldRequest, UpdateWorldRequest
 
 

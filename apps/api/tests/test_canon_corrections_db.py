@@ -8,7 +8,7 @@ from sqlalchemy import delete, func, select
 
 from app.db.models import CanonFact, ModelCall, Story, StoryBranch, StoryChapter, User
 from app.db.session import AsyncSessionLocal, engine as db_engine
-from app.routers.workspace import update_canon_fact
+from app.routers.workspace_memory import update_canon_fact
 from app.schemas.chat import UpdateCanonFactRequest
 from app.services.canon_corrections import CanonCorrectionError, correct_canon_fact
 

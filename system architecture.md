@@ -2,7 +2,7 @@
 
 **Document status:** Production baseline
 
-**Architecture version:** 3.31
+**Architecture version:** 3.32
 
 **Last updated:** 25 August 2026
 
@@ -134,7 +134,7 @@ FastAPI routers define six principal API areas:
 | `quota` | Authenticated personal weekly usage and reset boundary |
 | `admin` | Role-protected account usage overview and global quota reset |
 
-Routers perform protocol validation and authorization entry checks. Domain coordination remains in services so persistence and generation rules are not duplicated across endpoints. The public `workspace` API remains one stable router and URL namespace, but its onboarding boundary is implemented by `workspace_onboarding.py`: story interviews, inspiration drafts, rights-safe style-profile analysis, and narrative preferences are registered through a child router. The aggregator retains workspace hydration and the remaining story-resource routes. This is an internal modular-monolith boundary; paths, methods, response schemas, tags, rate-limit templates, and OpenAPI operation identifiers remain unchanged. Further workspace domains may move behind child routers only with the same contract gate.
+Routers perform protocol validation and authorization entry checks. Domain coordination remains in services so persistence and generation rules are not duplicated across endpoints. The public `workspace` API remains one stable router and URL namespace, while its implementation is divided into child routers for onboarding/preferences, story lifecycle, branches/summaries/exports, worlds/characters, and memory/canon. `workspace_support.py` owns authorized workspace hydration and the shared story/branch ownership-query helpers; the 17-line aggregator only composes those boundaries and registers `GET /workspace`. This is an internal modular-monolith boundary: paths, methods, response schemas, tags, rate-limit templates, and OpenAPI operation identifiers remain unchanged. A deterministic contract test pins all 26 workspace method/path/operation triples, while PostgreSQL integration tests remain authoritative for ownership and transaction behavior.
 
 ### 5.3 Story Engine
 
