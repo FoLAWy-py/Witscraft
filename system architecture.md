@@ -2,7 +2,7 @@
 
 **Document status:** Production baseline
 
-**Architecture version:** 3.35
+**Architecture version:** 3.36
 
 **Last updated:** 25 August 2026
 
@@ -167,6 +167,8 @@ Context construction is separated into deterministic stages:
 `StoryTurnRepository` stages message lifecycle changes: it creates player messages, creates or updates partial streamed assistant messages, and deletes state, memory, and canon derivatives before regeneration. It deliberately never commits or rolls back. The Story Engine continues to own transaction boundaries, cancellation shielding, generation claims, chapter transitions, post-processing, and provider calls, preserving the ordering guarantees shared by buffered and streamed turns.
 
 `StoryKnowledgeRepository` owns deterministic filtering, normalization, entity tagging, near-duplicate refresh, existence queries, and staging for memories and canon facts extracted after a turn. Every accepted memory and its durable embedding task are added to the same SQLAlchemy transaction; the repository neither calls an embedding provider nor commits or rolls back. The Story Engine commits duplicate refreshes at the existing orchestration boundary and later commits newly staged knowledge together with the completed turn. This preserves authorization preconditions, retry behavior, and account-wide cost accounting while isolating persistence policy from generation orchestration.
+
+The bidirectional chapter/message schema uses named composite foreign keys for tenant and branch scope. `fk_story_chapters_message_scope` is marked `use_alter` in ORM metadata so SQLAlchemy can deterministically sort the otherwise cyclic `messages` and `story_chapters` dependency graph. This is metadata-level DDL ordering only: it does not change the existing PostgreSQL constraint, delete behavior, migration revision, or runtime relationship semantics.
 
 The current user message appears exactly once as the final user message. Context sections share a deterministic 5,460-token ceiling beneath a 9,000-token input target and fixed render reserve. The allocator protects minimum continuity budgets, redistributes unused capacity up to per-section maxima, and shrinks the pool for a large player message. World, character, state, canon, preferences, custom instructions, cumulative summary, memories, and recent messages all enforce the resulting allocation. Preview evidence includes estimator identity, demand, allocation, selected tokens, authoritative source, dropped counts, and truncation reason for each section.
 

@@ -344,6 +344,7 @@ class StoryChapter(Base, TimestampMixin):
             ["story_id", "branch_id", "message_id"],
             ["messages.story_id", "messages.branch_id", "messages.id"],
             name="fk_story_chapters_message_scope",
+            use_alter=True,
         ),
         Index(
             "ix_story_chapters_story_branch_status",
