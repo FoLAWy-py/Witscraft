@@ -323,6 +323,13 @@ test("player signs in and directs the next scene", async ({ page }) => {
   await page.getByRole("button", { name: "进入小说" }).click();
 
   await expect(page.getByText("The Clockwork Key", { exact: true }).first()).toBeVisible();
+  const currentWorld = page.getByRole("region", { name: "当前世界" });
+  await expect(currentWorld).toContainText("The Archive");
+  await expect(currentWorld).toContainText("这套世界观仅属于当前小说。");
+  const activeCharacters = page.getByRole("region", { name: "活跃角色" });
+  await expect(activeCharacters).toContainText("Mira");
+  await expect(activeCharacters).toContainText("investigator");
+  await expect(activeCharacters).toContainText("主角");
   await expect(page.getByText("The clockwork archive waits for your decision.")).toBeVisible();
   const roadmap = page.getByText("章节路线图", { exact: true });
   await expect(roadmap).toBeVisible();
